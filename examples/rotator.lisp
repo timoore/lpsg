@@ -1,0 +1,225 @@
+;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
+;;;
+;;; Copyright (c) 2004, Oliver Markovic <entrox@entrox.org>
+;;;   All rights reserved.
+;;;
+;;; Redistribution and use in source and binary forms, with or without
+;;; modification, are permitted provided that the following conditions are met:
+;;;
+;;;  o Redistributions of source code must retain the above copyright notice,
+;;;    this list of conditions and the following disclaimer.
+;;;  o Redistributions in binary form must reproduce the above copyright
+;;;    notice, this list of conditions and the following disclaimer in the
+;;;    documentation and/or other materials provided with the distribution.
+;;;  o Neither the name of the author nor the names of the contributors may be
+;;;    used to endorse or promote products derived from this software without
+;;;    specific prior written permission.
+;;;
+;;; THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+;;; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+;;; IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+;;; ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+;;; LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+;;; CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+;;; SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+;;; INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+;;; CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+;;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+;;; POSSIBILITY OF SUCH DAMAGE.
+;;;
+;;; Demo program copied from shader-vao.lisp in the cl-opengl sources.
+
+(in-package #:lpsg-examples)
+
+(defclass rotator (glut:window)
+  ((renderer :accessor renderer)
+   (vs :accessor vertex-shader)
+   (fs :accessor fragment-shader)
+   (va :accessor vertex-array)
+   (program :accessor program)
+   (angle :accessor angle :initform 0.0)) 
+  (:default-initargs :width 500 :height 500 :pos-x 100 :pos-y 100
+		     :mode '(:double :rgb :depth) :title "shader-vao.lisp"
+		     :tick-interval (round 1000 60)))
+
+(defvar *shader-vao-vertex-program*
+  "#version 330
+
+// The location is 0 because that's the vertex attribute we associate with vertex positions.
+layout (location = 0) in vec3 in_Position;
+
+uniform mat4 projectionMatrix;
+uniform float angle;
+
+// This is interpolated and used in the fragment shader.
+smooth out vec2 pos;
+
+void main()
+{
+  mat2 rotationMatrix = mat2(cos(angle), sin(angle), -sin(angle), cos(angle));
+  float scaleFactor = 1.0 + 0.5 * sin(1.75 * angle);
+  vec2 vertPos = scaleFactor * rotationMatrix * in_Position.xy;
+  pos = vertPos * 5.0;
+
+  gl_Position = projectionMatrix * vec4(vertPos, 0.0, 1.0); 
+} 
+")
+
+(defvar *shader-vao-fragment-program*
+  "#version 330
+
+out vec4 out_Color;
+smooth in vec2 pos;
+
+uniform float angle;
+
+void main() 
+{
+  mat2 rotationMatrix = mat2( cos(angle), sin(angle), -sin(angle), cos(angle) );
+  vec2 rpos = mod(rotationMatrix * pos, 2.0 );
+  
+  if ((rpos.x > 1.0 && rpos.y > 1.0 ) || (rpos.x < 1.0 && rpos.y < 1.0))
+    out_Color = vec4(0.1, 0.1, 0.1, 1.0); 
+  else
+    out_Color = vec4(0.5, 0.5, 0.7, 1.0);
+} 
+")
+
+;;; Initialization 
+
+(gl:define-gl-array-format position
+  (gl:vertex :type :float :components (x y z)))
+
+(defun array-setup (p)
+  (gl:enable-vertex-attrib-array 0)
+  (gl:vertex-attrib-pointer 0 3 :float nil 0 p))
+
+;;; First, we create buffers for our vertex and index
+;;; data. Then, we create the vertex array object that we actually use
+;;; for rendering directly. Finally, we load the shader objects.
+(defmethod glut:display-window :before ((w rotator))
+  ;; An array buffer can be used to store verex position, colors,
+  ;; normals, or other data. We need to allocate an GL array, copy the
+  ;; data to the array, and tell OpenGL that the buffers data comes
+  ;; from this GL array. Like most OpenGL state objects, we bind the
+  ;; buffer before we can make changes to its state.
+  (unless (gl::features-present-p (>= :glsl-version 3.3))
+    (glut:destroy-current-window)
+    (return-from glut:display-window nil))
+  (setf (renderer w) (make-instance 'lpsg:renderer))
+  (let ((arr (gl:alloc-gl-array :float 12))
+	(verts #(-0.5 -0.5 0.0 
+		 -0.5 0.5 0.0 
+		 0.5 -0.5 0.0 
+		 0.5 0.5 0.0))
+        (iarr (gl:alloc-gl-array :unsigned-short 6))
+	(indexes #(0 2 1 1 2 3)))
+    (dotimes (i (length verts))
+      (setf (gl:glaref arr i) (aref verts i)))
+    (dotimes (i (length indexes))
+      (setf (gl:glaref iarr i) (aref indexes i)))
+    (lpsg:add-bundle
+     (renderer w)
+     (make-instance 'lpsg:render-bundle
+                    :geometry (make-instance 'lpsg:geometry
+                                             :mode :triangles
+                                             :number-vertices 6
+                                             :indices iarr
+                                             :vertex-attributes #'array-setup
+                                             :vertex-data arr))))
+  
+  ;; A program object is a collection of shader objects to be used
+  ;; together in a single pipeline for rendering objects. To create a
+  ;; program, you first create the individual shaders. Then you attach
+  ;; the shaders to the program and link the program together.
+  (let ((vs (gl:create-shader :vertex-shader))
+	(fs (gl:create-shader :fragment-shader)))
+    (setf (vertex-shader w) vs)
+    (setf (fragment-shader w) fs)
+    (gl:shader-source vs *shader-vao-vertex-program*)
+    (gl:compile-shader vs)
+    (gl:shader-source fs *shader-vao-fragment-program*)
+    (gl:compile-shader fs)
+    ;; If the shader doesn't compile, you can print errors with:
+    ;; (print (gl:get-shader-info-log vs))
+    ;; (print (gl:get-shader-info-log fs))
+
+    (setf (program w) (gl:create-program))
+    ;; You can attach the same shader to multiple different programs.
+    (gl:attach-shader (program w) vs)
+    (gl:attach-shader (program w) fs)
+    ;; Don't forget to link the program after attaching the
+    ;; shaders. This step actually puts the attached shader together
+    ;; to form the program.
+    (gl:link-program (program w))
+    ;; If we want to render using this program object, or add
+    ;; uniforms, we need to use the program. This is similar to
+    ;; binding a buffer.
+    (gl:use-program (program w))))
+
+(defmethod glut:tick ((w rotator))
+  (let ((seconds-per-revolution 6)) 
+    (incf  (angle w)
+	   (/ (* 2 pi) (* 60 seconds-per-revolution))))
+  (gl:uniformf (gl:get-uniform-location (program w) "angle") (angle w))
+  (glut:post-redisplay))
+
+(defmethod glut:display ((w rotator))
+  (gl:clear-color 0.0 0.0 0.2 1.0)
+  (gl:clear :color-buffer-bit :depth-buffer-bit)
+  
+  ;; Since we never use any other program object, this is unnecessary
+  ;; in this program. Typically, though, you'll have multiple program
+  ;; objects, so you'll need to 'use' each one to activate it.
+  (gl:use-program (program w))
+  
+  (lpsg:draw-render-groups (renderer w))
+  (glut:swap-buffers))
+
+(defmethod glut:reshape ((w rotator) width height)
+  (gl:viewport 0 0 width height)
+  (gl:matrix-mode :projection)
+  (gl:load-identity)
+  ;; Ensure that projection matrix ratio always matches the window size ratio,
+  ;; so the polygon will always look square.
+  (let ((right (max (float (/ width height)) 1.0))
+	(top (max (float (/ height width)) 1.0)))
+    (glu:ortho-2d (- right) right (- top) top))
+  (when (program w)
+      (let ((proj-mat (gl:get-float :projection-matrix)))
+	(gl:uniform-matrix 
+	 (gl:get-uniform-location (program w) "projectionMatrix") 
+	 4 
+	 (vector proj-mat))))
+  (gl:matrix-mode :modelview)
+  (gl:load-identity))
+
+(defmethod glut:keyboard ((w rotator) key x y)
+  (declare (ignore x y))
+  (case key
+    (#\Esc (glut:destroy-current-window))))
+
+;; Cleanup.
+;; Most of the objects we created have analogous deletion function.
+(defmethod glut:close ((w rotator))
+  ;; Note: It doesn't matter whether we delete the program or the
+  ;; linked shaders first. If a shader is linked to a program, the
+  ;; shader isn't destroyed until after the program is
+  ;; destroyed. Similarly, if the program is destroyed, the shaders
+  ;; are detached.
+  (when (slot-boundp w 'vs)
+   (gl:delete-shader (vertex-shader w)))
+  (when (slot-boundp w 'fs)
+    (gl:delete-shader (fragment-shader w)))
+  (when (slot-boundp w 'program)
+   (gl:delete-program (program w)))
+  (lpsg:close-renderer (renderer w)))
+
+
+(defun rotator ()
+  (let ((w (make-instance 'rotator)))
+    (unwind-protect
+         (glut:display-window w)
+      (when (not (glut::destroyed w))
+         (setf (glut::destroyed w) t)
+         (glut:destroy-window (glut:id w))))))
