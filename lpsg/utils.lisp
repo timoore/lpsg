@@ -27,17 +27,24 @@
 ;;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ;;; POSSIBILITY OF SUCH DAMAGE.
 
-(defpackage #:lpsg
-  (:use #:cl #:gl)
-  (:export
-   #:render-bundle
-   #:geometry
-   #:renderer
-   #:close-renderer
-   #:add-bundle
-   #:update-bundle
-   #:draw
-   #:draw-render-groups
-   ;; utilities
-   #:ortho-matrix
-   ))
+(in-package #:lpsg)
+
+(defun ortho-matrix (left right bottom top near far)
+  (let ((result (make-array '(4 4) :element-type 'single-float)))
+    (setf (aref result 0 0) (/ 2.0 (- right left)))
+    (setf (aref result 0 1) 0.0)
+    (setf (aref result 0 2) 0.0)
+    (setf (aref result 0 3) 0.0)
+    (setf (aref result 1 0) 0.0)
+    (setf (aref result 1 1) (/ 2.0 (- top bottom)))
+    (setf (aref result 1 2) 0.0)
+    (setf (aref result 1 3) 0.0)
+    (setf (aref result 2 0) 0.0)
+    (setf (aref result 2 1) 0.0)
+    (setf (aref result 2 2) (/ -2.0 (- far near)))
+    (setf (aref result 2 3) 0.0)
+    (setf (aref result 3 0) (- (/ (+ right left) (- right left))))
+    (setf (aref result 3 1) (- (/ (+ top bottom) (- top bottom))))
+    (setf (aref result 3 2) (- (/ (+ far near) (- far near))))
+    (setf (aref result 3 3) 1.0)
+    result))

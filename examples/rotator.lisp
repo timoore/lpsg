@@ -37,9 +37,9 @@
    (fs :accessor fragment-shader)
    (va :accessor vertex-array)
    (program :accessor program)
-   (angle :accessor angle :initform 0.0)) 
+   (angle :accessor angle :initform 0.0))
   (:default-initargs :width 500 :height 500 :pos-x 100 :pos-y 100
-		     :mode '(:double :rgb :depth) :title "shader-vao.lisp"
+		     :mode '(:double :rgb :depth) :title "rotator.lisp"
 		     :tick-interval (round 1000 60)))
 
 (defvar *shader-vao-vertex-program*
@@ -87,22 +87,12 @@ void main()
 
 ;;; Initialization 
 
-(gl:define-gl-array-format position
-  (gl:vertex :type :float :components (x y z)))
-
 (defun array-setup (p)
   (gl:enable-vertex-attrib-array 0)
   (gl:vertex-attrib-pointer 0 3 :float nil 0 p))
 
-;;; First, we create buffers for our vertex and index
-;;; data. Then, we create the vertex array object that we actually use
-;;; for rendering directly. Finally, we load the shader objects.
 (defmethod glut:display-window :before ((w rotator))
-  ;; An array buffer can be used to store verex position, colors,
-  ;; normals, or other data. We need to allocate an GL array, copy the
-  ;; data to the array, and tell OpenGL that the buffers data comes
-  ;; from this GL array. Like most OpenGL state objects, we bind the
-  ;; buffer before we can make changes to its state.
+  ;; Create a bundle and fill it with vertex attributes like position, etc.
   (unless (gl::features-present-p (>= :glsl-version 3.3))
     (glut:destroy-current-window)
     (return-from glut:display-window nil))
@@ -178,22 +168,18 @@ void main()
 
 (defmethod glut:reshape ((w rotator) width height)
   (gl:viewport 0 0 width height)
-  (gl:matrix-mode :projection)
-  (gl:load-identity)
   ;; Ensure that projection matrix ratio always matches the window size ratio,
   ;; so the polygon will always look square.
-  (let ((right (max (float (/ width height)) 1.0))
-	(top (max (float (/ height width)) 1.0)))
-    (glu:ortho-2d (- right) right (- top) top))
-  (when (program w)
-      (let ((proj-mat (gl:get-float :projection-matrix)))
-	(gl:uniform-matrix 
-	 (gl:get-uniform-location (program w) "projectionMatrix") 
-	 4 
-	 (vector proj-mat))))
-  (gl:matrix-mode :modelview)
-  (gl:load-identity))
-
+  (let* ((right (max (float (/ width height)) 1.0))
+         (top (max (float (/ height width)) 1.0))
+         (ortho-mat (lpsg:ortho-matrix (- right) right (- top) top -1.0 1.0)))
+    (when (program w)
+      (gl:uniform-matrix 
+       (gl:get-uniform-location (program w) "projectionMatrix") 
+       4 
+       (vector ortho-mat)
+       nil))))
+  
 (defmethod glut:keyboard ((w rotator) key x y)
   (declare (ignore x y))
   (case key

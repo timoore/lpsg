@@ -7,4 +7,5 @@
   ((:module "lpsg"
     :components
     ((:file "package")
+     (:file "utils" :depends-on ("package"))
      (:file "render" :depends-on ("package"))))))
