@@ -169,6 +169,237 @@
   (setf (slot-value obj 'geometry) new-val)
   new-val)
 
+(defclass graphics-state ()
+  ((bindings)
+   (program)
+   (uniform-sets)))
+
+;;; Uniforms variables, as defined in OpenGL, are slowly-changing values
+;;; in a shader program. They are contained in the program object. Uniform
+;;; blocks, first defined in OpenGL 3.0, are aggregates of uniform variables
+;;; that are stored in OpenGL buffer objects.
+;;;
+;;; A "uniform set" is an LPSG abstraction representing a collection of uniform
+;;; variables. They might be represented concretely in OpenGL as uniform
+;;; variables, a uniform block, several vertex attributes, values stored in a
+;;; texture, or values in shader storage objects. The choice will depend on the
+;;; frequency of updating, data size, and OpenGL version. A "uniform set
+;;; descriptor" defines the names, types, layout, etc. of variables in the
+;;; set. A particular instantiation of a uniform set's values can be assigned
+;;; to a render bundle [Individually? In a graphics state object?]
+;;;
+;;; Uniform sets are declared using LPSG functions, not declarations within the
+;;; shader program source. The shader program will refer to the variable names,
+;;; and LPSG will insert appropriate preprocessor defines at the beginning of
+;;; the program source.
+;;;
+;;; Any uniform variables [and uniform blocks?] declared explicitly in a
+;;; program will be treated automatically as a individual shader sets, and will
+;;; of course be stored within a program.
+
+(defclass uniform-declaration ()
+  ((name :accessor name :initarg :name)
+   (full-name :accessor full-name)
+   (gl-type :accessor gl-type :initarg :gl-type)))
+
+(defclass uniform-definition ()
+  ((decl :accessor decl)
+   (location :accessor location)
+   (offset :accessor offset)))
+
+(defclass uset-descriptor ()
+  ((uniform-layout :accessor uniform-layout)
+   (strategy)
+   (programs-using :accessor programs-using :initarg :programs-using
+                   :initform nil)))
+
+;;; Different memory layouts are needed, depending on the uniform set
+;;; strategy. For uniforms in the default block, we need a C-like layout. If we
+;;; are going to use uniform buffers, then we need to use a layout like
+;;; std140.
+
+(defparameter *uniform-type-info* (make-hash-table :test 'eq))
+
+(defclass uniform-type-info ()
+  ((name :accessor name :initarg :name)
+   (glsl-name :accessor glsl-name :initarg :glsl-name)
+   (size :accessor size :initarg :size)
+   (c-alignment :accessor c-alignment :initarg :c-alignment)
+   (std140-alignment :accessor std140-alignment :initarg :std140-alignment)
+   (stride :accessor stride :initarg :stride)
+   (local-writer :accessor local-writer :initarg :local-writer)
+   (uploader :accessor uploader :initarg :uploader)))
+
+(defmacro define-uniform-type (sym glsl-name size c-alignment gl-alignment
+                               stride)
+  (let ((writer-sym (intern (concatenate 'simple-string
+                                         (symbol-name '#:write-uniform-local-)
+                                         (symbol-name sym))))
+        (uploader-sym (intern (concatenate 'simple-string
+                                           (symbol-name '#:upload-uniform-)
+                                           (symbol-name sym)))))
+    `(setf (gethash ',sym *uniform-type-info*)
+           (make-instance 'uniform-type-info
+                          :name ,sym :glsl-name ,glsl-name :size ,size
+                          :c-alignment ,c-alignment
+                          :std140-alignment ,gl-alignment
+                          :stride ,stride
+                          :local-writer #',writer-sym
+                          :uploader #',uploader-sym))))
+
+#|
+(define-uniform-type :int)
+(define-uniform-type :unsigned-int)
+|#
+
+(defun write-uniform-local-float (ptr val)
+  (setf (cffi:mem-ref ptr :float) val))
+(defun upload-uniform-float (location ptr)
+  (%gl:uniform-1fv location 1 ptr))
+(define-uniform-type :float "float" 4 4 4 4)
+
+#|
+(define-uniform-type :double)
+
+(define-uniform-type :float-vec2 "vec2" 8 4 8)
+(define-uniform-type :float-vec3 "vec3" 12 4 16)
+|#
+
+(defun write-uniform-local-float-vec4 (ptr val)
+  (loop
+     for i from 0 below 4
+     do (setf (cffi:mem-aref ptr '%gl:float i) (aref val i))))
+(defun upload-uniform-float-vec4 (location ptr)
+  (%gl:uniform-4fv location 1 ptr))
+(define-uniform-type :float-vec4 "vec4" 16 4 16 16)
+
+#|
+(define-uniform-type :int-vec2)
+(define-uniform-type :int-vec3)
+(define-uniform-type :int-vec4)
+
+(define-uniform-type :unsigned-int-vec2)
+(define-uniform-type :unsigned-int-vec3)
+(define-uniform-type :unsigned-int-vec4)
+
+(define-uniform-type :float-mat2 "mat2" 16 4 8 16)
+(define-uniform-type :float-mat2x3)
+(define-uniform-type :float-mat2x4)
+(define-uniform-type :float-mat3)
+(define-uniform-type :float-mat3x2)
+(define-uniform-type :float-mat3x4)
+|#
+
+(defun write-uniform-local-float-mat4 (ptr val)
+  (loop
+     for i from 0 below 4
+     do (loop
+             for j from 0 below 4
+             do (setf (cffi:mem-aref ptr '%gl:float (+ (* i 4) j))
+                      (aref val i j)))))
+(defun upload-uniform-float-mat4 (location ptr)
+  (%gl:uniform-matrix-4fv location 1 nil ptr))
+(define-uniform-type :float-mat4 "mat4" 64 4 16 64)
+
+#|
+(define-uniform-type :float-mat4x2)
+(define-uniform-type :float-mat4x3)
+
+
+(define-uniform-type :int-sampler-1d)
+(define-uniform-type :int-sampler-1d-array)
+(define-uniform-type :int-sampler-1d-array-ext)
+(define-uniform-type :int-sampler-1d-ext)
+(define-uniform-type :int-sampler-2d)
+(define-uniform-type :int-sampler-2d-array)
+(define-uniform-type :int-sampler-2d-array-ext)
+(define-uniform-type :int-sampler-2d-ext)
+(define-uniform-type :int-sampler-2d-multisample)
+(define-uniform-type :int-sampler-2d-multisample-array)
+(define-uniform-type :int-sampler-2d-rect)
+(define-uniform-type :int-sampler-2d-rect-ext)
+(define-uniform-type :int-sampler-3d)
+(define-uniform-type :int-sampler-3d-ext)
+(define-uniform-type :int-sampler-buffer)
+(define-uniform-type :int-sampler-buffer-amd)
+(define-uniform-type :int-sampler-buffer-ext)
+(define-uniform-type :int-sampler-cube)
+(define-uniform-type :int-sampler-cube-ext)
+(define-uniform-type :int-sampler-cube-map-array)
+(define-uniform-type :int-sampler-cube-map-array-arb)
+
+(define-uniform-type :sampler)
+(define-uniform-type :sampler-1d)
+(define-uniform-type :sampler-1d-arb)
+(define-uniform-type :sampler-1d-array)
+(define-uniform-type :sampler-1d-array-ext)
+(define-uniform-type :sampler-1d-array-shadow)
+(define-uniform-type :sampler-1d-array-shadow-ext)
+(define-uniform-type :sampler-1d-shadow)
+(define-uniform-type :sampler-1d-shadow-arb)
+(define-uniform-type :sampler-2d)
+(define-uniform-type :sampler-2d-arb)
+(define-uniform-type :sampler-2d-array)
+(define-uniform-type :sampler-2d-array-ext)
+(define-uniform-type :sampler-2d-array-shadow)
+(define-uniform-type :sampler-2d-array-shadow-ext)
+(define-uniform-type :sampler-2d-multisample)
+(define-uniform-type :sampler-2d-multisample-array)
+(define-uniform-type :sampler-2d-rect)
+(define-uniform-type :sampler-2d-rect-arb)
+(define-uniform-type :sampler-2d-rect-shadow)
+(define-uniform-type :sampler-2d-rect-shadow-arb)
+(define-uniform-type :sampler-2d-shadow)
+(define-uniform-type :sampler-2d-shadow-arb)
+(define-uniform-type :sampler-2d-shadow-ext)
+(define-uniform-type :sampler-3d)
+(define-uniform-type :sampler-3d-arb)
+(define-uniform-type :sampler-3d-oes)
+
+(define-uniform-type :unsigned-int-sampler-1d)
+(define-uniform-type :unsigned-int-sampler-1d-array)
+(define-uniform-type :unsigned-int-sampler-1d-array-ext)
+(define-uniform-type :unsigned-int-sampler-1d-ext)
+(define-uniform-type :unsigned-int-sampler-2d)
+(define-uniform-type :unsigned-int-sampler-2d-array)
+(define-uniform-type :unsigned-int-sampler-2d-array-ext)
+(define-uniform-type :unsigned-int-sampler-2d-ext)
+(define-uniform-type :unsigned-int-sampler-2d-multisample)
+(define-uniform-type :unsigned-int-sampler-2d-multisample-array)
+(define-uniform-type :unsigned-int-sampler-2d-rect)
+(define-uniform-type :unsigned-int-sampler-2d-rect-ext)
+(define-uniform-type :unsigned-int-sampler-3d)
+(define-uniform-type :unsigned-int-sampler-3d-ext)
+(define-uniform-type :unsigned-int-sampler-buffer)
+(define-uniform-type :unsigned-int-sampler-buffer-amd)
+(define-uniform-type :unsigned-int-sampler-buffer-ext)
+(define-uniform-type :unsigned-int-sampler-cube)
+(define-uniform-type :unsigned-int-sampler-cube-ext)
+(define-uniform-type :unsigned-int-sampler-cube-map-array)
+(define-uniform-type :unsigned-int-sampler-cube-map-array-arb)
+|#
+
+
+(defun get-std140-base-alignment (type)
+  (case type
+    ((:int :unsigned-int :float :bool)
+     4)
+    (:double
+     8)
+    ((:float-vec2 :int-vec2)
+     8)
+    ((:float-vec3 :int-vec3 :float-vec4 :int-vec4)
+     16)
+    ))
+(defun std140-layout (uniforms)
+  (let ((offset 0))
+    (loop ))
+  )
+(defclass uniform-set ()
+  ((descriptor)
+   (uniform-values :accessor uniform-values :initarg :uniform-values
+                   :initform nil)))
+
 (defgeneric gl-finalize (obj &optional errorp))
 
 (defgeneric gl-finalized-p (obj))
@@ -246,6 +477,40 @@
        into uniforms
        finally (setf (uniforms obj) uniforms))
     obj)))
+
+
+
+
+(defvar *uset-descriptors* (make-hash-table :test 'eq))
+
+(defun ensure-uset-descriptor (descriptor)
+  (let* ((name (if (consp descriptor)
+                   (car descriptor)
+                   descriptor))
+         (desc (gethash name *uset-descriptors*)))
+    (cond (desc
+           (return-from ensure-uset-descriptor desc))
+          ((not (consp desc))
+           (error 'render-error
+                  :format-control "~S is not a descriptor definition."
+                  :format-arguments (list desc)))
+          (t (setq desc
+                   (loop
+                      for clause in desc
+                      collect (if (consp clause)
+                                  (make-instance 'uniform-declaration
+                                                 :name (car clause)
+                                                 :gl-type (cadr clause))
+                                  clause)))))
+    (setf (gethash name *uset-descriptors*) desc)
+    desc))
+
+(defun ensure-descriptors (descriptors)
+  (mapcar #'ensure-descriptor descriptors))
+
+(defun make-shader (stage uset-descriptors source)
+  (let ((descriptors (ensure-descriptors uset-descriptors))
+        )))
 
 (defmethod dereferenced :after ((obj geometry))
   (with-slots ((array-alloc array-buffer-allocation)
