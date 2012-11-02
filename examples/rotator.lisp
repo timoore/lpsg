@@ -33,8 +33,6 @@
 
 (defclass rotator (glut:window)
   ((renderer :accessor renderer)
-   (vs :accessor vertex-shader)
-   (fs :accessor fragment-shader)
    (va :accessor vertex-array)
    (program :accessor program)
    (angle :accessor angle :initform 0.0))
@@ -122,36 +120,31 @@ void main()
   ;; together in a single pipeline for rendering objects. To create a
   ;; program, you first create the individual shaders. Then you attach
   ;; the shaders to the program and link the program together.
-  (let ((vs (gl:create-shader :vertex-shader))
-	(fs (gl:create-shader :fragment-shader)))
-    (setf (vertex-shader w) vs)
-    (setf (fragment-shader w) fs)
-    (gl:shader-source vs *shader-vao-vertex-program*)
-    (gl:compile-shader vs)
-    (gl:shader-source fs *shader-vao-fragment-program*)
-    (gl:compile-shader fs)
-    ;; If the shader doesn't compile, you can print errors with:
-    ;; (print (gl:get-shader-info-log vs))
-    ;; (print (gl:get-shader-info-log fs))
+  (let* ((vs (make-instance 'lpsg::shader
+                            :shader-type :vertex-shader
+                            :source *shader-vao-vertex-program*))
+         (fs (make-instance 'lpsg::shader
+                            :shader-type :fragment-shader
+                            :source *shader-vao-fragment-program*))
+         (program (make-instance 'lpsg::program
+                                 :shaders (list vs fs))))
 
-    (setf (program w) (gl:create-program))
-    ;; You can attach the same shader to multiple different programs.
-    (gl:attach-shader (program w) vs)
-    (gl:attach-shader (program w) fs)
-    ;; Don't forget to link the program after attaching the
-    ;; shaders. This step actually puts the attached shader together
-    ;; to form the program.
-    (gl:link-program (program w))
+    (setf (program w) program)
+    (lpsg::gl-finalize program)
     ;; If we want to render using this program object, or add
     ;; uniforms, we need to use the program. This is similar to
     ;; binding a buffer.
-    (gl:use-program (program w))))
+    (gl:use-program (lpsg::id program))))
+
+(defun get-location (program name)
+  (cadr (assoc name (lpsg::uniforms program) :test #'equal)))
 
 (defmethod glut:tick ((w rotator))
-  (let ((seconds-per-revolution 6)) 
+  (let ((seconds-per-revolution 6)
+        (loc (get-location (program w) "angle"))) 
     (incf  (angle w)
-	   (/ (* 2 pi) (* 60 seconds-per-revolution))))
-  (gl:uniformf (gl:get-uniform-location (program w) "angle") (angle w))
+	   (/ (* 2 pi) (* 60 seconds-per-revolution)))
+    (gl:uniformf loc (angle w)))
   (glut:post-redisplay))
 
 (defmethod glut:display ((w rotator))
@@ -161,7 +154,7 @@ void main()
   ;; Since we never use any other program object, this is unnecessary
   ;; in this program. Typically, though, you'll have multiple program
   ;; objects, so you'll need to 'use' each one to activate it.
-  (gl:use-program (program w))
+  (gl:use-program (lpsg::id (program w)))
   
   (lpsg:draw-render-groups (renderer w))
   (glut:swap-buffers))
@@ -174,11 +167,8 @@ void main()
          (top (max (float (/ height width)) 1.0))
          (ortho-mat (lpsg:ortho-matrix (- right) right (- top) top -1.0 1.0)))
     (when (program w)
-      (gl:uniform-matrix 
-       (gl:get-uniform-location (program w) "projectionMatrix") 
-       4 
-       (vector ortho-mat)
-       nil))))
+      (let ((loc (get-location (program w) "projectionMatrix")))
+        (gl:uniform-matrix loc 4 (vector ortho-mat) nil)))))
   
 (defmethod glut:keyboard ((w rotator) key x y)
   (declare (ignore x y))
@@ -193,12 +183,8 @@ void main()
   ;; shader isn't destroyed until after the program is
   ;; destroyed. Similarly, if the program is destroyed, the shaders
   ;; are detached.
-  (when (slot-boundp w 'vs)
-   (gl:delete-shader (vertex-shader w)))
-  (when (slot-boundp w 'fs)
-    (gl:delete-shader (fragment-shader w)))
   (when (slot-boundp w 'program)
-   (gl:delete-program (program w)))
+   (gl:delete-program (lpsg::id (program w))))
   (lpsg:close-renderer (renderer w)))
 
 

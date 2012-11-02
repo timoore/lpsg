@@ -38,6 +38,8 @@
    #:update-bundle
    #:draw
    #:draw-render-groups
+   #:shader
+   #:program
    ;; utilities
    #:ortho-matrix
    ))

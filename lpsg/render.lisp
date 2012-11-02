@@ -29,6 +29,27 @@
 
 (in-package #:lpsg)
 
+(defun report-render-error (condition stream)
+  (let ((args (format-arguments condition))
+        (obj (gl-object condition)))
+    (when obj
+      (push obj args))
+    (cond ((format-control condition)
+           (apply #'format stream (format-control condition) args))
+          (obj
+           (format stream "A render error occured using ~S." obj))
+          (t (format stream "A render error occured.")))))
+
+(define-condition render-error (error)
+  ((gl-object :reader render-error-gl-object :initarg :gl-object
+              :initform nil)
+   (format-control :reader format-control :initarg :format-control
+                   :initarg :message :initform nil)
+   (format-arguments :reader format-arguments :initarg :format-arguments
+                     :initform nil)
+   (log :reader render-error-log :initarg :error-log :initform nil))
+  (:report report-render-error))
+
 ;;; A simple reference counting protocol for objects that should do some
 ;;; cleanup e.g., release OpenGL resources, when they are no longer used.
 
@@ -51,9 +72,17 @@
   (when (zerop (decf (slot-value obj 'refcount)))
     (dereferenced obj)))
 
-(defclass gl-buffer ()
-  ((id :accessor id :initarg :id)
-   (size :accessor size :initarg :size)
+(defclass gl-object ()
+  ((id :accessor id :initarg :id :initform 0))
+  (:documentation "Abstract class for objects allocated in OpenGL."))
+
+(defgeneric gl-valid-p (obj))
+
+(defmethod gl-valid-p ((obj gl-object))
+  (not (zerop (id obj))))
+
+(defclass gl-buffer (gl-object)
+  ((size :accessor size :initarg :size)
    (usage :accessor usage :initarg :usage)
    (free-list :accessor free-list :initform nil)
    (alloc-tail :accessor alloc-tail)))
@@ -139,6 +168,84 @@
     (ref new-val))
   (setf (slot-value obj 'geometry) new-val)
   new-val)
+
+(defgeneric gl-finalize (obj &optional errorp))
+
+(defgeneric gl-finalized-p (obj))
+
+(defclass shader (gl-object)
+  ((shader-type :accessor shader-type :initarg :shader-type)
+   (source :accessor source :initarg :source :initform nil)
+   (declared-usets :accessor declared-usets :initarg :declared-usets
+                   :initform nil)
+   (status :accessor status :initarg :status)
+   (compiler-log :accessor compiler-log :initarg :compiler-log :initform nil)))
+
+(defmethod gl-finalized-p ((obj shader))
+  (slot-boundp obj 'status))
+
+(defmethod gl-finalize ((obj shader) &optional (errorp t))
+  (if (gl-finalized-p obj)
+      (status obj)
+      (let ((id (gl:create-shader (shader-type obj))))
+        (setf (id obj) id)
+        (gl:shader-source id (source obj))
+        (gl:compile-shader id)
+        (let ((status (gl:get-shader id :compile-status)))
+          (setf (status obj) status)
+          (unless status
+            (setf (compiler-log obj) (gl:get-shader-info-log id))
+            (when errorp
+              (error 'render-error :gl-object obj :error-log (compiler-log obj)
+                     :format-control "The shader ~S has compile errors.")))
+          status))))
+
+(defclass program (gl-object)
+  ((shaders :accessor shaders :initarg :shaders :initform nil)
+   (uniforms :accessor uniforms :initarg :uniforms :initform nil
+             :documentation "Information on uniforms declared within the program shader source.")
+   (uset-descriptors)
+   (status :accessor status :initarg :status)
+   (link-log :accessor link-log :initarg :link-log :initform nil)))
+
+(defmethod gl-finalized-p ((obj shader))
+  (slot-boundp obj 'status))
+
+(defmethod gl-finalize ((obj program) &optional (errorp t))
+  (flet ((err (&rest args)
+           (if errorp
+               (apply #'error args)
+               (return-from gl-finalize nil))))
+    (let ((id (gl:create-program)))
+    (setf (id obj) id)
+    (with-slots (shaders)
+        obj
+      (loop
+         for shader in shaders
+         when (null (gl-finalize shader))
+         do (err 'render-error
+                 :gl-object shader
+                 :format-control "The shader ~S is not finalized."))
+      (loop
+         for shader in shaders
+         do (gl:attach-shader id (id shader))))
+    (gl:link-program id)
+    (unless (setf (status obj) (gl:get-program id :link-status))
+      (setf (link-log obj) (gl:get-program-info-log id))
+      (err 'render-error
+           :gl-object obj :error-log (link-log obj)
+           :format-control "The program ~S has link errors."))
+    (loop
+       with num-actives = (gl:get-program id :active-uniforms)
+       for index from 0 below num-actives
+       collecting (multiple-value-bind (size type name)
+                      (gl:get-active-uniform id index)
+                    (let ((location (gl:get-uniform-location id name)))
+                      (unless (eql -1 location)
+                        (list name location type size))))
+       into uniforms
+       finally (setf (uniforms obj) uniforms))
+    obj)))
 
 (defmethod dereferenced :after ((obj geometry))
   (with-slots ((array-alloc array-buffer-allocation)
