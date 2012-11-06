@@ -108,6 +108,9 @@
 (defun allocation-buffer (alloc)
   (caddr alloc))
 
+(defun round-up (val divisor)
+  (* (ceiling val divisor) divisor))
+
 (defun allocate-from-buffer (buffer size &optional (alignment 4))
   (let ((rounded-size (* (ceiling size alignment) alignment)))
     (loop
@@ -179,14 +182,15 @@
 ;;; blocks, first defined in OpenGL 3.0, are aggregates of uniform variables
 ;;; that are stored in OpenGL buffer objects.
 ;;;
-;;; A "uniform set" is an LPSG abstraction representing a collection of uniform
-;;; variables. They might be represented concretely in OpenGL as uniform
-;;; variables, a uniform block, several vertex attributes, values stored in a
-;;; texture, or values in shader storage objects. The choice will depend on the
-;;; frequency of updating, data size, and OpenGL version. A "uniform set
-;;; descriptor" defines the names, types, layout, etc. of variables in the
-;;; set. A particular instantiation of a uniform set's values can be assigned
-;;; to a render bundle [Individually? In a graphics state object?]
+;;; A uniform set, or "uset", is an LPSG abstraction representing a collection
+;;; of uniform variables. They might be represented concretely in OpenGL as
+;;; uniform variables, a uniform block, several vertex attributes, values
+;;; stored in a texture, or values in shader storage objects. The choice will
+;;; depend on the frequency of updating, data size, and OpenGL version. A
+;;; "uniform set descriptor" defines the names, types, layout, etc. of
+;;; variables in the set. A particular instantiation of a uniform set's values
+;;; can be assigned to a render bundle [Individually? In a graphics state
+;;; object?]
 ;;;
 ;;; Uniform sets are declared using LPSG functions, not declarations within the
 ;;; shader program source. The shader program will refer to the variable names,
@@ -197,26 +201,56 @@
 ;;; program will be treated automatically as a individual shader sets, and will
 ;;; of course be stored within a program.
 
+;;; Uniforms within a uset descriptor
 (defclass uniform-declaration ()
   ((name :accessor name :initarg :name)
    (full-name :accessor full-name)
-   (gl-type :accessor gl-type :initarg :gl-type)))
+   (gl-type :accessor gl-type :initarg :gl-type)
+   (local-offset :accessor local-offset :initarg :local-offset
+                 :documentation "offset of uniform in local storage")
+   (local-storage-setter :accessor local-storage-setter)))
 
-(defclass uniform-definition ()
-  ((decl :accessor decl)
-   (location :accessor location)
-   (offset :accessor offset)))
+;;; The uniform set descriptor. The strategy object controls how and when the
+;;; uniform values will be set in OpenGL.
 
 (defclass uset-descriptor ()
-  ((uniform-layout :accessor uniform-layout)
-   (strategy)
-   (programs-using :accessor programs-using :initarg :programs-using
-                   :initform nil)))
+  ((uniforms :accessor uniforms)
+   (local-storage-size :accessor local-storage-size :initform 0)
+   (strategy :accessor strategy)))
+
+;;; Strategies will be defined later. A strategy may need per-uset data, which
+;;; will be a subclass of uset-strategy-data.
+
+(defclass uset-strategy-data ()
+  ((strategy :accessor strategy)))
+
+;;; Uset variable values are stored locally, so they can be set by the
+;;; application and then later uploaded to shader programs during
+;;; rendering. They are stored in foreign memory in order to optimize the
+;;; upload process by minimizing conversions and further foreign memory
+;;; allocation. For simplicity we use one local storage layout, which is
+;;; similar to the native C layout. It might be more optimal to choose the
+;;; local layout based on the strategy, for example, use std140 with uniform
+;;; blocks, that complicates the implementation a lot and makes it harder to
+;;; change strategies.
+;;; 
+(defclass uset ()
+  ((descriptor :accessor descriptor :initarg :descriptor)
+   (local-storage :accessor local-storage)
+   (strategy-data :accessor strategy-data)))
+
+(defun has-valid-strategy-p (uset)
+  (with-slots (descriptor strategy-data)
+      uset
+    (and descriptor
+         strategy-data
+         (eq (strategy descriptor) (strategy strategy-data)))))
+
 
 ;;; Different memory layouts are needed, depending on the uniform set
 ;;; strategy. For uniforms in the default block, we need a C-like layout. If we
 ;;; are going to use uniform buffers, then we need to use a layout like
-;;; std140.
+;;; std140 in the memory backing the uniform buffer object.
 
 (defparameter *uniform-type-info* (make-hash-table :test 'eq))
 
@@ -395,10 +429,23 @@
   (let ((offset 0))
     (loop ))
   )
-(defclass uniform-set ()
-  ((descriptor)
-   (uniform-values :accessor uniform-values :initarg :uniform-values
-                   :initform nil)))
+
+;;; Implementation of strategies
+(defclass strategy ()
+  ((uset-descriptor :accessor uset-descriptor :initarg :uset-descriptor)))
+
+;;; The default uniform set strategy, which uploads uniform values into uniform
+;;; locations in a shader program.
+
+(defclass default-uniform-strategy (strategy)
+  ((per-program-locations :accessor per-program-locations
+                          :initarg :per-program-locations
+                          :initform nil)))
+
+(defclass uniform-definition ()
+  ((decl :accessor decl)
+   (location :accessor location)
+   (offset :accessor offset)))
 
 (defgeneric gl-finalize (obj &optional errorp))
 
@@ -478,10 +525,42 @@
        finally (setf (uniforms obj) uniforms))
     obj)))
 
-
-
-
 (defvar *uset-descriptors* (make-hash-table :test 'eq))
+
+(defun define-uset (name variables &key (strategy :default) usage)
+  (declare (ignore usage))
+  (let ((descriptor (make-instance 'uset-descriptor :strategy strategy))
+        (decls (mapcar #'(lambda (clause)
+                           (destructuring-bind (name gl-type)
+                               clause
+                             (make-instance 'uniform-declaration
+                                            :name name
+                                            :gl-type gl-type)))
+                       variables)))
+    ;; lay out local storage
+    (loop
+       with offset = 0
+       for var in decls
+       for typeinfo = (gethash (gl-type var) *uniform-type-info*)
+       do (if typeinfo
+              (with-slots (size c-alignment local-writer)
+                  typeinfo
+                ;; XXX Do something with size when arrays are supported
+                (setq offset (round-up offset c-alignment))
+                (setf (local-offset var) offset)
+                (let ((raw-setter-fun local-writer)
+                      (offset offset))  ;rebind to close over
+                  (setf (local-storage-setter var)
+                        #'(lambda (storage val)
+                            (cffi:with-pointer-to-vector-data (ptr storage)
+                              (funcall raw-setter-fun
+                                       (cffi:inc-pointer ptr offset)
+                                       val)))))
+                (incf offset size)))
+       finally (let ((local-size (round-up offset 8))) ;double alignment
+                 (setf (local-storage-size descriptor) local-size)))
+    (setf (gethash name *uset-descriptors*) descriptor)
+    descriptor))
 
 (defun ensure-uset-descriptor (descriptor)
   (let* ((name (if (consp descriptor)
@@ -490,18 +569,19 @@
          (desc (gethash name *uset-descriptors*)))
     (cond (desc
            (return-from ensure-uset-descriptor desc))
-          ((not (consp desc))
+          ((not (consp descriptor))
            (error 'render-error
                   :format-control "~S is not a descriptor definition."
                   :format-arguments (list desc)))
-          (t (setq desc
-                   (loop
-                      for clause in desc
-                      collect (if (consp clause)
-                                  (make-instance 'uniform-declaration
-                                                 :name (car clause)
-                                                 :gl-type (cadr clause))
-                                  clause)))))
+          (t (let ((clauses (cadr descriptor)))
+               (setq desc
+                     (loop
+                        for clause in desc
+                        collect (if (consp clause)
+                                    (make-instance 'uniform-declaration
+                                                   :name (car clause)
+                                                   :gl-type (cadr clause))
+                                    clause))))))
     (setf (gethash name *uset-descriptors*) desc)
     desc))
 

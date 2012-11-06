@@ -40,6 +40,7 @@
    #:draw-render-groups
    #:shader
    #:program
+   #:define-uset
    ;; utilities
    #:ortho-matrix
    ))

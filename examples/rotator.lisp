@@ -83,6 +83,9 @@ void main()
 } 
 ")
 
+(lpsg:define-uset 'animation '(("angle" :float)))
+(lpsg:define-uset 'projection '(("projectionMatrix" :float-mat4)))
+
 ;;; Initialization 
 
 (defun array-setup (p)
