@@ -50,6 +50,11 @@
    (log :reader render-error-log :initarg :error-log :initform nil))
   (:report report-render-error))
 
+(defclass renderer ()
+  ((buffers :accessor buffers :initform nil)
+   (bundles :accessor bundles :initform nil)
+   (new-bundles :accessor new-bundles :initform nil)))
+
 ;;; A simple reference counting protocol for objects that should do some
 ;;; cleanup e.g., release OpenGL resources, when they are no longer used.
 
@@ -613,11 +618,6 @@
 
 (defgeneric allocate-buffer-storage (renderer size target usage))
 
-(defclass renderer ()
-  ((buffers :accessor buffers :initform nil)
-   (bundles :accessor bundles :initform nil)
-   (new-bundles :accessor new-bundles :initform nil)))
-
 (defmethod allocate-buffer-storage ((renderer renderer) size target usage)
   (loop
      for buffer in (buffers renderer)
@@ -672,6 +672,11 @@
 
 (defgeneric draw (renderer))
 
+(defgeneric bind-state (renderer state))
+
+(defmethod bind-state ((renderer renderer) (state graphics-state))
+  )
+
 (defun draw-render-groups (renderer)
   (upload-bundles renderer)
   (draw renderer))
@@ -681,6 +686,7 @@
      for bundle in (bundles renderer)
      for geom = (geometry bundle)
      do (progn
+          (bind-state renderer (gl-state bundle))
           (gl:bind-vertex-array (vao geom))
           (if (indices geom)
               (let ((index-offset (allocation-offset
