@@ -53,7 +53,8 @@
 (defclass renderer ()
   ((buffers :accessor buffers :initform nil)
    (bundles :accessor bundles :initform nil)
-   (new-bundles :accessor new-bundles :initform nil)))
+   (new-bundles :accessor new-bundles :initform nil)
+   (current-state :accessor current-state :initform nil)))
 
 ;;; A simple reference counting protocol for objects that should do some
 ;;; cleanup e.g., release OpenGL resources, when they are no longer used.
@@ -179,7 +180,7 @@
 
 (defclass graphics-state ()
   ((bindings)
-   (program)
+   (program :accessor program :initform :program)
    (uniform-sets)))
 
 ;;; Uniforms variables, as defined in OpenGL, are slowly-changing values
@@ -243,6 +244,7 @@
   ((descriptor :accessor descriptor :initarg :descriptor)
    (local-storage :accessor local-storage)
    (strategy-data :accessor strategy-data)))
+
 
 (defun has-valid-strategy-p (uset)
   (with-slots (descriptor strategy-data)
@@ -487,9 +489,15 @@
   ((shaders :accessor shaders :initarg :shaders :initform nil)
    (uniforms :accessor uniforms :initarg :uniforms :initform nil
              :documentation "Information on uniforms declared within the program shader source.")
-   (uset-descriptors)
+   (uset-descriptors :accessor uset-descriptors :initform nil)
    (status :accessor status :initarg :status)
-   (link-log :accessor link-log :initarg :link-log :initform nil)))
+   (link-log :accessor link-log :initarg :link-log :initform nil)
+   (current-usets :accessor current-usets :initform nil)))
+
+;;; Set the uniform values in a program, assuming  that it is currently bound.
+(defun upload-uset-to-program (uset program)
+  (let ((descriptor (descriptor uset)))
+    ))
 
 (defmethod gl-finalized-p ((obj shader))
   (slot-boundp obj 'status))
@@ -674,8 +682,23 @@
 
 (defgeneric bind-state (renderer state))
 
+
+
 (defmethod bind-state ((renderer renderer) (state graphics-state))
-  )
+  (with-slots (current-state)
+      renderer
+    (when (eq current-state state)
+      (return-from bind-state nil))
+    (let* ((old-program (program current-state))
+           (new-program (program state))
+           (prog-descriptors (uset-descriptors new-program)))
+      (unless (eq new-program old-program)
+        (gl:use-program (id new-program)))
+      (loop
+         for)
+    
+      ))
+)
 
 (defun draw-render-groups (renderer)
   (upload-bundles renderer)
