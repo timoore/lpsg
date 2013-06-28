@@ -35,7 +35,9 @@
   ((renderer :accessor renderer)
    (va :accessor vertex-array)
    (program :accessor program)
-   (angle :accessor angle :initform 0.0))
+   (angle :accessor angle :initform 0.0)
+   (animation-uset :accessor animation-uset)
+   (projection-uset :accessor projection-uset))
   (:default-initargs :width 500 :height 500 :pos-x 100 :pos-y 100
 		     :mode '(:double :rgb :depth) :title "rotator.lisp"
 		     :tick-interval (round 1000 60)))
@@ -83,8 +85,9 @@ void main()
 } 
 ")
 
-(lpsg:define-uset 'animation '(("angle" :float)))
-(lpsg:define-uset 'projection '(("projectionMatrix" :float-mat4)))
+(lpsg:define-uset 'animation '(("angle" :float angle)))
+(lpsg:define-uset 'projection '(("projectionMatrix" :float-mat4
+                                 projection-matrix)))
 
 ;;; Initialization 
 
@@ -109,35 +112,38 @@ void main()
       (setf (gl:glaref arr i) (aref verts i)))
     (dotimes (i (length indexes))
       (setf (gl:glaref iarr i) (aref indexes i)))
-    (lpsg:add-bundle
-     (renderer w)
-     (make-instance 'lpsg:render-bundle
-                    :geometry (make-instance 'lpsg:geometry
-                                             :mode :triangles
-                                             :number-vertices 6
-                                             :indices iarr
-                                             :vertex-attributes #'array-setup
-                                             :vertex-data arr))))
-  
-  ;; A program object is a collection of shader objects to be used
-  ;; together in a single pipeline for rendering objects. To create a
-  ;; program, you first create the individual shaders. Then you attach
-  ;; the shaders to the program and link the program together.
-  (let* ((vs (make-instance 'lpsg::shader
-                            :shader-type :vertex-shader
-                            :source *shader-vao-vertex-program*))
-         (fs (make-instance 'lpsg::shader
-                            :shader-type :fragment-shader
-                            :source *shader-vao-fragment-program*))
-         (program (make-instance 'lpsg::program
-                                 :shaders (list vs fs))))
-
-    (setf (program w) program)
-    (lpsg::gl-finalize program)
-    ;; If we want to render using this program object, or add
-    ;; uniforms, we need to use the program. This is similar to
-    ;; binding a buffer.
-    (gl:use-program (lpsg::id program))))
+    (setf (animation-uset w)
+          (make-uset 'animation))
+    
+    ;; A program object is a collection of shader objects to be used
+    ;; together in a single pipeline for rendering objects. To create a
+    ;; program, you first create the individual shaders. Then you attach
+    ;; the shaders to the program and link the program together.
+    (let* ((geom (make-instance 'lpsg:geometry
+                                :mode :triangles
+                                :number-vertices 6
+                                :indices iarr
+                                :vertex-attributes #'array-setup
+                                :vertex-data arr))
+           (vs (make-instance 'lpsg::shader
+                              :shader-type :vertex-shader
+                              :source *shader-vao-vertex-program*))
+           (fs (make-instance 'lpsg::shader
+                              :shader-type :fragment-shader
+                              :source *shader-vao-fragment-program*))
+           (program (make-instance 'lpsg::program
+                                   :shaders (list vs fs)
+                                   :usets '(animation projection)))
+           (lpsg:add-bundle
+            (renderer w)
+             (make-instance 'lpsg:render-bundle
+                            :geometry geom)))
+      (setf (program w) program)
+      (lpsg::gl-finalize program)
+      ;; If we want to render using this program object, or add
+      ;; uniforms, we need to use the program. This is similar to
+      ;; binding a buffer.
+      (gl:use-program (lpsg::id program)))))
 
 (defun get-location (program name)
   (cadr (assoc name (lpsg::uniforms program) :test #'equal)))

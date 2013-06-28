@@ -1,6 +1,6 @@
 ;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; Copyright (c) 2012, Tim Moore (moore@bricoworks.com)
+;;; Copyright (c) 2012, 2013, Tim Moore (moore@bricoworks.com)
 ;;;   All rights reserved.
 ;;;
 ;;; Redistribution and use in source and binary forms, with or without
@@ -79,7 +79,8 @@
     (dereferenced obj)))
 
 (defclass gl-object ()
-  ((id :accessor id :initarg :id :initform 0))
+  ((id :accessor id :initarg :id :initform 0
+       :documentation "ID from OpenGL of object"))
   (:documentation "Abstract class for objects allocated in OpenGL."))
 
 (defgeneric gl-valid-p (obj))
@@ -140,11 +141,19 @@
   (setf (car (alloc-tail buffer)) nil))
 
 (defclass geometry (reference-counted)
-  ((mode :accessor mode :initarg :mode)
-   (number-vertices :accessor number-vertices :initarg :number-vertices)
-   (indices :accessor indices :initarg :indices :initform nil)
+  ((mode :accessor mode :initarg :mode
+         :documentation "A mode for an OpenGL draw-elements or draw-array call,
+  e.g. :triangles")
+   (number-vertices :accessor number-vertices :initarg :number-vertices
+                    :documentation "The total number of vertices in this geometry.")
+   (indices :accessor indices :initarg :indices :initform nil
+            : "A gl-array (:unsigned-short) of indices into the vertex
+   attributes, for each vertex of each geometry element. This can be NULL, in
+   which case the geometry will be drawn using %gl:draw-elements.")
    (index-usage :accessor index-usage :initarg :index-usage
-                :initform :static-draw)
+                :initform :static-draw
+                :documentation "A hint for allocation of the index buffer
+   storage")
    (vertex-attributes :accessor vertex-attributes :initarg :vertex-attributes
                       :documentation "A symbol (cl-opengl gl-array-format or a
   list of (attrib-number type size")
@@ -152,12 +161,16 @@
                 :documentation "a single gl-array, or a list of gl-array
   objects corresponding to the vertex attributes")
    (vertex-usage :accessor vertex-usage :initarg :vertex-usage
-                 :initform :static-draw)
+                 :initform :static-draw
+                 :documentation "A hint for allocation of the vertex data buffer
+   storage")
    (array-buffer :accessor array-buffer)
    (array-buffer-allocation :accessor array-buffer-allocation :initform nil)
    (element-buffer :accessor element-buffer)
    (element-buffer-allocation :accessor element-buffer-allocation :initform nil)
-   (vao :accessor vao :initarg :vao :initform 0)))
+   (vao :accessor vao :initarg :vao :initform 0
+        :documentation "OpenGL object for binding vertex attributes for
+   rendering.")))
 
 (defclass render-bundle ()
   ((geometry :reader geometry :initarg :geometry)
@@ -181,7 +194,7 @@
 (defclass graphics-state ()
   ((bindings)
    (program :accessor program :initform :program)
-   (uniform-sets)))
+   (uniform-sets :accessor uniform-sets :initform :uniform-sets)))
 
 ;;; Uniforms variables, as defined in OpenGL, are slowly-changing values
 ;;; in a shader program. They are contained in the program object. Uniform
@@ -212,6 +225,7 @@
   ((name :accessor name :initarg :name)
    (full-name :accessor full-name)
    (gl-type :accessor gl-type :initarg :gl-type)
+   (accessor :accessor accessor :initarg accessor)
    (local-offset :accessor local-offset :initarg :local-offset
                  :documentation "offset of uniform in local storage")
    (local-storage-setter :accessor local-storage-setter)))
@@ -237,8 +251,8 @@
 ;;; allocation. For simplicity we use one local storage layout, which is
 ;;; similar to the native C layout. It might be more optimal to choose the
 ;;; local layout based on the strategy, for example, use std140 with uniform
-;;; blocks, that complicates the implementation a lot and makes it harder to
-;;; change strategies.
+;;; blocks, but that complicates the implementation a lot and makes it
+;;; harder to change strategies.
 ;;; 
 (defclass uset ()
   ((descriptor :accessor descriptor :initarg :descriptor)
@@ -454,7 +468,9 @@
    (location :accessor location)
    (offset :accessor offset)))
 
-(defgeneric gl-finalize (obj &optional errorp))
+(defgeneric gl-finalize (obj &optional errorp)
+  :documentation "Allocate any OpenGL resources needed for OBJ and perform any
+  tasks needed to use it (e.g. link a shader program)")
 
 (defgeneric gl-finalized-p (obj))
 
@@ -487,8 +503,10 @@
 
 (defclass program (gl-object)
   ((shaders :accessor shaders :initarg :shaders :initform nil)
-   (uniforms :accessor uniforms :initarg :uniforms :initform nil
-             :documentation "Information on uniforms declared within the program shader source.")
+   ;; (name location type size)
+   (uniforms :accessor uniforms :initform nil
+             :documentation "Information on uniforms declared within
+  the program shader source.") 
    (uset-descriptors :accessor uset-descriptors :initform nil)
    (status :accessor status :initarg :status)
    (link-log :accessor link-log :initarg :link-log :initform nil)
@@ -499,7 +517,7 @@
   (let ((descriptor (descriptor uset)))
     ))
 
-(defmethod gl-finalized-p ((obj shader))
+(defmethod gl-finalized-p ((obj program))
   (slot-boundp obj 'status))
 
 (defmethod gl-finalize ((obj program) &optional (errorp t))
@@ -544,7 +562,8 @@
   (declare (ignore usage))
   (let ((descriptor (make-instance 'uset-descriptor :strategy strategy))
         (decls (mapcar #'(lambda (clause)
-                           (destructuring-bind (name gl-type)
+                           (destructuring-bind (name gl-type
+                                                     &optional accessor)
                                clause
                              (make-instance 'uniform-declaration
                                             :name name
@@ -695,10 +714,9 @@
       (unless (eq new-program old-program)
         (gl:use-program (id new-program)))
       (loop
-         for)
+         for set in (uniform-sets state))
     
-      ))
-)
+      )))
 
 (defun draw-render-groups (renderer)
   (upload-bundles renderer)

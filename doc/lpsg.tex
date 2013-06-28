@@ -1,0 +1,25 @@
+Although performance optimization of OpenGL programs is a complex and
+sometimes arcane subject, several strategies are always helpful:
+reduce the number of calls to the OpenGL API; reduce the amount of
+memory traffic from the CPU to the GPU; and minimize the number of
+graphical state changes during rendering. lpsg is a library that helps
+to implement these strategies.
+
+OpenGL provides storage, called \emph{buffer objects}, that is
+allocated on the GPU. Once initialized, the data in buffer objects
+does not need to be copied from the CPU unless it is modifed. In
+recent versions of OpenGL, buffer objects are the only mechanism for
+supplying geometric data. Earlier versions do support rendering
+directly from CPU memory, but buffer objects provide a performance
+advantage in most cases. The usage of buffer objects is somewhat
+complicated, with various options available for copying data into
+buffer objects. lpsg provides an interface for allocating and
+deallocating storage from buffer objects; it manages the actual
+allocation of the buffer objects in OpenGL itself.
+
+lpsg 
+lpsg also provides support for the management of that graphical state which
+is not uniquely associated with any one geometric object.
+
+lpsg is not a scene graph!
+
