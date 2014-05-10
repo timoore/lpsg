@@ -1,6 +1,6 @@
 ;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; Copyright (c) 2012, Tim Moore (moore@bricoworks.com)
+;;; Copyright (c) 2014 Tim Moore (moore@bricoworks.com)
 ;;;   All rights reserved.
 ;;;
 ;;; Redistribution and use in source and binary forms, with or without
@@ -27,24 +27,28 @@
 ;;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ;;; POSSIBILITY OF SUCH DAMAGE.
 
-(defpackage #:lpsg
-  (:use #:cl #:gl)
-  (:export
-   #:render-bundle
-   #:geometry
-   #:renderer
-   #:close-renderer
-   #:add-bundle
-   #:update-bundle
-   #:draw
-   #:draw-render-groups
-   #:shader
-   #:program
-   #:define-uset
-   #:graphics-state
-   #:uniform-sets
-   #:with-mutable
-   #:up-to-date-p
-   ;; utilities
-   #:ortho-matrix
-   ))
+(in-package #:lpsg)
+
+;;; A mutable object contains a counter that is incremented whenever the object
+;;; is mutated. By keeping a copy of the counter when the object was last read,
+;;; one can tell if one has already seen the most recent copy of the object.
+;;;
+;;; The counter is not updated automatically, but helper forms are provided to
+;;; make it convenient to update the counter when multiple elements of a
+;;; mutable object are updated.
+;;;
+;;; If an object is mutated, objects that hold it may need to have their
+;;; counters updated too.
+
+(defclass mutable ()
+  ((counter :accessor counter :initform 0)))
+
+(defmacro with-mutable (obj &body body)
+  `(progn
+     (incf (counter ,obj))
+     ,@body))
+
+(defun up-to-date-p (mutable-object local-ref local-counter)
+  (and (eq mutable-object local-ref)
+       (eql (counter mutable-object) local-counter)))
+

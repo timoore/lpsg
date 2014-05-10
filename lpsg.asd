@@ -8,4 +8,6 @@
     :components
     ((:file "package")
      (:file "utils" :depends-on ("package"))
-     (:file "render" :depends-on ("package"))))))
+     (:file "mutable" :depends-on ("package"))
+     (:file "uset" :depends-on ("package" "mutable"))
+     (:file "render" :depends-on ("package" "mutable" "uset"))))))

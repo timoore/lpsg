@@ -1,6 +1,6 @@
 ;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; Copyright (c) 2012, 2013, Tim Moore (moore@bricoworks.com)
+;;; Copyright (c) 2012-2014 Tim Moore (moore@bricoworks.com)
 ;;;   All rights reserved.
 ;;;
 ;;; Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@
 
 (defun report-render-error (condition stream)
   (let ((args (format-arguments condition))
-        (obj (gl-object condition)))
+        (obj (render-error-gl-object condition)))
     (when obj
       (push obj args))
     (cond ((format-control condition)
@@ -147,7 +147,7 @@
    (number-vertices :accessor number-vertices :initarg :number-vertices
                     :documentation "The total number of vertices in this geometry.")
    (indices :accessor indices :initarg :indices :initform nil
-            : "A gl-array (:unsigned-short) of indices into the vertex
+            :documentation "A gl-array (:unsigned-short) of indices into the vertex
    attributes, for each vertex of each geometry element. This can be NULL, in
    which case the geometry will be drawn using %gl:draw-elements.")
    (index-usage :accessor index-usage :initarg :index-usage
@@ -174,13 +174,14 @@
 
 (defclass render-bundle ()
   ((geometry :reader geometry :initarg :geometry)
-   (gl-state)))
+   (gl-state :reader gl-state :initarg :gl-state)))
 
 (defmethod initialize-instance :after ((obj render-bundle) &key)
   (let ((geometry (slot-value obj 'geometry)))
     (when geometry
       (ref geometry))))
 
+;;; XXX make this go away
 (defmethod (setf geometry) (new-val (obj render-bundle))
   (when (slot-boundp obj 'geometry)
     (let ((old-val (slot-value obj 'geometry)))
@@ -193,293 +194,32 @@
 
 (defclass graphics-state ()
   ((bindings)
-   (program :accessor program :initform :program)
-   (uniform-sets :accessor uniform-sets :initform :uniform-sets)))
-
-;;; Uniforms variables, as defined in OpenGL, are slowly-changing values
-;;; in a shader program. They are contained in the program object. Uniform
-;;; blocks, first defined in OpenGL 3.0, are aggregates of uniform variables
-;;; that are stored in OpenGL buffer objects.
-;;;
-;;; A uniform set, or "uset", is an LPSG abstraction representing a collection
-;;; of uniform variables. They might be represented concretely in OpenGL as
-;;; uniform variables, a uniform block, several vertex attributes, values
-;;; stored in a texture, or values in shader storage objects. The choice will
-;;; depend on the frequency of updating, data size, and OpenGL version. A
-;;; "uniform set descriptor" defines the names, types, layout, etc. of
-;;; variables in the set. A particular instantiation of a uniform set's values
-;;; can be assigned to a render bundle [Individually? In a graphics state
-;;; object?]
-;;;
-;;; Uniform sets are declared using LPSG functions, not declarations within the
-;;; shader program source. The shader program will refer to the variable names,
-;;; and LPSG will insert appropriate preprocessor defines at the beginning of
-;;; the program source.
-;;;
-;;; Any uniform variables [and uniform blocks?] declared explicitly in a
-;;; program will be treated automatically as a individual shader sets, and will
-;;; of course be stored within a program.
-
-;;; Uniforms within a uset descriptor
-(defclass uniform-declaration ()
-  ((name :accessor name :initarg :name)
-   (full-name :accessor full-name)
-   (gl-type :accessor gl-type :initarg :gl-type)
-   (accessor :accessor accessor :initarg accessor)
-   (local-offset :accessor local-offset :initarg :local-offset
-                 :documentation "offset of uniform in local storage")
-   (local-storage-setter :accessor local-storage-setter)))
-
-;;; The uniform set descriptor. The strategy object controls how and when the
-;;; uniform values will be set in OpenGL.
-
-(defclass uset-descriptor ()
-  ((uniforms :accessor uniforms)
-   (local-storage-size :accessor local-storage-size :initform 0)
-   (strategy :accessor strategy)))
-
-;;; Strategies will be defined later. A strategy may need per-uset data, which
-;;; will be a subclass of uset-strategy-data.
-
-(defclass uset-strategy-data ()
-  ((strategy :accessor strategy)))
-
-;;; Uset variable values are stored locally, so they can be set by the
-;;; application and then later uploaded to shader programs during
-;;; rendering. They are stored in foreign memory in order to optimize the
-;;; upload process by minimizing conversions and further foreign memory
-;;; allocation. For simplicity we use one local storage layout, which is
-;;; similar to the native C layout. It might be more optimal to choose the
-;;; local layout based on the strategy, for example, use std140 with uniform
-;;; blocks, but that complicates the implementation a lot and makes it
-;;; harder to change strategies.
-;;; 
-(defclass uset ()
-  ((descriptor :accessor descriptor :initarg :descriptor)
-   (local-storage :accessor local-storage)
-   (strategy-data :accessor strategy-data)))
-
-
-(defun has-valid-strategy-p (uset)
-  (with-slots (descriptor strategy-data)
-      uset
-    (and descriptor
-         strategy-data
-         (eq (strategy descriptor) (strategy strategy-data)))))
-
-
-;;; Different memory layouts are needed, depending on the uniform set
-;;; strategy. For uniforms in the default block, we need a C-like layout. If we
-;;; are going to use uniform buffers, then we need to use a layout like
-;;; std140 in the memory backing the uniform buffer object.
-
-(defparameter *uniform-type-info* (make-hash-table :test 'eq))
-
-(defclass uniform-type-info ()
-  ((name :accessor name :initarg :name)
-   (glsl-name :accessor glsl-name :initarg :glsl-name)
-   (size :accessor size :initarg :size)
-   (c-alignment :accessor c-alignment :initarg :c-alignment)
-   (std140-alignment :accessor std140-alignment :initarg :std140-alignment)
-   (stride :accessor stride :initarg :stride)
-   (local-writer :accessor local-writer :initarg :local-writer)
-   (uploader :accessor uploader :initarg :uploader)))
-
-(defmacro define-uniform-type (sym glsl-name size c-alignment gl-alignment
-                               stride)
-  (let ((writer-sym (intern (concatenate 'simple-string
-                                         (symbol-name '#:write-uniform-local-)
-                                         (symbol-name sym))))
-        (uploader-sym (intern (concatenate 'simple-string
-                                           (symbol-name '#:upload-uniform-)
-                                           (symbol-name sym)))))
-    `(setf (gethash ',sym *uniform-type-info*)
-           (make-instance 'uniform-type-info
-                          :name ,sym :glsl-name ,glsl-name :size ,size
-                          :c-alignment ,c-alignment
-                          :std140-alignment ,gl-alignment
-                          :stride ,stride
-                          :local-writer #',writer-sym
-                          :uploader #',uploader-sym))))
-
-#|
-(define-uniform-type :int)
-(define-uniform-type :unsigned-int)
-|#
-
-(defun write-uniform-local-float (ptr val)
-  (setf (cffi:mem-ref ptr :float) val))
-(defun upload-uniform-float (location ptr)
-  (%gl:uniform-1fv location 1 ptr))
-(define-uniform-type :float "float" 4 4 4 4)
-
-#|
-(define-uniform-type :double)
-
-(define-uniform-type :float-vec2 "vec2" 8 4 8)
-(define-uniform-type :float-vec3 "vec3" 12 4 16)
-|#
-
-(defun write-uniform-local-float-vec4 (ptr val)
-  (loop
-     for i from 0 below 4
-     do (setf (cffi:mem-aref ptr '%gl:float i) (aref val i))))
-(defun upload-uniform-float-vec4 (location ptr)
-  (%gl:uniform-4fv location 1 ptr))
-(define-uniform-type :float-vec4 "vec4" 16 4 16 16)
-
-#|
-(define-uniform-type :int-vec2)
-(define-uniform-type :int-vec3)
-(define-uniform-type :int-vec4)
-
-(define-uniform-type :unsigned-int-vec2)
-(define-uniform-type :unsigned-int-vec3)
-(define-uniform-type :unsigned-int-vec4)
-
-(define-uniform-type :float-mat2 "mat2" 16 4 8 16)
-(define-uniform-type :float-mat2x3)
-(define-uniform-type :float-mat2x4)
-(define-uniform-type :float-mat3)
-(define-uniform-type :float-mat3x2)
-(define-uniform-type :float-mat3x4)
-|#
-
-(defun write-uniform-local-float-mat4 (ptr val)
-  (loop
-     for i from 0 below 4
-     do (loop
-             for j from 0 below 4
-             do (setf (cffi:mem-aref ptr '%gl:float (+ (* i 4) j))
-                      (aref val i j)))))
-(defun upload-uniform-float-mat4 (location ptr)
-  (%gl:uniform-matrix-4fv location 1 nil ptr))
-(define-uniform-type :float-mat4 "mat4" 64 4 16 64)
-
-#|
-(define-uniform-type :float-mat4x2)
-(define-uniform-type :float-mat4x3)
-
-
-(define-uniform-type :int-sampler-1d)
-(define-uniform-type :int-sampler-1d-array)
-(define-uniform-type :int-sampler-1d-array-ext)
-(define-uniform-type :int-sampler-1d-ext)
-(define-uniform-type :int-sampler-2d)
-(define-uniform-type :int-sampler-2d-array)
-(define-uniform-type :int-sampler-2d-array-ext)
-(define-uniform-type :int-sampler-2d-ext)
-(define-uniform-type :int-sampler-2d-multisample)
-(define-uniform-type :int-sampler-2d-multisample-array)
-(define-uniform-type :int-sampler-2d-rect)
-(define-uniform-type :int-sampler-2d-rect-ext)
-(define-uniform-type :int-sampler-3d)
-(define-uniform-type :int-sampler-3d-ext)
-(define-uniform-type :int-sampler-buffer)
-(define-uniform-type :int-sampler-buffer-amd)
-(define-uniform-type :int-sampler-buffer-ext)
-(define-uniform-type :int-sampler-cube)
-(define-uniform-type :int-sampler-cube-ext)
-(define-uniform-type :int-sampler-cube-map-array)
-(define-uniform-type :int-sampler-cube-map-array-arb)
-
-(define-uniform-type :sampler)
-(define-uniform-type :sampler-1d)
-(define-uniform-type :sampler-1d-arb)
-(define-uniform-type :sampler-1d-array)
-(define-uniform-type :sampler-1d-array-ext)
-(define-uniform-type :sampler-1d-array-shadow)
-(define-uniform-type :sampler-1d-array-shadow-ext)
-(define-uniform-type :sampler-1d-shadow)
-(define-uniform-type :sampler-1d-shadow-arb)
-(define-uniform-type :sampler-2d)
-(define-uniform-type :sampler-2d-arb)
-(define-uniform-type :sampler-2d-array)
-(define-uniform-type :sampler-2d-array-ext)
-(define-uniform-type :sampler-2d-array-shadow)
-(define-uniform-type :sampler-2d-array-shadow-ext)
-(define-uniform-type :sampler-2d-multisample)
-(define-uniform-type :sampler-2d-multisample-array)
-(define-uniform-type :sampler-2d-rect)
-(define-uniform-type :sampler-2d-rect-arb)
-(define-uniform-type :sampler-2d-rect-shadow)
-(define-uniform-type :sampler-2d-rect-shadow-arb)
-(define-uniform-type :sampler-2d-shadow)
-(define-uniform-type :sampler-2d-shadow-arb)
-(define-uniform-type :sampler-2d-shadow-ext)
-(define-uniform-type :sampler-3d)
-(define-uniform-type :sampler-3d-arb)
-(define-uniform-type :sampler-3d-oes)
-
-(define-uniform-type :unsigned-int-sampler-1d)
-(define-uniform-type :unsigned-int-sampler-1d-array)
-(define-uniform-type :unsigned-int-sampler-1d-array-ext)
-(define-uniform-type :unsigned-int-sampler-1d-ext)
-(define-uniform-type :unsigned-int-sampler-2d)
-(define-uniform-type :unsigned-int-sampler-2d-array)
-(define-uniform-type :unsigned-int-sampler-2d-array-ext)
-(define-uniform-type :unsigned-int-sampler-2d-ext)
-(define-uniform-type :unsigned-int-sampler-2d-multisample)
-(define-uniform-type :unsigned-int-sampler-2d-multisample-array)
-(define-uniform-type :unsigned-int-sampler-2d-rect)
-(define-uniform-type :unsigned-int-sampler-2d-rect-ext)
-(define-uniform-type :unsigned-int-sampler-3d)
-(define-uniform-type :unsigned-int-sampler-3d-ext)
-(define-uniform-type :unsigned-int-sampler-buffer)
-(define-uniform-type :unsigned-int-sampler-buffer-amd)
-(define-uniform-type :unsigned-int-sampler-buffer-ext)
-(define-uniform-type :unsigned-int-sampler-cube)
-(define-uniform-type :unsigned-int-sampler-cube-ext)
-(define-uniform-type :unsigned-int-sampler-cube-map-array)
-(define-uniform-type :unsigned-int-sampler-cube-map-array-arb)
-|#
-
-
-(defun get-std140-base-alignment (type)
-  (case type
-    ((:int :unsigned-int :float :bool)
-     4)
-    (:double
-     8)
-    ((:float-vec2 :int-vec2)
-     8)
-    ((:float-vec3 :int-vec3 :float-vec4 :int-vec4)
-     16)
-    ))
-(defun std140-layout (uniforms)
-  (let ((offset 0))
-    (loop ))
-  )
-
-;;; Implementation of strategies
-(defclass strategy ()
-  ((uset-descriptor :accessor uset-descriptor :initarg :uset-descriptor)))
-
-;;; The default uniform set strategy, which uploads uniform values into uniform
-;;; locations in a shader program.
-
-(defclass default-uniform-strategy (strategy)
-  ((per-program-locations :accessor per-program-locations
-                          :initarg :per-program-locations
-                          :initform nil)))
-
-(defclass uniform-definition ()
-  ((decl :accessor decl)
-   (location :accessor location)
-   (offset :accessor offset)))
+   (program :accessor program :initarg :program :initform nil)
+   (uniform-sets :accessor uniform-sets :initarg :uniform-sets :initform nil)))
 
 (defgeneric gl-finalize (obj &optional errorp)
-  :documentation "Allocate any OpenGL resources needed for OBJ and perform any
-  tasks needed to use it (e.g. link a shader program)")
+  (:documentation "Allocate any OpenGL resources needed for OBJ and perform any
+  tasks needed to use it (e.g. link a shader program)"))
 
 (defgeneric gl-finalized-p (obj))
 
-(defclass shader (gl-object)
-  ((shader-type :accessor shader-type :initarg :shader-type)
+(defclass shader-source ()
+  ((shader-type :accessor shader-type :initarg :shader-type )
    (source :accessor source :initarg :source :initform nil)
-   (declared-usets :accessor declared-usets :initarg :declared-usets
-                   :initform nil)
-   (status :accessor status :initarg :status)
+   (usets :accessor usets)))
+   
+(defmethod initialize-instance :after ((obj shader-source) &key usets)
+  (setf (usets obj) (mapcar #'(lambda (uset-name)
+                                (or (get-uset-descriptor uset-name)
+                                    (error "Uset ~S is not defined." uset-name)))
+                            usets)))
+ 
+;;; A shader object could be different for different programs because the uset
+;;; strategies might be different. Should we keep a cache of objects for a set
+;;; of uset strategies?
+
+(defclass shader (shader-source gl-object)
+  ((status :accessor status :initarg :status)
    (compiler-log :accessor compiler-log :initarg :compiler-log :initform nil)))
 
 (defmethod gl-finalized-p ((obj shader))
@@ -488,9 +228,11 @@
 (defmethod gl-finalize ((obj shader) &optional (errorp t))
   (if (gl-finalized-p obj)
       (status obj)
-      (let ((id (gl:create-shader (shader-type obj))))
+      (let* ((src (source obj))
+             (id (gl:create-shader (shader-type obj))))
         (setf (id obj) id)
-        (gl:shader-source id (source obj))
+        ;; XXX #defines for usets; comes from program
+        (gl:shader-source id src)
         (gl:compile-shader id)
         (let ((status (gl:get-shader id :compile-status)))
           (setf (status obj) status)
@@ -503,19 +245,51 @@
 
 (defclass program (gl-object)
   ((shaders :accessor shaders :initarg :shaders :initform nil)
+   (compiled-shaders :accessor compiled-shaders :initform nil)
    ;; (name location type size)
    (uniforms :accessor uniforms :initform nil
              :documentation "Information on uniforms declared within
   the program shader source.") 
-   (uset-descriptors :accessor uset-descriptors :initform nil)
    (status :accessor status :initarg :status)
    (link-log :accessor link-log :initarg :link-log :initform nil)
-   (current-usets :accessor current-usets :initform nil)))
+   ;; elements are (desc strategy (most-recent-uset counter))
+   (uset-alist :accessor uset-alist :initform nil)))
+
+;;; Compute all the usets used in a program's shaders, then choose strategies
+;;; for them.
+(defun compute-usets (program)
+  (let ((uset-alist nil))
+    (loop
+       for shader in (shaders program)
+       for usets = (usets shader)
+       do (loop
+             for uset in usets
+             for uset-pair = (assoc uset uset-alist)
+             do (if uset-pair
+                    (push shader (cdr uset-pair))
+                    (push (cons uset shader) uset-alist))))
+    ;; Only one kind of uset for now.
+    (setf (uset-alist program)
+          (mapcar #'(lambda (entry)
+                      (list (car entry)
+                            (make-uset-strategy (car entry)
+                                                program
+                                                'explicit-uniforms)
+                            (list nil 0)))
+                  uset-alist))))
 
 ;;; Set the uniform values in a program, assuming  that it is currently bound.
 (defun upload-uset-to-program (uset program)
-  (let ((descriptor (descriptor uset)))
-    ))
+  (let* ((descriptor (descriptor uset))
+         (uset-entry (assoc descriptor (uset-alist program)))
+         (strategy (cadr uset-entry))
+         (last-uset-data (caddr uset-entry)))
+    (when (and strategy
+               (not (up-to-date-p uset (car last-uset-data) (cdr last-uset-data))))
+      (funcall (uploader strategy) uset)
+      (setf (car last-uset-data) uset
+            (cdr last-uset-data) (counter uset)))
+    uset))
 
 (defmethod gl-finalized-p ((obj program))
   (slot-boundp obj 'status))
@@ -525,100 +299,40 @@
            (if errorp
                (apply #'error args)
                (return-from gl-finalize nil))))
+    (compute-usets obj)
     (let ((id (gl:create-program)))
-    (setf (id obj) id)
-    (with-slots (shaders)
-        obj
+      (setf (id obj) id)
+      (with-slots (shaders)
+          obj
+        (loop
+           for shader in shaders
+           when (null (gl-finalize shader))
+           do (err 'render-error
+                   :gl-object shader
+                   :format-control "The shader ~S is not finalized."))
+        (loop
+           for shader in shaders
+           do (gl:attach-shader id (id shader))))
+      (gl:link-program id)
+      (unless (setf (status obj) (gl:get-program id :link-status))
+        (setf (link-log obj) (gl:get-program-info-log id))
+        (err 'render-error
+             :gl-object obj :error-log (link-log obj)
+             :format-control "The program ~S has link errors."))
       (loop
-         for shader in shaders
-         when (null (gl-finalize shader))
-         do (err 'render-error
-                 :gl-object shader
-                 :format-control "The shader ~S is not finalized."))
+         with num-actives = (gl:get-program id :active-uniforms)
+         for index from 0 below num-actives
+         collecting (multiple-value-bind (size type name)
+                        (gl:get-active-uniform id index)
+                      (let ((location (gl:get-uniform-location id name)))
+                        (unless (eql -1 location)
+                          (list name location type size))))
+         into uniforms
+         finally (setf (uniforms obj) uniforms))
       (loop
-         for shader in shaders
-         do (gl:attach-shader id (id shader))))
-    (gl:link-program id)
-    (unless (setf (status obj) (gl:get-program id :link-status))
-      (setf (link-log obj) (gl:get-program-info-log id))
-      (err 'render-error
-           :gl-object obj :error-log (link-log obj)
-           :format-control "The program ~S has link errors."))
-    (loop
-       with num-actives = (gl:get-program id :active-uniforms)
-       for index from 0 below num-actives
-       collecting (multiple-value-bind (size type name)
-                      (gl:get-active-uniform id index)
-                    (let ((location (gl:get-uniform-location id name)))
-                      (unless (eql -1 location)
-                        (list name location type size))))
-       into uniforms
-       finally (setf (uniforms obj) uniforms))
-    obj)))
-
-(defvar *uset-descriptors* (make-hash-table :test 'eq))
-
-(defun define-uset (name variables &key (strategy :default) usage)
-  (declare (ignore usage))
-  (let ((descriptor (make-instance 'uset-descriptor :strategy strategy))
-        (decls (mapcar #'(lambda (clause)
-                           (destructuring-bind (name gl-type
-                                                     &optional accessor)
-                               clause
-                             (make-instance 'uniform-declaration
-                                            :name name
-                                            :gl-type gl-type)))
-                       variables)))
-    ;; lay out local storage
-    (loop
-       with offset = 0
-       for var in decls
-       for typeinfo = (gethash (gl-type var) *uniform-type-info*)
-       do (if typeinfo
-              (with-slots (size c-alignment local-writer)
-                  typeinfo
-                ;; XXX Do something with size when arrays are supported
-                (setq offset (round-up offset c-alignment))
-                (setf (local-offset var) offset)
-                (let ((raw-setter-fun local-writer)
-                      (offset offset))  ;rebind to close over
-                  (setf (local-storage-setter var)
-                        #'(lambda (storage val)
-                            (cffi:with-pointer-to-vector-data (ptr storage)
-                              (funcall raw-setter-fun
-                                       (cffi:inc-pointer ptr offset)
-                                       val)))))
-                (incf offset size)))
-       finally (let ((local-size (round-up offset 8))) ;double alignment
-                 (setf (local-storage-size descriptor) local-size)))
-    (setf (gethash name *uset-descriptors*) descriptor)
-    descriptor))
-
-(defun ensure-uset-descriptor (descriptor)
-  (let* ((name (if (consp descriptor)
-                   (car descriptor)
-                   descriptor))
-         (desc (gethash name *uset-descriptors*)))
-    (cond (desc
-           (return-from ensure-uset-descriptor desc))
-          ((not (consp descriptor))
-           (error 'render-error
-                  :format-control "~S is not a descriptor definition."
-                  :format-arguments (list desc)))
-          (t (let ((clauses (cadr descriptor)))
-               (setq desc
-                     (loop
-                        for clause in desc
-                        collect (if (consp clause)
-                                    (make-instance 'uniform-declaration
-                                                   :name (car clause)
-                                                   :gl-type (cadr clause))
-                                    clause))))))
-    (setf (gethash name *uset-descriptors*) desc)
-    desc))
-
-(defun ensure-descriptors (descriptors)
-  (mapcar #'ensure-descriptor descriptors))
+         for (nil strategy) in (uset-alist obj)
+         do (initialize-uset-strategy strategy obj))
+      obj)))
 
 (defun make-shader (stage uset-descriptors source)
   (let ((descriptors (ensure-descriptors uset-descriptors))
@@ -701,22 +415,20 @@
 
 (defgeneric bind-state (renderer state))
 
-
-
 (defmethod bind-state ((renderer renderer) (state graphics-state))
   (with-slots (current-state)
       renderer
     (when (eq current-state state)
       (return-from bind-state nil))
-    (let* ((old-program (program current-state))
-           (new-program (program state))
-           (prog-descriptors (uset-descriptors new-program)))
+    (let* ((old-program (and current-state (program current-state)))
+           (new-program (program state)))
       (unless (eq new-program old-program)
         (gl:use-program (id new-program)))
+        ;; XXX bindings
       (loop
-         for set in (uniform-sets state))
-    
-      )))
+         for uset in (uniform-sets state)
+         do (upload-uset-to-program uset new-program))
+      (setf (current-state renderer) state))))
 
 (defun draw-render-groups (renderer)
   (upload-bundles renderer)

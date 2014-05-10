@@ -85,9 +85,9 @@ void main()
 } 
 ")
 
-(lpsg:define-uset 'animation '(("angle" :float angle)))
-(lpsg:define-uset 'projection '(("projectionMatrix" :float-mat4
-                                 projection-matrix)))
+(lpsg:define-uset animation (("angle" :float angle :accessor angle)))
+(lpsg:define-uset projection (("projectionMatrix" :float-mat4
+                               projection-matrix :accessor projection-matrix)))
 
 ;;; Initialization 
 
@@ -112,8 +112,8 @@ void main()
       (setf (gl:glaref arr i) (aref verts i)))
     (dotimes (i (length indexes))
       (setf (gl:glaref iarr i) (aref indexes i)))
-    (setf (animation-uset w)
-          (make-uset 'animation))
+    (setf (animation-uset w) (make-instance 'animation))
+    (setf (projection-uset w) (make-instance 'projection))
     
     ;; A program object is a collection of shader objects to be used
     ;; together in a single pipeline for rendering objects. To create a
@@ -127,44 +127,36 @@ void main()
                                 :vertex-data arr))
            (vs (make-instance 'lpsg::shader
                               :shader-type :vertex-shader
-                              :source *shader-vao-vertex-program*))
+                              :source *shader-vao-vertex-program*
+                              :usets '(animation projection)))
            (fs (make-instance 'lpsg::shader
                               :shader-type :fragment-shader
-                              :source *shader-vao-fragment-program*))
+                              :source *shader-vao-fragment-program*
+                              :usets '(animation)))
            (program (make-instance 'lpsg::program
-                                   :shaders (list vs fs)
-                                   :usets '(animation projection)))
-           (lpsg:add-bundle
-            (renderer w)
-             (make-instance 'lpsg:render-bundle
-                            :geometry geom)))
+                                   :shaders (list vs fs))))
       (setf (program w) program)
       (lpsg::gl-finalize program)
-      ;; If we want to render using this program object, or add
-      ;; uniforms, we need to use the program. This is similar to
-      ;; binding a buffer.
-      (gl:use-program (lpsg::id program)))))
-
-(defun get-location (program name)
-  (cadr (assoc name (lpsg::uniforms program) :test #'equal)))
+      (let ((state (make-instance 'lpsg:graphics-state
+                                  :program program
+                                  :uniform-sets (list (animation-uset w)
+                                                      (projection-uset w)))))
+        (lpsg:add-bundle (renderer w) (make-instance 'lpsg:render-bundle
+                                                     :geometry geom
+                                                     :gl-state state))))))
 
 (defmethod glut:tick ((w rotator))
   (let ((seconds-per-revolution 6)
-        (loc (get-location (program w) "angle"))) 
+        (anim (animation-uset w)))
     (incf  (angle w)
 	   (/ (* 2 pi) (* 60 seconds-per-revolution)))
-    (gl:uniformf loc (angle w)))
+    (with-mutable anim
+      (setf (angle anim) (angle w))))
   (glut:post-redisplay))
 
 (defmethod glut:display ((w rotator))
   (gl:clear-color 0.0 0.0 0.2 1.0)
   (gl:clear :color-buffer-bit :depth-buffer-bit)
-  
-  ;; Since we never use any other program object, this is unnecessary
-  ;; in this program. Typically, though, you'll have multiple program
-  ;; objects, so you'll need to 'use' each one to activate it.
-  (gl:use-program (lpsg::id (program w)))
-  
   (lpsg:draw-render-groups (renderer w))
   (glut:swap-buffers))
 
@@ -175,9 +167,8 @@ void main()
   (let* ((right (max (float (/ width height)) 1.0))
          (top (max (float (/ height width)) 1.0))
          (ortho-mat (lpsg:ortho-matrix (- right) right (- top) top -1.0 1.0)))
-    (when (program w)
-      (let ((loc (get-location (program w) "projectionMatrix")))
-        (gl:uniform-matrix loc 4 (vector ortho-mat) nil)))))
+    (with-mutable (projection-uset w)
+      (setf (projection-matrix (projection-uset w)) ortho-mat))))
   
 (defmethod glut:keyboard ((w rotator) key x y)
   (declare (ignore x y))
@@ -194,7 +185,8 @@ void main()
   ;; are detached.
   (when (slot-boundp w 'program)
    (gl:delete-program (lpsg::id (program w))))
-  (lpsg:close-renderer (renderer w)))
+  (when (slot-boundp w 'renderer)
+    (lpsg:close-renderer (renderer w))))
 
 
 (defun rotator ()
