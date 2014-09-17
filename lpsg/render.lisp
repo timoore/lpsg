@@ -435,6 +435,8 @@
   (draw renderer))
 
 (defmethod draw ((renderer renderer))
+  ;; XXX Should we set the state to something known here?
+  (setf (current-state renderer) nil)
   (loop
      for bundle in (bundles renderer)
      for geom = (geometry bundle)
