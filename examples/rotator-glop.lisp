@@ -9,7 +9,8 @@
    (program :accessor program)
    (angle :accessor angle :initform 0.0)
    (animation-uset :accessor animation-uset)
-   (projection-uset :accessor projection-uset)))
+   (projection-uset :accessor projection-uset)
+   (exposed :accessor exposed :initform nil)))
 
 (defmethod glop:on-event ((window renderer-window) (event glop:key-event))
   (when (eq (glop:keysym event) :escape)
@@ -42,6 +43,7 @@
   (format t "Resize: ~Sx~S~%" (glop:width event) (glop:height event)))
 
 (defmethod glop:on-event ((window renderer-window) (event glop:expose-event))
+  (setf (exposed window) t)
   (update-for-window-change window event)
   (format t "Expose~%"))
 
@@ -150,27 +152,32 @@ void main()
   (let ((win (glop:create-window "rotator test" 800 600
                                  :win-class 'renderer-window))
         (time (get-internal-real-time)))
-    (unless win
-      (return-from rotator-glop nil))
-    (format t "GL Context version: ~a~%Renderer: ~a~%Vendor: ~a~%"
-            (gl:get-string :version)
-            (gl:get-string :renderer)
-            (gl:get-string :vendor))
-    (let ((ticks-per-sec (float internal-time-units-per-second 1.0d0)))
-      (setup-lpsg win)
-      ;; 6 revolutions per second
-      (loop
-         with start-time = (get-internal-real-time)
-         while (glop:dispatch-events win :blocking nil :on-foo nil)
-         do (let* ((current-time (/ (float (- (get-internal-real-time) start-time)
-                                           1.0d0)
-                                    ticks-per-sec))
-                   (angle (mod (* current-time 6.0d0 2.0d0 pi)
-                               (* 2.0d0 pi)))
-                   (anim (animation-uset win)))
-              (lpsg:with-mutable anim
-                (setf (angle anim) (float angle 1.0)))
-              (gl:clear :color-buffer)
-              (lpsg:draw-render-groups (renderer win))
-              (glop:swap-buffers win)))
-      (glop:destroy-window win))))
+    (unwind-protect
+         (progn
+           (unless win
+             (return-from rotator-glop nil))
+           (format t "GL Context version: ~a~%Renderer: ~a~%Vendor: ~a~%"
+                   (gl:get-string :version)
+                   (gl:get-string :renderer)
+                   (gl:get-string :vendor))
+           (let ((ticks-per-sec (float internal-time-units-per-second 1.0d0)))
+             (setup-lpsg win)
+             ;; 1 revolution per 6 seconds
+             (loop
+                with start-time = (get-internal-real-time)
+                while (glop:dispatch-events win :blocking nil :on-foo nil)
+                when (exposed win)
+                do (let* ((current-time (/ (float (- (get-internal-real-time) start-time)
+                                                  1.0d0)
+                                           ticks-per-sec))
+                          (angle (mod (* (/ current-time 6.0d0) 2.0d0 pi)
+                                      (* 2.0d0 pi)))
+                          (anim (animation-uset win)))
+                     (lpsg:with-mutable anim
+                       (setf (angle anim) (float angle 1.0)))
+                     (gl:clear :color-buffer)
+                     (lpsg:draw-render-groups (renderer win))
+                     (glop:swap-buffers win)))))
+      (and win (glop:destroy-window win)))))
+
+
