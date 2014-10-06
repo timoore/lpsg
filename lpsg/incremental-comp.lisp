@@ -11,18 +11,14 @@
 ;;; can be easily managed. A computation node class is free to also keep a
 ;;; source or sink in a slot for convenient access.
 
-(defvar *frame-counter* 0)
-
 (defclass computation-node ()
   ((sinks :accessor sinks :initform nil)
    (cached-value :accessor cached-value :initarg :inital-value)
-   (invalidated-on-frame :accessor invalidated-on-frame :initform 0)
-   (refreshed-on-frame :accessor refreshed-on-frame :initform -1)))
+   (validp :accessor validp :initform t)))
 
 (defgeneric add-sink (node sink))
 
 (defgeneric delete-sink (node))
-
 
 (defmethod add-sink ((node computation-node) sink)
   (pushnew sink (sinks node))
@@ -31,34 +27,35 @@
 (defmethod delete-sink ((node computation-node))
   (delete node (sinks node)))
 
-(defgeneric value (node &optional frame))
+(defgeneric value (node))
 
-(defmethod value ((node computation-node) &optional (frame *frame-counter*))
-  (if (<= (invalidated-on-frame node) (refreshed-on-frame node))
+(defmethod value ((node computation-node))
+  (if (validp node)
       (cached-value node)
-      (let ((new-value (compute node frame)))
+      (let ((new-value (compute node)))
         (setf (cached-value node) new-value)
-        (setf (refreshed-on-frame node) frame)
+        (setf (validp node) t)
         new-value)))
 
-(defgeneric compute (node &optional frame))
+(defgeneric compute (node))
 
-(defun invalidate-calculation (node &optional (frame *frame-counter*))
-  (when (<= (invalidated-on-frame node) frame)
-    (mapc (lambda (sink) (invalidate-calculation sink frame))
+(defgeneric invalidate-calculation (node invalid-source))
+
+(defmethod invalidate-calculation ((node computation-node) invalid-source)
+  (declare (ignorable invalid-source))
+  (when (validp node)
+    (mapc (lambda (sink) (invalidate-calculation sink node))
           (sinks node))
-    (setf (invalidated-on-frame node) frame)))
+    (setf (validp node) nil)))
 
 (defclass input-value-node (computation-node)
   ())
 
-(defgeneric (setf value) (value node &optional frame))
+(defgeneric (setf value) (value node))
 
-(defmethod (setf value) (value (node input-value-node)
-                         &optional (frame *frame-counter*))
+(defmethod (setf value) (value (node input-value-node))
   (setf (cached-value node) value)
-  (invalidate-calculation node frame)
-  (setf (refreshed-on-frame node) frame)
+  (invalidate-calculation node node)
   value)
 
 ;;; Testing
@@ -69,7 +66,7 @@
   ((arg1 :accessor arg1)
    (arg2 :accessor arg2)))
 
-(defmethod compute ((node plus-node) &optional frame)
+(defmethod compute ((node plus-node))
   (+ (value (arg1 node) frame)
      (value (arg2 node) frame)))
 
@@ -77,7 +74,7 @@
   ((arg1 :accessor arg1)
    (arg2 :accessor arg2)))
 
-(defmethod compute ((node mult-node) &optional frame)
+(defmethod compute ((node mult-node))
   (* (value (arg1 node) frame)
      (value (arg2 node) frame)))
 
@@ -96,8 +93,6 @@
 (add-sink *source1* *mult-node*)
 (setf (arg2 *mult-node*) *source2*)
 (add-sink *source2* *mult-node*)
-
-(setf *frame-counter* 1)
 
 (setf (value *source1*) 4)
 (setf (value *source2*) 8)

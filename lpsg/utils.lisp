@@ -48,3 +48,32 @@
     (setf (aref result 3 2) (- (/ (+ far near) (- far near))))
     (setf (aref result 3 3) 1.0)
     result))
+
+(defun vec+ (v1 v2)
+  (let ((result (make-array (list (length v1)) :element-type (array-element-type v1))))
+    (loop
+       for i from 0 below (length v1)
+       do (setf (aref result i) (+ (aref i v1) (aref i v2))))
+    result))
+
+(defun vec- (v1 v2)
+  (let ((result (make-array (list (length v1)) :element-type (array-element-type v1))))
+    (loop
+       for i from 0 below (length v1)
+       do (setf (aref result i) (- (aref i v1) (aref i v2))))
+    result))
+
+
+(defun dot (v1 v2)
+  (let ((result 0))
+    (loop
+       for i from 0 below (length v1)
+       do (setf result (+ result (* (aref v1 i) (aref v2 i)))))
+    result))
+
+(defun cross (v1 v2)
+  (let ((result (make-array '(3) :element-type (array-element-type v1))))
+    (setf (aref result 0) (- (* (aref v1 1) (aref v2 2)) (* (aref v2 1) (aref v1 2))))
+    (setf (aref result 0) (- (* (aref v2 0) (aref v1 2)) (* (aref v1 0) (aref v2 2))))
+    (setf (aref result 0) (- (* (aref v1 0) (aref v2 1)) (* (aref v2 0) (aref v1 1))))
+    result))

@@ -23,11 +23,28 @@
    (log :reader render-error-log :initarg :error-log :initform nil))
   (:report report-render-error))
 
-(defclass renderer ()
+(defclass renderer (assembly)
   ((buffers :accessor buffers :initform nil)
    (bundles :accessor bundles :initform nil)
    (new-bundles :accessor new-bundles :initform nil)
-   (current-state :accessor current-state :initform nil)))
+   (current-state :accessor current-state :initform nil)
+   (finalize-queue :accessor finalize-queue :initform nil)
+   (upload-queue :accessor upload-queue :initform nil)))
+
+(defmethod add-object :after ((parent renderer) object)
+  (labels ((do-all-children (obj)
+             (unless (gl-finalized-p obj)
+               (push obj (finalize-queue renderer)))
+             (when (typep obj 'assembly)
+               (mapc #'do-all-children (children object)))))
+    (do-all-children object)))
+
+(defun process-finalize-queue (renderer)
+  (loop
+     for obj in (finalize-queue renderer)
+     if (not (gl-finalized-p obj))
+     do (gl-finalize obj))
+  (setf (finalize-queue renderer) nil))
 
 ;;; A simple reference counting protocol for objects that should do some
 ;;; cleanup e.g., release OpenGL resources, when they are no longer used.
