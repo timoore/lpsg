@@ -46,28 +46,6 @@
      do (gl-finalize obj))
   (setf (finalize-queue renderer) nil))
 
-;;; A simple reference counting protocol for objects that should do some
-;;; cleanup e.g., release OpenGL resources, when they are no longer used.
-
-(defclass reference-counted ()
-  ((refcount :accessor refcount :initform 0 :type fixnum)))
-
-(defgeneric ref (obj))
-
-(defmethod ref ((obj reference-counted))
-  (incf (slot-value obj 'refcount)))
-
-(defgeneric dereferenced (obj))
-
-(defmethod dereferenced ((obj t))
-  nil)
-
-(defgeneric unref (obj))
-
-(defmethod unref ((obj reference-counted))
-  (when (zerop (decf (slot-value obj 'refcount)))
-    (dereferenced obj)))
-
 (defclass gl-object ()
   ((id :accessor id :initarg :id :initform 0
        :documentation "ID from OpenGL of object"))
@@ -130,7 +108,7 @@
   (gl:delete-buffers (list (id buffer)))
   (setf (car (alloc-tail buffer)) nil))
 
-(defclass geometry (reference-counted)
+(defclass geometry ()
   ((mode :accessor mode :initarg :mode
          :documentation "A mode for an OpenGL draw-elements or draw-array call,
   e.g. :triangles")
@@ -163,24 +141,8 @@
    rendering.")))
 
 (defclass render-bundle ()
-  ((geometry :reader geometry :initarg :geometry)
+  ((geometry :accessor geometry :initarg :geometry)
    (gl-state :reader gl-state :initarg :gl-state)))
-
-(defmethod initialize-instance :after ((obj render-bundle) &key)
-  (let ((geometry (slot-value obj 'geometry)))
-    (when geometry
-      (ref geometry))))
-
-;;; XXX make this go away
-(defmethod (setf geometry) (new-val (obj render-bundle))
-  (when (slot-boundp obj 'geometry)
-    (let ((old-val (slot-value obj 'geometry)))
-      (when old-val
-        (unref old-val))))
-  (when new-val
-    (ref new-val))
-  (setf (slot-value obj 'geometry) new-val)
-  new-val)
 
 (defclass graphics-state ()
   ((bindings)
