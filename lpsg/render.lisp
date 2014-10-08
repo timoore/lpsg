@@ -117,13 +117,13 @@
    (indices :accessor indices :initarg :indices :initform nil
             :documentation "A gl-array (:unsigned-short) of indices into the vertex
    attributes, for each vertex of each geometry element. This can be NULL, in
-   which case the geometry will be drawn using %gl:draw-elements.")
+   which case the geometry will be drawn using %gl:draw-array.")
    (index-usage :accessor index-usage :initarg :index-usage
                 :initform :static-draw
                 :documentation "A hint for allocation of the index buffer
    storage")
    (vertex-attributes :accessor vertex-attributes :initarg :vertex-attributes
-                      :documentation "A symbol (cl-opengl gl-array-format or a
+                      :documentation "A symbol (cl-opengl gl-array-format) or a
   list of (attrib-number type size")
    (vertex-data :accessor vertex-data :initarg :vertex-data
                 :documentation "a single gl-array, or a list of gl-array

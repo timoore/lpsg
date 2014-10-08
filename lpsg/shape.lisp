@@ -70,6 +70,12 @@
 (defmethod mode ((obj shape))
   (mode (geometry obj)))
 
-(defmethod (setf mode) (new-mode (obj shape))
-  (setf (mode (geometry obj)) new-mode))
+(defmethod (setf mode) (mode (obj shape))
+  (setf (mode (geometry obj)) mode))
+
+(defmethod number-vertices ((obj shape))
+  (number-vertices (geometry obj)))
+
+(defmethod (setf number-vertices) (num (obj shape))
+  (setf (number-vertices (geometry obj)) num))
 
