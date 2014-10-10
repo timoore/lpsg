@@ -3,20 +3,22 @@
 (in-package #:lpsg)
 
 (defclass buffered-resource ()
-  ((usage :accessor usage :initarg :usage)
-   (buffer :accessor buffer :initarg :buffer)
-   (offset :accessor offset :initarg :offset :initform 0)
-   (stride :accessor stride :initarg :stride :initform 0)
+  ((buffer :accessor buffer :initarg :buffer :documentation "The GL buffer.")
    (size)
    (buffer-type)
    (normalizedp :accessor normalizedp :initarg :normalizedp :initform nil)
-   (num-components :accessor num-components :initarg :num-components)
+   (stride :accessor stride :initarg :stride :initform 0)
+   (offset :accessor offset :initarg :offset :initform 0)
+
    ))
 
 (defclass mirrored-resource (buffered-resource)
   ((data :accessor data :initarg :data)
    (data-offset :accessor data-offset :initarg :data-offset :initform 0)
-   (data-size :accessor data-size :initarg :data-size :initform 0)))
+   (data-size :accessor data-size :initarg :data-size :initform 0)
+   (data-stride :accessor data-stride :initarg :data-stride :initform 0
+                :documentation "number of elements")
+   (num-components :accessor num-components :initarg :num-components)))
 
 ;;; Definition of an individual vertex attribute
 ;;;
@@ -41,11 +43,11 @@
 (defclass shape ()
   ((attributes :accessor attributes :initarg :attributes :initform nil)
    (effect)
-   (geometry :accessor geometry)
+   (drawable :accessor drawable)
    (bundle)))
 
 (defmethod initialize-instance ((obj shape) &key)
-  (setf (geometry obj) (make-instance 'geometry)))
+  (setf (drawable obj) (make-instance 'drawable)))
 
 (defgeneric attribute (obj attribute-name))
 
@@ -65,17 +67,17 @@
         (setf (attribute obj attribute-name)
               (make-instance 'vertex-attribute)))))
 
-;;; Delegate to geometry
+;;; Delegate to drawable
 
 (defmethod mode ((obj shape))
-  (mode (geometry obj)))
+  (mode (drawable obj)))
 
 (defmethod (setf mode) (mode (obj shape))
-  (setf (mode (geometry obj)) mode))
+  (setf (mode (drawable obj)) mode))
 
 (defmethod number-vertices ((obj shape))
-  (number-vertices (geometry obj)))
+  (number-vertices (drawable obj)))
 
 (defmethod (setf number-vertices) (num (obj shape))
-  (setf (number-vertices (geometry obj)) num))
+  (setf (number-vertices (drawable obj)) num))
 

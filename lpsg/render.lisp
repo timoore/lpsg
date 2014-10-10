@@ -56,14 +56,35 @@
 (defmethod gl-valid-p ((obj gl-object))
   (not (zerop (id obj))))
 
-(defclass gl-buffer (gl-object)
-  ((size :accessor size :initarg :size)
-   (usage :accessor usage :initarg :usage)
-   (free-list :accessor free-list :initform nil)
-   (alloc-tail :accessor alloc-tail)))
+(defclass allocator ()
+  ((free-list :accessor free-list :initform nil)))
 
-(defmethod initialize-instance :after ((obj gl-buffer) &key)
-  (setf (alloc-tail obj) (list obj)))
+(defmethod initialize-instance :after ((obj allocator) &key size)
+  (when size
+    (push (list 0 size) (free-list obj))))
+
+(defgeneric allocate (allocator size &optional alignment))
+
+(defun round-up (val divisor)
+  (* (ceiling val divisor) divisor))
+
+(defmethod allocate ((allocator allocator) size &optional (alignment 4))
+  (let ((rounded-size (* (ceiling size alignment) alignment)))
+    (loop
+       for region in (free-list allocator)
+       for (offset region-size) = region
+       if (>= region-size rounded-size)
+       do (progn
+            (if (eql rounded-size region-size)
+                (setf (free-list allocator) (delete region (free-list allocator)))
+                (setf (car region) (+ offset rounded-size)
+                      (cadr region) (- region-size rounded-size)))
+            (return-from allocate (values offset rounded-size))))
+    nil))
+
+(defclass gl-buffer (allocator gl-object)
+  ((size :accessor size :initarg :size)
+   (usage :accessor usage :initarg :usage)))
 
 (defun reserve-buffer (target &optional (usage :static-draw) (size 104856))
   (let* ((ids (gl:gen-buffers 1))
@@ -71,7 +92,6 @@
          (buf (make-instance 'gl-buffer :id id :size size :usage usage)))
     (gl:bind-buffer target id)
     (%gl:buffer-data target size (cffi:null-pointer) usage)
-    (push (list* 0 size (alloc-tail buf)) (free-list buf))
     buf))
 
 (defun allocation-offset (alloc)
@@ -83,22 +103,11 @@
 (defun allocation-buffer (alloc)
   (caddr alloc))
 
-(defun round-up (val divisor)
-  (* (ceiling val divisor) divisor))
-
 (defun allocate-from-buffer (buffer size &optional (alignment 4))
   (let ((rounded-size (* (ceiling size alignment) alignment)))
-    (loop
-       for region in (free-list buffer)
-       for (offset region-size) = region
-       if (>= region-size rounded-size)
-       do (progn
-            (let ((allocation (list* offset rounded-size (alloc-tail buffer))))
-              (if (eql rounded-size region-size)
-                  (setf (free-list buffer) (delete region (free-list buffer)))
-                  (setf (car region) (+ offset rounded-size)
-                        (cadr region) (- region-size rounded-size)))
-              (return-from allocate-from-buffer allocation))))
+    (multiple-value-bind (offset rounded-size)
+        (allocate buffer size alignment)
+      (list offset rounded-size buffer))
     nil))
 
 (defun deallocate-in-buffer (buffer allocation)
@@ -106,15 +115,18 @@
 
 (defun release-buffer (buffer)
   (gl:delete-buffers (list (id buffer)))
-  (setf (car (alloc-tail buffer)) nil))
+  (setf (id buffer) 0)
+  nil)
 
-(defclass geometry ()
+(defclass drawable ()
   ((mode :accessor mode :initarg :mode
          :documentation "A mode for an OpenGL draw-elements or draw-array call,
   e.g. :triangles")
    (number-vertices :accessor number-vertices :initarg :number-vertices
-                    :documentation "The total number of vertices in this geometry.")
-   (indices :accessor indices :initarg :indices :initform nil
+                    :documentation "The total number of vertices in this geometry.")))
+
+(defclass geometry (drawable)
+  ((indices :accessor indices :initarg :indices :initform nil
             :documentation "A gl-array (:unsigned-short) of indices into the vertex
    attributes, for each vertex of each geometry element. This can be NULL, in
    which case the geometry will be drawn using %gl:draw-array.")
