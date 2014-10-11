@@ -22,9 +22,8 @@
 
 ;;; Definition of an individual vertex attribute
 ;;;
-;;; data - a Lisp array. If 1d, data will be taken from consecutive elements of
-;;; the array, according to format. If 2d, each data item will be taken from
-;;; the beginning of a row in the array. Arrays can be displaced.
+;;; data - a Lisp array. Data will be taken from consecutive elements of
+;;; the array, as by row-major-aref, according to format.
 ;;;
 ;;; format - OpenGL format
 ;;;

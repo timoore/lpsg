@@ -9,6 +9,7 @@
     ((:file "package")
      (:file "utils" :depends-on ("package"))
      (:file "mutable" :depends-on ("package"))
+     (:file "assembly" :depends-on ("package"))
      (:file "uset" :depends-on ("package" "mutable"))
      (:file "incremental-comp" :depends-on ("package"))
-     (:file "render" :depends-on ("package" "mutable" "uset"))))))
+     (:file "render" :depends-on ("package" "mutable" "uset" "assembly"))))))

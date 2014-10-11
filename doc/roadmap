@@ -1,0 +1,23 @@
+0.0.1
+ Basics
+  assembly, shape, transform
+  shape + environment -> bundle
+  environment skeleton
+  texture binding (basic)
+ Testing
+  solid examples, sphere
+  viewer tnat can change orientation
+  
+0.0.2
+ Rendering
+  bundle sorting
+  GC of GL resources
+ Testing
+  arcball in viewer
+  viewer sets incremental values
+  
+0.0.3
+ Rendering
+  multiple bundle queues
+  frame buffer objects
+  render targets

@@ -23,6 +23,22 @@
    (log :reader render-error-log :initarg :error-log :initform nil))
   (:report report-render-error))
 
+(defgeneric gl-finalize (obj &optional errorp)
+  (:documentation "Allocate any OpenGL resources needed for OBJ and perform any
+  tasks needed to use it (e.g. link a shader program)"))
+
+(defgeneric gl-finalized-p (obj))
+
+;;; Defaults: most objects won't need GL finalization.
+
+(defmethod gl-finalize (obj &optional errorp)
+  (declare (ignore obj errorp)
+  nil))
+
+(defmethod gl-finalized-p (obj)
+  (declare (ignore obj))
+  t)
+
 (defclass renderer (assembly)
   ((buffers :accessor buffers :initform nil)
    (bundles :accessor bundles :initform nil)
@@ -161,11 +177,7 @@
    (program :accessor program :initarg :program :initform nil)
    (uniform-sets :accessor uniform-sets :initarg :uniform-sets :initform nil)))
 
-(defgeneric gl-finalize (obj &optional errorp)
-  (:documentation "Allocate any OpenGL resources needed for OBJ and perform any
-  tasks needed to use it (e.g. link a shader program)"))
 
-(defgeneric gl-finalized-p (obj))
 
 (defclass shader-source ()
   ((shader-type :accessor shader-type :initarg :shader-type )
