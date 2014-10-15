@@ -8,9 +8,9 @@
    (buffer-type)
    (normalizedp :accessor normalizedp :initarg :normalizedp :initform nil)
    (stride :accessor stride :initarg :stride :initform 0)
-   (offset :accessor offset :initarg :offset :initform 0)
+   (offset :accessor offset :initarg :offset :initform 0)))
 
-   ))
+(defclass buffer-map () ())
 
 (defclass mirrored-resource (buffered-resource)
   ((data :accessor data :initarg :data)
@@ -41,9 +41,9 @@
 ;;; semantic from an effect.
 (defclass shape ()
   ((attributes :accessor attributes :initarg :attributes :initform nil)
-   (effect)
+   (environment :accessor environment :initarg :environment :initform nil)
    (drawable :accessor drawable)
-   (bundle)))
+   (bundle :accessor bundle)))
 
 (defmethod initialize-instance ((obj shape) &key)
   (setf (drawable obj) (make-instance 'drawable)))
@@ -80,3 +80,20 @@
 (defmethod (setf number-vertices) (num (obj shape))
   (setf (number-vertices (drawable obj)) num))
 
+;;; Turn a shape into something that can be rendered.
+
+(defmethod gl-finalized-p ((obj shape))
+  (and (bundle obj)
+       (gl-finalized-p (environment obj))
+       (gl-finalized-p (attributes obj))
+       (gl-finalized-p (bundle obj))))
+
+;;; Allocate buffers for attributes
+;;; upload?
+;;; Finalize environment: shader, textures
+;;; create the vertex attribute binding
+;;; finish bundle
+
+(defmethod gl-finalize ((obj shape) &optional errorp)
+  (gl-finalize (environment obj))
+  )

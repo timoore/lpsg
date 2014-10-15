@@ -146,7 +146,6 @@ void main()
         (lpsg:add-bundle (renderer w) (make-instance 'lpsg:render-bundle
                                                      :geometry geom
                                                      :gl-state state))))))
-  
 
 (defun rotator-glop ()
   (let ((win (glop:create-window "rotator test" 800 600

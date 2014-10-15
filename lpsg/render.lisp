@@ -166,7 +166,13 @@
    (element-buffer-allocation :accessor element-buffer-allocation :initform nil)
    (vao :accessor vao :initarg :vao :initform 0
         :documentation "OpenGL object for binding vertex attributes for
-   rendering.")))
+   rendering."))
+  :documentation "Deprecated.")
+
+(defclass attribute-set ()
+  ()
+  :documentation "A collection of buffer mappings (buffer + offset) bound to specific attributes,
+  along with a vao.")
 
 (defclass render-bundle ()
   ((geometry :accessor geometry :initarg :geometry)
@@ -229,7 +235,8 @@
    (status :accessor status :initarg :status)
    (link-log :accessor link-log :initarg :link-log :initform nil)
    ;; elements are (desc strategy (most-recent-uset counter))
-   (uset-alist :accessor uset-alist :initform nil)))
+   (uset-alist :accessor uset-alist :initform nil)
+   (vertex-attribs :accessor vertex-attribs :initform nil)))
 
 ;;; Compute all the usets used in a program's shaders, then choose strategies
 ;;; for them.
@@ -295,6 +302,7 @@
         (err 'render-error
              :gl-object obj :error-log (link-log obj)
              :format-control "The program ~S has link errors."))
+      ;; Info on the uniforms
       (loop
          with num-actives = (gl:get-program id :active-uniforms)
          for index from 0 below num-actives
@@ -308,12 +316,23 @@
       (loop
          for (nil strategy) in (uset-alist obj)
          do (initialize-uset-strategy strategy obj))
+      ;; Info on vertex attributes
+      (loop
+         with num-active-attribs = (gl:get-program id :active-attributes)
+         for index from 0 below num-active-attribs
+         collecting (multiple-value-bind (size type name)
+                        (gl:get-active-attrib id index)
+                      (let ((location (gl:get-attrib-location id name)))
+                        (list name location type size)))
+         into attributes
+         finally (setf (vertex-attribs obj) attributes))
       obj)))
 
 (defun make-shader (stage uset-descriptors source)
   (let ((descriptors (ensure-descriptors uset-descriptors))
         )))
 
+;;;TODO: not dereferenced anymore
 (defmethod dereferenced :after ((obj geometry))
   (with-slots ((array-alloc array-buffer-allocation)
                (element-alloc element-buffer-allocation))
