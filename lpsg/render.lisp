@@ -110,6 +110,17 @@
     (%gl:buffer-data target size (cffi:null-pointer) usage)
     buf))
 
+(gl-finalized-p ((obj gl-buffer))
+  (gl-valid-p obj))
+  
+(defgeneric gl-finalize-buffer (buffer target)
+  :documention "Finalize BUFFER while bound to a TARGET.")
+
+(defmethod gl-finalize-buffer ((buffer gl-buffer) target)
+  (let ((id (car (gl:gen-buffers 1))))
+    (gl:bind-buffer target id)
+    (%gl:buffer-data target (size buffer) (cffi:null-pointer) (usage buffer))))
+  
 (defun allocation-offset (alloc)
   (car alloc))
 
@@ -170,10 +181,15 @@
   :documentation "Deprecated.")
 
 (defclass attribute-set ()
-  ()
+  ((array-bindings :accessor array-bindings :initarg :array-bindings :initform nil)
+   (element-binding :accessor element-binding :initarg element-binding :initform nil)
+   (vao :accessor vao))
   :documentation "A collection of buffer mappings (buffer + offset) bound to specific attributes,
-  along with a vao.")
+  along with an associated VAO.")
 
+(defclass vertex-array-object (gl-object)
+  ())
+  
 (defclass render-bundle ()
   ((geometry :accessor geometry :initarg :geometry)
    (gl-state :reader gl-state :initarg :gl-state)))
