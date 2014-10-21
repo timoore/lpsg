@@ -116,7 +116,8 @@
 (defgeneric gl-finalize-buffer (buffer target)
   :documention "Finalize BUFFER while bound to a TARGET.")
 
-(defmethod gl-finalize-buffer ((buffer gl-buffer) target)
+(defmethod gl-finalize-buffer ((buffer gl-buffer) target &optional errorp)
+  (declare (ignorable errorp))          ; TODO: handle errorp
   (let ((id (car (gl:gen-buffers 1))))
     (gl:bind-buffer target id)
     (%gl:buffer-data target (size buffer) (cffi:null-pointer) (usage buffer))))
@@ -149,10 +150,19 @@
   ((mode :accessor mode :initarg :mode
          :documentation "A mode for an OpenGL draw-elements or draw-array call,
   e.g. :triangles")
-   (number-vertices :accessor number-vertices :initarg :number-vertices
+   (count :accessor count :initarg :count
                     :documentation "The total number of vertices in this geometry.")))
 
-(defclass geometry (drawable)
+(defclass array-drawable (drawable)
+  ((first-vertex :accessor first-vertex :initarg :first-vertex
+                 :documentation "The starting index in the enabled arrays.")))
+
+(defclass indexed-drawable (drawable)
+  ((index-type :accessor index-type :initarg :index-type)
+   (base-vertex :accessor base-vertex :initarg :base-vertex))
+  (:default-initargs :index-type :unsigned-short :base-vertex 0)))
+
+(defclass geometry (indexed-drawable)
   ((indices :accessor indices :initarg :indices :initform nil
             :documentation "A gl-array (:unsigned-short) of indices into the vertex
    attributes, for each vertex of each geometry element. This can be NULL, in
@@ -180,6 +190,28 @@
    rendering."))
   :documentation "Deprecated.")
 
+(defclass buffer-area ()
+  ((buffer :accessor buffer :initarg :buffer)
+   (resource-size :accessor resource-size :initarg :resource-size
+                  :documentation "size in bytes of resource's data in buffer")
+   (components :accessor components :initarg :components
+               :documentation "number of components in each element of an attribute")
+   (buffer-type :accessor buffer-type :initarg :buffer-type
+                :documentation "GL format of data in buffer")
+   (normalizedp :accessor normalizedp :initarg :normalizedp :initform nil)
+   (stride :accessor stride :initarg :stride :initform 0)
+   (offset :accessor offset :initarg :offset :initform 0))
+  :documentation "class for formatted data stored somewhere in a buffer"
+  (:default-initargs :usage :static-draw))
+
+(defmethod gl-finalized-p ((obj buffer-area))
+  (gl-finalized-p (buffer obj)))
+
+(defmethod gl-finalize ((obj buffer-area) &optional errorp)
+  (gl-finalize-buffer (buffer obj) :array-buffer errorp))
+
+(defclass buffer-map () ())
+
 (defclass attribute-set ()
   ((array-bindings :accessor array-bindings :initarg :array-bindings :initform nil)
    (element-binding :accessor element-binding :initarg element-binding :initform nil)
@@ -189,7 +221,34 @@
 
 (defclass vertex-array-object (gl-object)
   ())
-  
+
+(defmethod gl-finalized-p ((obj attribute-set))
+  ((not (null (vao attribute-set)))))
+
+(defmethod gl-finalize ((attribute-set attribute-set) &optional errorp)
+  (declare (ignorable errorp))
+  (let* ((vao-id (gl:gen-vertex-array))
+         (vao (make-instance 'vertex-array-object :id vao-id))
+         (nullptr (cffi:null-pointer))
+         (element-binding (element-binding attribute-set)))
+    (setf (vao attribute-set) vao)
+    (gl:bind-vertex-array vao-id)
+    (loop
+       for (index . area) in (array-bindings attribute-set)
+       do (progn
+            (gl:bind-buffer :array-buffer (buffer area))
+            (gl:enable-vertex-attrib-array index)
+            (gl:vertex-attrib-pointer index
+                                      (components area)
+                                      (buffer-type area)
+                                      (normalizedp area)
+                                      (stride area)
+                                      (cffi:inc-pointer nullptr (offset area)))))
+    (when element-binding
+      (gl:bind-buffer :element-array-buffer (buffer (element-binding attribute-set))))
+    (gl:bind-vertex-array 0)
+    attribute-set))
+
 (defclass render-bundle ()
   ((geometry :accessor geometry :initarg :geometry)
    (gl-state :reader gl-state :initarg :gl-state)))

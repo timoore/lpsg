@@ -2,18 +2,7 @@
 
 (in-package #:lpsg)
 
-(defclass buffered-resource ()
-  ((buffer :accessor buffer :initarg :buffer :documentation "The GL buffer.")
-   (size)
-   (buffer-type)
-   (normalizedp :accessor normalizedp :initarg :normalizedp :initform nil)
-   (stride :accessor stride :initarg :stride :initform 0)
-   (offset :accessor offset :initarg :offset :initform 0))
-  :documentation "Class for data stored somewhere in a buffer")
-
-(defclass buffer-map () ())
-
-(defclass mirrored-resource (buffered-resource)
+(defclass mirrored-resource (buffer-area)
   ((data :accessor data :initarg :data)
    (data-offset :accessor data-offset :initarg :data-offset :initform 0)
    (data-size :accessor data-size :initarg :data-size :initform 0)
@@ -38,8 +27,8 @@
 (defclass vertex-attribute (mirrored-resource)
   ())
 
-;;; attributes - alist of (name . vertex-attribute). Name is tested EQUAL to a
-;;; semantic from an effect.
+;;; attributes - alist of (name . vertex-attribute). 
+
 (defclass shape ()
   ((attributes :accessor attributes :initarg :attributes :initform nil)
    (environment :accessor environment :initarg :environment :initform nil)
@@ -99,8 +88,11 @@
   (flet ((maybe-finalize (obj)
            (or (gl-finalized-p obj) (gl-finalize obj errorp))))
     (maybe-finalize (environment obj))
-	(mapc (lambda (attr-pair)
-			(maybe-finalize (cdr attr-pair)))
-		  (attributes obj))
-
-  ))
+    (mapc (lambda (attr-pair) (maybe-finalize (cdr attr-pair)))
+          (attributes obj))
+    ;; Find location of each vertex attribute
+    (let ((locations (mapcar (lambda (attr-pair)
+                               `(,@attr-pair ,(attribute-array-location (car attr-pair)
+                                                                        (environment obj)))))))
+      )
+    ))

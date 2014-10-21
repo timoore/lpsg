@@ -12,4 +12,6 @@
      (:file "assembly" :depends-on ("package"))
      (:file "uset" :depends-on ("package" "mutable"))
      (:file "incremental-comp" :depends-on ("package"))
-     (:file "render" :depends-on ("package" "mutable" "uset" "assembly"))))))
+     (:file "render" :depends-on ("package" "mutable" "uset" "assembly"))
+     (:file "environment" :depends-on ("package" "render"))
+     (:file "shape" :depends-on ("package" "render" "environment"))))))
