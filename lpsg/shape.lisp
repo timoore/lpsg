@@ -91,8 +91,14 @@
     (mapc (lambda (attr-pair) (maybe-finalize (cdr attr-pair)))
           (attributes obj))
     ;; Find location of each vertex attribute
-    (let ((locations (mapcar (lambda (attr-pair)
-                               `(,@attr-pair ,(attribute-array-location (car attr-pair)
-                                                                        (environment obj)))))))
-      )
-    ))
+    (let* ((locations (mapcar (lambda (attr-pair)
+                                `(,@attr-pair ,(attribute-array-location (car attr-pair)
+                                                                         (environment obj))))
+                              (attributes obj)))
+           (attr-set (make-instance 'attribute-set
+                                    :array-binding (mapcar (lambda (loc)
+                                                             `(,(caddr loc) . ,(cadr loc)))
+                                                           locations))))
+      (unless (slot-boundp obj 'bundle)
+        (setf (bundle obj) (make-instance 'render-bundle :attribute-set attr-set))))))
+
