@@ -6,4 +6,4 @@
   ((:module "examples"
     :components
     ((:file "package")
-     (:file "rotator-glop" :depends-on ("package"))))))
+     #+(or) (:file "rotator-glop" :depends-on ("package")))))) ;obsolete now

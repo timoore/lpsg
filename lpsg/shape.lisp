@@ -88,17 +88,22 @@
   (flet ((maybe-finalize (obj)
            (or (gl-finalized-p obj) (gl-finalize obj errorp))))
     (maybe-finalize (environment obj))
-    (mapc (lambda (attr-pair) (maybe-finalize (cdr attr-pair)))
-          (attributes obj))
+    (mapc (lambda (attr-pair) (maybe-finalize (cdr attr-pair))) (attributes obj))
     ;; Find location of each vertex attribute
     (let* ((locations (mapcar (lambda (attr-pair)
-                                `(,@attr-pair ,(attribute-array-location (car attr-pair)
-                                                                         (environment obj))))
+                                (cons (attribute-array-location (car attr-pair)
+                                                                (environment obj))
+                                      (cadr attr-pair)))
                               (attributes obj)))
-           (attr-set (make-instance 'attribute-set
-                                    :array-binding (mapcar (lambda (loc)
-                                                             `(,(caddr loc) . ,(cadr loc)))
-                                                           locations))))
-      (unless (slot-boundp obj 'bundle)
-        (setf (bundle obj) (make-instance 'render-bundle :attribute-set attr-set))))))
+           ;; What about attributes that are not active in the environment's shader?
+           (attr-set (make-instance 'attribute-set :array-binding locations)))
+      (when (bundle obj)
+        (remove-bundle *renderer* bundle))
+      (maybe-finalize attr-set)
+      (setf (bundle obj) (make-instance 'render-bundle
+                                        :drawable (drawable obj)
+                                        :environment environment
+                                        :attribute-set attr-set))
+      (add-bundle *renderer* (bundle obj)))))
+
 

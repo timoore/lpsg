@@ -250,7 +250,9 @@
     attribute-set))
 
 (defclass render-bundle ()
-  ((geometry :accessor geometry :initarg :geometry)
+  ((drawable :accessor drawable :initarg :drawable)
+   (attribute-set :accessor attribute-set :initarg :attribute-set)
+   
    (gl-state :reader gl-state :initarg :gl-state)))
 
 (defclass graphics-state ()
@@ -500,9 +502,16 @@
          do (upload-uset-to-program uset new-program))
       (setf (current-state renderer) state))))
 
+(defvar *renderer*)
+
 (defun draw-render-groups (renderer)
-  (upload-bundles renderer)
-  (draw renderer))
+  (let ((*renderer* renderer))
+    (mapc (lambda (obj)
+            (unless (gl-finalized-p obj)
+              (gl-finalize obj)))
+          (finalize-queue renderer))
+    (upload-bundles renderer)
+    (draw renderer)))
 
 (defmethod draw ((renderer renderer))
   ;; XXX Should we set the state to something known here?
