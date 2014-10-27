@@ -8,7 +8,10 @@
    (data-size :accessor data-size :initarg :data-size :initform 0)
    (data-stride :accessor data-stride :initarg :data-stride :initform 0
                 :documentation "number of elements")
-   (num-components :accessor num-components :initarg :num-components)))
+   (num-components :accessor num-components :initarg :num-components)
+   (upload-fn :accessor upload-fn :initarg :upload-fn
+              :documentation "Function to upload Lisp data to a mapped buffer.
+Will be created automatically, but must be specified for now.")))
 
 ;;; Definition of an individual vertex attribute
 ;;;

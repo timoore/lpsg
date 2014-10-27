@@ -484,6 +484,7 @@
 (defgeneric upload-bundles (renderer))
 
 (defgeneric draw (renderer))
+(defgeneric draw-bundles (renderer))
 
 (defgeneric bind-state (renderer state))
 
@@ -504,16 +505,17 @@
 
 (defvar *renderer*)
 
-(defun draw-render-groups (renderer)
+(defmethod draw ((renderer renderer))
   (let ((*renderer* renderer))
     (mapc (lambda (obj)
             (unless (gl-finalized-p obj)
               (gl-finalize obj)))
           (finalize-queue renderer))
-    (upload-bundles renderer)
+    (setf (finalize-queue renderer) nil)
+    (do-upload-queue renderer)
     (draw renderer)))
 
-(defmethod draw ((renderer renderer))
+(defmethod draw-bundles ((renderer renderer))
   ;; XXX Should we set the state to something known here?
   (setf (current-state renderer) nil)
   (loop
