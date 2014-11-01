@@ -45,6 +45,7 @@
    (new-bundles :accessor new-bundles :initform nil)
    (current-state :accessor current-state :initform nil)
    (finalize-queue :accessor finalize-queue :initform nil)
+   ;; alist of (buffer . buffer-areas)
    (upload-queue :accessor upload-queue :initform nil)))
 
 (defmethod add-object :after ((parent renderer) object)
@@ -119,6 +120,7 @@
 (defmethod gl-finalize-buffer ((buffer gl-buffer) target &optional errorp)
   (declare (ignorable errorp))          ; TODO: handle errorp
   (let ((id (car (gl:gen-buffers 1))))
+    (setf (id buffer) id)
     (gl:bind-buffer target id)
     (%gl:buffer-data target (size buffer) (cffi:null-pointer) (usage buffer))))
   
@@ -203,6 +205,29 @@
    (offset :accessor offset :initarg :offset :initform 0))
   :documentation "class for formatted data stored somewhere in a buffer"
   (:default-initargs :usage :static-draw))
+
+(defgeneric upload-fn (buffer-area)
+  :documentation "function taking (BUFFER-AREA POINTER) ???")
+
+(defmethod upload-fn ((obj buffer-area))
+  (error "No upload function defined."))
+
+(defgeneric add-to-upload-queue (renderer buffer-area))
+
+(defmethod add-to-upload-queue ((renderer renderer) (obj buffer-area))
+  (let* ((buffer (buffer buffer-area))
+         (entry (assoc obj (upload-queue renderer))))
+    (if entry
+        (push obj (cdr entry))
+        (setf (upload-queue renderer) (acons buffer (list obj) (upload-queue renderer))))))
+
+(defun do-upload-queue (renderer)
+  (loop
+     for (buffer . uploads) in (upload-queue renderer)
+     do (progn
+          (gl:bind-buffer :array-buffer (id buffer))
+          (let ((ptr (gl:map-buffer :array-buffer :write-only)))
+            ))))
 
 (defmethod gl-finalized-p ((obj buffer-area))
   (gl-finalized-p (buffer obj)))
