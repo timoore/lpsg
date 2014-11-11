@@ -227,7 +227,10 @@
      do (progn
           (gl:bind-buffer :array-buffer (id buffer))
           (let ((ptr (gl:map-buffer :array-buffer :write-only)))
-            ))))
+            (mapc (lambda (area)
+                    (funcall (upload-fn area) area ptr))
+                  uploads))))
+  (gl:bind-buffer :array-buffer 0))
 
 (defmethod gl-finalized-p ((obj buffer-area))
   (gl-finalized-p (buffer obj)))

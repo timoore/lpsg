@@ -13,6 +13,27 @@
               :documentation "Function to upload Lisp data to a mapped buffer.
 Will be created automatically, but must be specified for now.")))
 
+;;; An upload function that should work for floats
+
+(defun upload-resource-float (resource buffer-ptr)
+  (let ((real-data-stride (if (zerop (data-stride resource))
+                              (num-components resource)
+                              (data-stride resource)))
+        (effective-stride (if (zerop (stride resource))
+                              (* (components resource) 4)
+                              (stride resource))))
+    (loop
+       for i = 0 below (data-size resource) ; ??? Is this how limit should be specified?
+       for src-idx = (+ (data-offset resource)  (* i real-data-stride))
+       for dest = (cffi:inc-pointer buffer-ptr (+ (* i stride)))
+       do (setf (mem-aref dest :float) (row-major-aref data srd-idx)))))
+
+(defmethod initialize-instance :after ((obj mirrored-resource) &key)
+  (unless (slot-boundp obj 'upload-fn)
+    (when (and (slot-boundp obj 'buffer-type)
+               (eq (buffer-type obj) :float))
+      (setf (upload-fn obj) #'upload-resource-float))))
+
 ;;; Definition of an individual vertex attribute
 ;;;
 ;;; data - a Lisp array. Data will be taken from consecutive elements of
