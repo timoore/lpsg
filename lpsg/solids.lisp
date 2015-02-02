@@ -42,7 +42,7 @@
         (element-array (make-array 36)) ; 6 vertices per face
         ;; Scratch vectors for normal computation
         (v1 (make-array 3 :element-type 'single-float))
-        (v2 (make-araay 3 :element-type 'single-float)))
+        (v2 (make-array 3 :element-type 'single-float)))
     (loop
        for i from 0 below 6
        ;; for each face, construct a surface normal
@@ -71,7 +71,7 @@
                  for k from 0 below 3
                  do (setf (aref element-array (+ (* i 6) k)) (+ (* i 4) k)))
               (loop
-                 for k from 2 below 5
+                 for k from 3 below 6
                  do (setf (aref element-array (+ (* i 6) k)) (+ (* i 4) (mod k 4)))))))
     ;; Now we can construct the vertex attributes and the shape
     (let* ((vertex-attr (make-instance 'vertex-attribute
