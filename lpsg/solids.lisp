@@ -37,7 +37,6 @@
      do (setf (aref dest dest-row i) (aref src i))))
 
 (defun make-cube-shape ()
-  ;; Fill pointers would be nice, but I don't dare.
   (let ((vertex-array (make-array '(24 3) :element-type 'single-float))
         (normal-array (make-array '(24 3) :element-type 'single-float))
         (element-array (make-array 36)) ; 6 vertices per face
@@ -75,8 +74,20 @@
                  for k from 2 below 5
                  do (setf (aref element-array (+ (* i 6) k)) (+ (* i 4) (mod k 4)))))))
     ;; Now we can construct the vertex attributes and the shape
-    (let ((vertex-attr (make-instance 'vertex-attribute
-                                      :data vertex-array :data-size (* 24 3)))
+    (let* ((vertex-attr (make-instance 'vertex-attribute
+                                      :data vertex-array :data-size (* 24 3)
+                                      :components 3 :buffer-type :float))
           (normal-attr (make-instance 'vertex-attribute
-                                      :data normal-array :data-size (* 24 3)))))))
+                                      :data normal-array :data-size (* 24 3)
+                                      :components 3 :buffer-type :float))
+           (element-attr (make-instance 'mirrored-resource
+                                        :data element-array :data-size 36
+                                        :components 1 :buffer-type :short))
+          (cube-shape (make-instance 'shape
+                                     :drawable (make-instance 'indexed-drawable
+                                                              :mode :triangles
+                                                              :vertex-count 24))))
+      (setf (attribute cube-shape 'vertex) vertex-attr)
+      (setf (attribute cube-shape 'normal) normal-attr)
+      shape)))
 

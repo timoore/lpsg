@@ -111,11 +111,11 @@
     (%gl:buffer-data target size (cffi:null-pointer) usage)
     buf))
 
-(gl-finalized-p ((obj gl-buffer))
+(defmethod gl-finalized-p ((obj gl-buffer))
   (gl-valid-p obj))
   
-(defgeneric gl-finalize-buffer (buffer target)
-  :documention "Finalize BUFFER while bound to a TARGET.")
+(defgeneric gl-finalize-buffer (buffer target &optional errorp)
+  (:documentation "Finalize BUFFER while bound to a TARGET."))
 
 (defmethod gl-finalize-buffer ((buffer gl-buffer) target &optional errorp)
   (declare (ignorable errorp))          ; TODO: handle errorp
@@ -152,7 +152,7 @@
   ((mode :accessor mode :initarg :mode
          :documentation "A mode for an OpenGL draw-elements or draw-array call,
   e.g. :triangles")
-   (count :accessor count :initarg :count
+   (vertex-count :accessor vertex-count :initarg :vertex-count
                     :documentation "The total number of vertices in this geometry.")))
 
 (defclass array-drawable (drawable)
@@ -161,8 +161,9 @@
 
 (defclass indexed-drawable (drawable)
   ((index-type :accessor index-type :initarg :index-type)
-   (base-vertex :accessor base-vertex :initarg :base-vertex))
-  (:default-initargs :index-type :unsigned-short :base-vertex 0)))
+   (base-vertex :accessor base-vertex :initarg :base-vertex)
+   (element-array :accessor element-array :initarg :element-array))
+  (:default-initargs :index-type :unsigned-short :base-vertex 0))
 
 (defclass geometry (indexed-drawable)
   ((indices :accessor indices :initarg :indices :initform nil
@@ -190,7 +191,7 @@
    (vao :accessor vao :initarg :vao :initform 0
         :documentation "OpenGL object for binding vertex attributes for
    rendering."))
-  :documentation "Deprecated.")
+  (:documentation "Deprecated."))
 
 (defclass buffer-area ()
   ((buffer :accessor buffer :initarg :buffer)
@@ -203,11 +204,11 @@
    (normalizedp :accessor normalizedp :initarg :normalizedp :initform nil)
    (stride :accessor stride :initarg :stride :initform 0)
    (offset :accessor offset :initarg :offset :initform 0))
-  :documentation "class for formatted data stored somewhere in a buffer"
+  (:documentation "class for formatted data stored somewhere in a buffer")
   (:default-initargs :usage :static-draw))
 
 (defgeneric upload-fn (buffer-area)
-  :documentation "function taking (BUFFER-AREA POINTER) ???")
+  (:documentation "function taking (BUFFER-AREA POINTER) ???"))
 
 (defmethod upload-fn ((obj buffer-area))
   (error "No upload function defined."))
@@ -244,14 +245,14 @@
   ((array-bindings :accessor array-bindings :initarg :array-bindings :initform nil)
    (element-binding :accessor element-binding :initarg element-binding :initform nil)
    (vao :accessor vao))
-  :documentation "A collection of buffer mappings (buffer + offset) bound to specific attributes,
-  along with an associated VAO.")
+  (:documentation "A collection of buffer mappings (buffer + offset) bound to specific attributes,
+  along with an associated VAO."))
 
 (defclass vertex-array-object (gl-object)
   ())
 
 (defmethod gl-finalized-p ((obj attribute-set))
-  ((not (null (vao attribute-set)))))
+  (not (null (vao attribute-set))))
 
 (defmethod gl-finalize ((attribute-set attribute-set) &optional errorp)
   (declare (ignorable errorp))

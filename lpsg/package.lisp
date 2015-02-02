@@ -47,4 +47,5 @@
    #:up-to-date-p
    ;; utilities
    #:ortho-matrix
+   #:identity-matrix
    ))

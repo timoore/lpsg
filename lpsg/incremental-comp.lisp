@@ -11,10 +11,12 @@
 ;;; can be easily managed. A computation node class is free to also keep a
 ;;; source or sink in a slot for convenient access.
 
-(defclass computation-node ()
+(defclass consumer-node ()
+  ((validp :accessor validp :initform t)))
+
+(defclass computation-node (consumer-node)
   ((sinks :accessor sinks :initform nil)
-   (cached-value :accessor cached-value :initarg :inital-value)
-   (validp :accessor validp :initform t)))
+   (cached-value :accessor cached-value :initarg :inital-value)))
 
 (defgeneric add-sink (node sink))
 
@@ -41,12 +43,18 @@
 
 (defgeneric invalidate-calculation (node invalid-source))
 
+(defmethod invalidate-calculation ((node consumer-node) invalid-source)
+  (declare (ignorable invalid-source)))
+
+(defmethod invalidate-calculation :after ((node consumer-node) invalid-source)
+  (declare (ignorable invalid-source))
+  (setf (validp node) nil))
+
 (defmethod invalidate-calculation ((node computation-node) invalid-source)
   (declare (ignorable invalid-source))
   (when (validp node)
     (mapc (lambda (sink) (invalidate-calculation sink node))
-          (sinks node))
-    (setf (validp node) nil)))
+          (sinks node))))
 
 (defclass input-value-node (computation-node)
   ())

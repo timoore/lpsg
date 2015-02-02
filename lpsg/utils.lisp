@@ -29,6 +29,13 @@
 
 (in-package #:lpsg)
 
+(defun identity-matrix ()
+  (make-array '(4 4) :element-type 'single-float
+              :initial-contents '((1.0 0.0 0.0 0.0)
+                                  (0.0 1.0 0.0 0.0)
+                                  (0.0 0.0 1.0 0.0)
+                                  (0.0 0.0 0.0 1.0))))
+
 (defun ortho-matrix (left right bottom top near far)
   (let ((result (make-array '(4 4) :element-type 'single-float)))
     (setf (aref result 0 0) (/ 2.0 (- right left)))
