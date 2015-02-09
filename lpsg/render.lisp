@@ -39,14 +39,27 @@
   (declare (ignore obj))
   t)
 
-(defclass renderer (assembly)
+;;; This should be some kind of ordered data structure (map, skip list, ...)
+(defclass render-queue ()
+  ((bundles :accessor bundles :initarg :bundles :initform nil)))
+
+;;; holds multiple render queues. These will be rendered in order.
+(defclass render-stage (render-queue)
+  ((bundles :accessor render-queues)))
+
+(defclass renderer ()
   ((buffers :accessor buffers :initform nil)
    (bundles :accessor bundles :initform nil)
    (new-bundles :accessor new-bundles :initform nil)
    (current-state :accessor current-state :initform nil)
    (finalize-queue :accessor finalize-queue :initform nil)
    ;; alist of (buffer . buffer-areas)
-   (upload-queue :accessor upload-queue :initform nil)))
+   (upload-queue :accessor upload-queue :initform nil)
+   (render-stages :accessor render-stages )))
+
+(defgeneric submit (assembly renderer))
+
+(defgeneric submit-with-effect (shape renderer effect))
 
 (defmethod add-object :after ((parent renderer) object)
   (labels ((do-all-children (obj)
@@ -279,9 +292,9 @@
     attribute-set))
 
 (defclass render-bundle ()
-  ((drawable :accessor drawable :initarg :drawable)
+  ((shape :accessor shape :initarg :shape)
    (attribute-set :accessor attribute-set :initarg :attribute-set)
-   
+   ;; environment?
    (gl-state :reader gl-state :initarg :gl-state)))
 
 (defclass graphics-state ()

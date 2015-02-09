@@ -14,4 +14,5 @@
      (:file "incremental-comp" :depends-on ("package"))
      (:file "render" :depends-on ("package" "mutable" "uset" "assembly"))
      (:file "environment" :depends-on ("package" "render"))
+     (:file "effect" :depends-on ("package" "render" "environment"))
      (:file "shape" :depends-on ("package" "render" "environment"))))))

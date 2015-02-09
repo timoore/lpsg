@@ -139,7 +139,7 @@ Will be created automatically, but must be specified for now.")))
            ;; What about attributes that are not active in the environment's shader?
            (attr-set (make-instance 'attribute-set :array-binding locations)))
       (when (bundle obj)
-        (remove-bundle *renderer* bundle))
+        (remove-bundle *renderer* bundle)) ;?? necessary?
       (maybe-finalize attr-set)
       (let ((gl-state (make-state environment)))
         ;; hook up usets
