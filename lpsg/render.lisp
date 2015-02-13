@@ -291,9 +291,8 @@
     (gl:bind-vertex-array 0)
     attribute-set))
 
-(defclass render-bundle ()
+(defclass render-bundle (attribute-set)
   ((shape :accessor shape :initarg :shape)
-   (attribute-set :accessor attribute-set :initarg :attribute-set)
    ;; environment?
    (gl-state :reader gl-state :initarg :gl-state)))
 
