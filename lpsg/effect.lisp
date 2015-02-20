@@ -6,3 +6,5 @@
 (defclass effect ()
   ())
 
+(defclass simple-effect (effect)
+  ((shader-program :accessor shader-program :initarg :shader-program)))

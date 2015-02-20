@@ -54,9 +54,9 @@ void main()
   ((assembly :accessor assembly :initarg :assembly))
   (:default-initargs :assembly (make-instance 'assembly)))
 
-(defvar *window* (make-instance 'cube-window))
 
 (defun cube-example ()
-  (let ((win (make-instance 'viewer-window))
-        (cube (make-cube-shape)))
+  (let* ((win (make-instance 'cube-window))
+         (cube (make-cube-shape))
+         (effect (make-instance )))
     (open-viewer win "cube demo" 800 600)))

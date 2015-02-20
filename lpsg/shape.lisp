@@ -72,6 +72,7 @@ Will be created automatically, but must be specified for now.")))
 (defclass shape (consumer-node)
   ((attributes :accessor attributes :initarg :attributes :initform nil)
    (environment :accessor environment :initarg :environment :initform nil)
+   ;; XXX uset computation nodes?
    (usets :accessor usets :initarg :usets :initform nil)
    (drawable :accessor drawable :initarg :drawable :initform nil)
    (bundle :accessor bundle)))
