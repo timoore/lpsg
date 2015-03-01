@@ -60,14 +60,14 @@
   (let ((result (make-array (list (length v1)) :element-type (array-element-type v1))))
     (loop
        for i from 0 below (length v1)
-       do (setf (aref result i) (+ (aref i v1) (aref i v2))))
+       do (setf (aref result i) (+ (aref v1 i) (aref v2 i))))
     result))
 
 (defun vec- (v1 v2)
   (let ((result (make-array (list (length v1)) :element-type (array-element-type v1))))
     (loop
        for i from 0 below (length v1)
-       do (setf (aref result i) (- (aref i v1) (aref i v2))))
+       do (setf (aref result i) (- (aref v1 i) (aref v2 i))))
     result))
 
 

@@ -26,7 +26,7 @@ Will be created automatically, but must be specified for now.")))
        for i from 0 below (data-size resource) ; ??? Is this how limit should be specified?
        for src-idx = (+ (data-offset resource)  (* i real-data-stride))
        for dest = (cffi:inc-pointer buffer-ptr (+ (* i effective-stride)))
-       do (setf (mem-aref dest :float) (float (row-major-aref data srd-idx) 1.0))))
+       do (setf (mem-aref dest :float) (float (row-major-aref data srd-idx) 1.0)))))
 
 (defun upload-resource-short (resource buffer-ptr)
   (let ((real-data-stride (if (zerop (data-stride resource))
@@ -70,11 +70,14 @@ Will be created automatically, but must be specified for now.")))
 ;;; attributes - alist of (name . vertex-attribute). 
 
 (defclass shape (consumer-node)
-  ((attributes :accessor attributes :initarg :attributes :initform nil)
+  ((attributes :accessor attributes :initarg :attributes :initform nil
+               :documentation "alist of (name . attribute)")
    (environment :accessor environment :initarg :environment :initform nil)
+   (effect :accessor effect :initarg :effect)
    ;; XXX uset computation nodes?
    (usets :accessor usets :initarg :usets :initform nil)
    (drawable :accessor drawable :initarg :drawable :initform nil)
+   ;; XXX Bundles?
    (bundle :accessor bundle)))
 
 (defmethod initialize-instance ((obj shape) &key)
@@ -89,7 +92,7 @@ Will be created automatically, but must be specified for now.")))
   (let ((cell (assoc attribute-name (attributes obj) :test #'equal)))
     (if cell
         (setf (cdr cell) attrib)
-        (setf (attributes obj) (acons attribute-name attrib)))
+        (setf (attributes obj) (acons attribute-name attrib (attributes obj))))
     attrib))
 
 (defmethod ensure-attribute ((obj shape) attribute-name)
@@ -112,6 +115,7 @@ Will be created automatically, but must be specified for now.")))
 (defmethod (setf number-vertices) (num (obj shape))
   (setf (number-vertices (drawable obj)) num))
 
+#|
 ;;; Turn a shape into something that can be rendered.
 
 (defmethod gl-finalized-p ((obj shape))
@@ -149,5 +153,21 @@ Will be created automatically, but must be specified for now.")))
                                           :gl-state gl-state
                                           :attribute-set attr-set)))
       (add-bundle *renderer* (bundle obj)))))
+|#
 
+;;; defmethod is here because it uses methods on SHAPE.
 
+(defmethod submit (assembly renderer)
+  (do-shapes assembly
+    (lambda (shape)
+      (submit-with-effect shape renderer (effect shape)))))
+
+(defmethod submit-with-effect :after ((shape shape) renderer effect)
+  (declare (ignore effect))
+  (loop
+     for (name . vertex-attrib) in (attributes shape)
+     do (progn
+          () ;; XXX finalize
+          ;;; XXX Is vertex attrib mirrored? Does it actually need uploading?
+          (add-to-upload-queue renderer vertex-attrib)))
+  )

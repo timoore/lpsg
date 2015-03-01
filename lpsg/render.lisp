@@ -45,7 +45,7 @@
 
 ;;; holds multiple render queues. These will be rendered in order.
 (defclass render-stage (render-queue)
-  ((bundles :accessor render-queues)))
+  ((render-queues :accessor render-queues)))
 
 (defclass renderer ()
   ((buffers :accessor buffers :initform nil)
@@ -55,26 +55,13 @@
    (finalize-queue :accessor finalize-queue :initform nil)
    ;; alist of (buffer . buffer-areas)
    (upload-queue :accessor upload-queue :initform nil)
-   (render-stages :accessor render-stages )))
-
-(defgeneric submit (assembly renderer))
-
-(defgeneric submit-with-effect (shape renderer effect))
-
-(defmethod add-object :after ((parent renderer) object)
-  (labels ((do-all-children (obj)
-             (unless (gl-finalized-p obj)
-               (push obj (finalize-queue renderer)))
-             (when (typep obj 'assembly)
-               (mapc #'do-all-children (children object)))))
-    (do-all-children object)))
+   (render-stages :accessor render-stages :initform nil)))
 
 (defun process-finalize-queue (renderer)
   (loop
      for obj in (finalize-queue renderer)
      if (not (gl-finalized-p obj))
-     do (gl-finalize obj))
-  (setf (finalize-queue renderer) nil))
+     do (gl-finalize obj)))
 
 (defclass gl-object ()
   ((id :accessor id :initarg :id :initform 0
@@ -114,7 +101,9 @@
 
 (defclass gl-buffer (allocator gl-object)
   ((size :accessor size :initarg :size)
-   (usage :accessor usage :initarg :usage)))
+   (usage :accessor usage :initarg :usage)
+   (target :accessor target :initarg :target))
+  (:default-initargs :target :array-buffer))
 
 (defun reserve-buffer (target &optional (usage :static-draw) (size 104856))
   (let* ((ids (gl:gen-buffers 1))
@@ -178,6 +167,7 @@
    (element-array :accessor element-array :initarg :element-array))
   (:default-initargs :index-type :unsigned-short :base-vertex 0))
 
+#|
 (defclass geometry (indexed-drawable)
   ((indices :accessor indices :initarg :indices :initform nil
             :documentation "A gl-array (:unsigned-short) of indices into the vertex
@@ -205,6 +195,7 @@
         :documentation "OpenGL object for binding vertex attributes for
    rendering."))
   (:documentation "Deprecated."))
+|#
 
 (defclass buffer-area ()
   ((buffer :accessor buffer :initarg :buffer)
@@ -240,7 +231,7 @@
      for (buffer . uploads) in (upload-queue renderer)
      do (progn
           (gl:bind-buffer :array-buffer (id buffer))
-          (let ((ptr (gl:map-buffer :array-buffer :write-only)))
+          (let ((ptr (gl:map-buffer (target buffer) :write-only)))
             (mapc (lambda (area)
                     (funcall (upload-fn area) area ptr))
                   uploads))))
@@ -277,6 +268,7 @@
     (gl:bind-vertex-array vao-id)
     (loop
        for (index . area) in (array-bindings attribute-set)
+       when index
        do (progn
             (gl:bind-buffer :array-buffer (buffer area))
             (gl:enable-vertex-attrib-array index)
@@ -287,13 +279,13 @@
                                       (stride area)
                                       (cffi:inc-pointer nullptr (offset area)))))
     (when element-binding
-      (gl:bind-buffer :element-array-buffer (buffer (element-binding attribute-set))))
+      (gl:bind-buffer :element-array-buffer (buffer element-binding)))
     (gl:bind-vertex-array 0)
     attribute-set))
 
 (defclass render-bundle (attribute-set)
   ((shape :accessor shape :initarg :shape)
-   ;; environment?
+   ;; environment? Is gl-state for the moment
    (gl-state :reader gl-state :initarg :gl-state)))
 
 (defclass graphics-state ()
@@ -554,7 +546,8 @@
           (finalize-queue renderer))
     (setf (finalize-queue renderer) nil)
     (do-upload-queue renderer)
-    (draw renderer)))
+    (setf (upload-queue renderer) nil)
+    (draw-bundles renderer)))
 
 (defmethod draw-bundles ((renderer renderer))
   ;; XXX Should we set the state to something known here?

@@ -2,10 +2,10 @@
 
 (in-package #:lpsg)
 
-(defclass environment ()
-  ((shader-program :accessor shader-program :initarg :shader-program)
-   (attribute-map :accessor attribute-map :initform nil
-                  :documentation "list of (symbol glsl-name) where glsl-name is a string")))
+(defclass environment (gl-state)
+  ((attribute-map :accessor attribute-map :initform nil
+                  :documentation "list of (symbol glsl-name) where glsl-name is a string")
+   (effect :accessor effect :initarg :effect :documentation "back pointer to effect object")))
 
 (defmethod gl-finalized-p ((obj environment))
   (gl-finalized-p (shader-program obj)))

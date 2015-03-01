@@ -1,9 +1,9 @@
 ;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 (defsystem lpsg-examples
   :description "OpenGL rendering pipeline examples"
-  :depends-on (lpsg glop cl-opengl cl-glu)
+  :depends-on (lpsg glop cl-opengl)
   :components
   ((:module "examples"
     :components
     ((:file "package")
-     #+(or) (:file "rotator-glop" :depends-on ("package")))))) ;obsolete now
+     (:file "cube" :depends-on ("package"))))))
