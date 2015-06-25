@@ -30,5 +30,5 @@
             (list (make-instance 'render-stage
                                  :render-queues (list (make-instance 'render-queue))))))
     (let ((rq (car (render-queues (render-stages renderer)))))
-      )))
+      (add-bundle rq bundle))))
 

@@ -51,12 +51,30 @@ void main()
                                                :usets ()))))
 
 (defclass cube-window (viewer-window renderer)
-  ((assembly :accessor assembly :initarg :assembly))
-  (:default-initargs :assembly (make-instance 'assembly)))
+  ((cube :accessor cube)
+   (effect :accessor effect)
+   (exposed :accessor exposed :initarg :exposed))
+  (:default-initargs :exposed nil))
 
+(defmethod glop:on-event :after ((window cube-window) (event glop:expose-event))
+  (setf (cube window) (make-cube-shape))
+  (setf (effect window) (make-instance 'simple-effect :shader-program *shader-program*))
+  (submit-with-effect (cube window) window (effect window))
+  (setf (exposed window) t))
 
 (defun cube-example ()
-  (let* ((win (make-instance 'cube-window))
-         (cube (make-cube-shape))
-         (effect (make-instance )))
-    (open-viewer win "cube demo" 800 600)))
+  (let* ((win (make-instance 'cube-window)))
+    (open-viewer win "cube demo" 800 600)
+    (unwind-protect
+         (progn
+           (unless win
+             (return-from cube-example nil)
+             (loop
+                while (glop:dispatch-events win :blocking nil :on-foo nil)
+                when (exposed win)
+                do (progn
+                     (gl:clear :color-buffer)
+                     (lpsg:draw win)
+                     (glop:swap-buffers win)))))
+      (and (win (glop:destroy-window win))))))
+

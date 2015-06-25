@@ -6,7 +6,7 @@
 (defclass viewer-window (glop:window)
   ((ortho-screen-matrix :accessor ortho-screen-matrix
                         :initarg :ortho-screen-matrix
-                        :initform (indentity-matrix))))
+                        :initform (identity-matrix))))
 
 (defmethod glop:on-event ((window viewer-window) (event glop:key-event))
   (when (eq (glop:keysym event) :escape)

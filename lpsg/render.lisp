@@ -43,6 +43,11 @@
 (defclass render-queue ()
   ((bundles :accessor bundles :initarg :bundles :initform nil)))
 
+(defgeneric add-bundle (render-queue bundle))
+
+(defmethod add-bundle ((render-queue render-queue) bundle)
+  (push bundle (bundles render-queue)))
+
 ;;; holds multiple render queues. These will be rendered in order.
 (defclass render-stage (render-queue)
   ((render-queues :accessor render-queues)))
@@ -99,19 +104,13 @@
             (return-from allocate (values offset rounded-size))))
     nil))
 
+(defconstant +default-buffer-size+ 104856)
+
 (defclass gl-buffer (allocator gl-object)
   ((size :accessor size :initarg :size)
    (usage :accessor usage :initarg :usage)
    (target :accessor target :initarg :target))
-  (:default-initargs :target :array-buffer))
-
-(defun reserve-buffer (target &optional (usage :static-draw) (size 104856))
-  (let* ((ids (gl:gen-buffers 1))
-         (id (car ids))
-         (buf (make-instance 'gl-buffer :id id :size size :usage usage)))
-    (gl:bind-buffer target id)
-    (%gl:buffer-data target size (cffi:null-pointer) usage)
-    buf))
+  (:default-initargs :target :array-buffer :usage :static-draw :size +default-buffer-size+))
 
 (defmethod gl-finalized-p ((obj gl-buffer))
   (gl-valid-p obj))
@@ -471,8 +470,10 @@
      do (let ((alloc (allocate-from-buffer buffer size)))
           (when alloc
             (return-from allocate-buffer-storage alloc))))
-  (let ((new-buf (reserve-buffer target usage)))
+  (let ((new-buf (make-instance 'gl-buffer :target target :usage usage
+                                :size (max +default-buffer-size+ size))))
     (push new-buf (buffers renderer))
+    (push new-buf (finalize-queue renderer))
     (allocate-from-buffer new-buf size)))
 
 
@@ -549,25 +550,31 @@
     (setf (upload-queue renderer) nil)
     (draw-bundles renderer)))
 
+(defgeneric draw-bundle (renderer bundle))
+
+(defmethod draw-bundle ((renderer renderer) bundle)
+  (let ((geom (geometry bundle)))
+    (bind-state renderer (gl-state bundle))
+    (gl:bind-vertex-array (vao geom))
+    (if (indices geom)
+        (let ((index-offset (allocation-offset (element-buffer-allocation geom))))
+          (%gl:draw-elements (mode geom)
+                             (number-vertices geom)
+                             (gl::cffi-type-to-gl
+                              (gl::gl-array-type (indices geom)))
+                             (cffi:inc-pointer (cffi:null-pointer) index-offset)))
+        (gl:draw-arrays (mode geom) 0 (number-vertices geom)))))
+
 (defmethod draw-bundles ((renderer renderer))
   ;; XXX Should we set the state to something known here?
   (setf (current-state renderer) nil)
   (loop
-     for bundle in (bundles renderer)
-     for geom = (geometry bundle)
-     do (progn
-          (bind-state renderer (gl-state bundle))
-          (gl:bind-vertex-array (vao geom))
-          (if (indices geom)
-              (let ((index-offset (allocation-offset
-                                   (element-buffer-allocation geom))))
-                (%gl:draw-elements (mode geom)
-                                   (number-vertices geom)
-                                   (gl::cffi-type-to-gl
-                                    (gl::gl-array-type (indices geom)))
-                                   (cffi:inc-pointer (cffi:null-pointer)
-                                                     index-offset)))
-              (gl:draw-arrays (mode geom) 0 (number-vertices geom))))))
+     for stage in (render-stages renderer)
+     do (loop
+           for rq in (render-queues stage)
+           do (loop
+                 for bundle in (bundles rq)
+                 do (draw-bundle renderer bundle)))))
 
 (defgeneric upload-geometry (renderer geometry))
 

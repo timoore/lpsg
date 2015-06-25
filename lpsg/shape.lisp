@@ -169,5 +169,4 @@ Will be created automatically, but must be specified for now.")))
      do (progn
           () ;; XXX finalize
           ;;; XXX Is vertex attrib mirrored? Does it actually need uploading?
-          (add-to-upload-queue renderer vertex-attrib)))
-  )
+          (add-to-upload-queue renderer vertex-attrib))))
