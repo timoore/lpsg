@@ -56,7 +56,7 @@
 ;;; application and then later uploaded to shader programs during
 ;;; rendering. 
 
-(defclass uset (mutable)
+(defclass uset ()
   ;; descriptor slot is class allocated, but it must be shared by each specific
   ;; uset class.
   ())
