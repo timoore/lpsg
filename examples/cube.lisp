@@ -56,6 +56,8 @@ void main()
    (exposed :accessor exposed :initarg :exposed))
   (:default-initargs :exposed nil))
 
+(defvar *proj-uset* (make-instance 'projection))
+
 (defmethod glop:on-event :after ((window cube-window) (event glop:expose-event))
   (setf (cube window) (make-cube-shape))
   (setf (effect window) (make-instance 'simple-effect :shader-program *shader-program*))
