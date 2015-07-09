@@ -2,7 +2,7 @@
 
 (in-package #:lpsg)
 
-(defclass environment (gl-state)
+(defclass environment (graphics-state)
   ((attribute-map :accessor attribute-map :initform nil
                   :documentation "list of (symbol glsl-name) where glsl-name is a string")
    (effect :accessor effect :initarg :effect :documentation "back pointer to effect object")))
