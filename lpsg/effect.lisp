@@ -24,6 +24,7 @@
                                           (attributes shape)))
     (when (typep (drawable shape) 'indexed-drawable)
       (setf (element-binding bundle) (element-array (drawable shape))))
+    ;; XXX usets?
     ;; For now, just use one render-stage / render-queue
     (unless (render-stages renderer)
       (setf (render-stages renderer)
