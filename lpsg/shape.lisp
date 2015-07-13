@@ -167,6 +167,7 @@ Will be created automatically, but must be specified for now.")))
   (loop
      for (name . vertex-attrib) in (attributes shape)
      do (progn
-          () ;; XXX finalize
-          ;;; XXX Is vertex attrib mirrored? Does it actually need uploading?
-          (add-to-upload-queue renderer vertex-attrib))))
+          ;; XXX Is vertex attrib mirrored? Does it actually need uploading?
+          ;; Is there a better way than typep?
+          (when (typep vertex-attrib 'mirrored-resource)
+            (add-to-upload-queue renderer vertex-attrib)))))

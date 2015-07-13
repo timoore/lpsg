@@ -44,8 +44,9 @@
    #:graphics-state
    #:uniform-sets
    #:with-mutable
-   #:up-to-date-p
+   #:submit-with-effect
    ;; utilities
    #:ortho-matrix
    #:identity-matrix
+   #:make-cube-shape
    ))

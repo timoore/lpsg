@@ -44,13 +44,13 @@ void main()
                  :shaders (list (make-instance 'lpsg:shader
                                                :shader-type :vertex-shader
                                                :source *vertex-shader-source*
-                                               :usets (projection))
+                                               :usets '(projection))
                                 (make-instance 'lpsg:shader
                                                :shader-type :fragment-shader
-                                               *source *fragment-shader-source
+                                               :source *fragment-shader-source*
                                                :usets ()))))
 
-(defclass cube-window (viewer-window renderer)
+(defclass cube-window (viewer-window lpsg:renderer)
   ((cube :accessor cube)
    (effect :accessor effect)
    (exposed :accessor exposed :initarg :exposed))
@@ -59,11 +59,11 @@ void main()
 (defvar *proj-uset* (make-instance 'projection))
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:expose-event))
-  (setf (cube window) (make-cube-shape))
+  (setf (cube window) (lpsg:make-cube-shape))
   (let ((env (make-instance 'environment :program *shader-program*)))
     (setf (projection-matrix *proj-uset*) (ortho-screen-matrix window))
     (setf (effect window) (make-instance 'simple-effect :environment env)))
-  (submit-with-effect (cube window) window (effect window))
+  (lpsg:submit-with-effect (cube window) window (effect window))
   (setf (exposed window) t))
 
 (defun cube-example ()
@@ -72,13 +72,13 @@ void main()
     (unwind-protect
          (progn
            (unless win
-             (return-from cube-example nil)
-             (loop
-                while (glop:dispatch-events win :blocking nil :on-foo nil)
-                when (exposed win)
-                do (progn
-                     (gl:clear :color-buffer)
-                     (lpsg:draw win)
-                     (glop:swap-buffers win)))))
-      (and (win (glop:destroy-window win))))))
+             (return-from cube-example nil))
+           (loop
+              while (glop:dispatch-events win :blocking nil :on-foo nil)
+              when (exposed win)
+              do (progn
+                   (gl:clear :color-buffer)
+                   (lpsg:draw win)
+                   (glop:swap-buffers win))))
+      (and win (glop:destroy-window win)))))
 

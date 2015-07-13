@@ -450,12 +450,12 @@
       (deallocate-in-buffer (allocation-buffer element-alloc)
                             element-alloc)
       (setf element-alloc nil))))
-|#
 
 (defgeneric loadedp (obj))
 
 (defmethod loadedp ((obj geometry))
   (slot-boundp obj 'array-buffer))
+|#
 
 (defgeneric upload-buffers (renderer obj))
 
@@ -474,7 +474,7 @@
     (push new-buf (finalize-queue renderer))
     (allocate-from-buffer new-buf size)))
 
-
+#|
 (defmethod upload-buffers (renderer (obj geometry))
   (let* ((data-size (gl-array-byte-size (vertex-data obj)))
          (data-alloc (allocate-buffer-storage renderer
@@ -501,6 +501,7 @@
         (gl:buffer-sub-data :element-array-buffer (indices obj)
                             :buffer-offset (allocation-offset index-alloc)
                             :size index-size)))))
+|#
 
 (defun add-bundle (renderer bundle)
   (push bundle (new-bundles renderer)))
@@ -573,7 +574,7 @@
            do (loop
                  for bundle in (bundles rq)
                  do (draw-bundle renderer bundle)))))
-
+#|
 (defgeneric upload-geometry (renderer geometry))
 
 (defmethod upload-geometry ((renderer renderer) geometry)
@@ -596,6 +597,7 @@
      do (upload-geometry renderer (geometry bundle)))
   (setf (bundles renderer) (nconc (new-bundles renderer) (bundles renderer)))
   (setf (new-bundles renderer) nil))
+|#
 
 (defgeneric close-renderer (renderer))
 

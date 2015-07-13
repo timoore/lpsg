@@ -6,7 +6,7 @@
 (defclass viewer-window (glop:window)
   ((ortho-screen-matrix :accessor ortho-screen-matrix
                         :initarg :ortho-screen-matrix
-                        :initform (identity-matrix))))
+                        :initform (lpsg:identity-matrix))))
 
 (defmethod glop:on-event ((window viewer-window) (event glop:key-event))
   (when (eq (glop:keysym event) :escape)
@@ -24,7 +24,7 @@
 
 (defgeneric update-for-window-change (w event))
 
-(defmethod update-for-window-change (w viewer-window) event)
+(defmethod update-for-window-change ((w viewer-window) event)
   (let ((width (glop:width event))
         (height (glop:height event)))
     (gl:viewport 0 0 (glop:width event) (glop:height event))
@@ -67,10 +67,11 @@
                            stencil-size))
 
 (defmethod open-viewer ((window viewer-window) title width height
-                        &rest key-args &key major minor fullscreen)
+                        &rest key-args &key major minor fullscreen
+                        &allow-other-keys)
   (apply #'glop:open-window window title width height :allow-other-keys t key-args)
-  (create-gl-context win :major major :minor minor :make-current t)
+  (glop:create-gl-context window :major major :minor minor :make-current t)
   (glop::show-window window)
-  (set-fullscreen win fullscreen)
+  (glop:set-fullscreen window fullscreen)
   window)
 

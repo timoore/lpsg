@@ -6,4 +6,5 @@
   ((:module "examples"
     :components
     ((:file "package")
-     (:file "cube" :depends-on ("package"))))))
+     (:file "viewer" :depends-on ("package"))
+     (:file "cube" :depends-on ("package" "viewer"))))))
