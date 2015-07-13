@@ -374,13 +374,9 @@
 (defun upload-uset-to-program (uset program)
   (let* ((descriptor (descriptor uset))
          (uset-entry (assoc descriptor (uset-alist program)))
-         (strategy (cadr uset-entry))
-         (last-uset-data (caddr uset-entry)))
-    (when (and strategy
-               (not (up-to-date-p uset (car last-uset-data) (cdr last-uset-data))))
-      (funcall (uploader strategy) uset)
-      (setf (car last-uset-data) uset
-            (cdr last-uset-data) (counter uset)))
+         (strategy (cadr uset-entry)))
+    (when strategy
+      (funcall (uploader strategy) uset))
     uset))
 
 (defmethod gl-finalized-p ((obj program))
@@ -442,6 +438,7 @@
         )))
 
 ;;;TODO: not dereferenced anymore
+#|
 (defmethod dereferenced :after ((obj geometry))
   (with-slots ((array-alloc array-buffer-allocation)
                (element-alloc element-buffer-allocation))
@@ -453,6 +450,7 @@
       (deallocate-in-buffer (allocation-buffer element-alloc)
                             element-alloc)
       (setf element-alloc nil))))
+|#
 
 (defgeneric loadedp (obj))
 

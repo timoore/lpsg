@@ -60,7 +60,9 @@ void main()
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:expose-event))
   (setf (cube window) (make-cube-shape))
-  (setf (effect window) (make-instance 'simple-effect :shader-program *shader-program*))
+  (let ((env (make-instance 'environment :program *shader-program*)))
+    (setf (projection-matrix *proj-uset*) (ortho-screen-matrix window))
+    (setf (effect window) (make-instance 'simple-effect :environment env)))
   (submit-with-effect (cube window) window (effect window))
   (setf (exposed window) t))
 

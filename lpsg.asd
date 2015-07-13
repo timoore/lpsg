@@ -12,7 +12,6 @@
      (:file "utils" :depends-on ("package"))
      (:file "assembly" :depends-on ("package"))
      (:file "uset" :depends-on ("package"))
-     (:file "incremental-comp" :depends-on ("package"))
      (:file "render" :depends-on ("package" "uset" "assembly" "interface"))
      (:file "environment" :depends-on ("package" "render"))
      (:file "effect" :depends-on ("package" "render" "environment"))
