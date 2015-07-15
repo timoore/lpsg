@@ -75,17 +75,17 @@ Will be created automatically, but must be specified for now.")))
 
 (defclass shape (consumer-node)
   ((attributes :accessor attributes :initarg :attributes :initform nil
-               :documentation "alist of (name . attribute)")
+               :documentation "Alist of (name . attribute). The names are later mapped to a vertex binding index.")
    (environment :accessor environment :initarg :environment :initform nil)
    (effect :accessor effect :initarg :effect)
    ;; XXX uset computation nodes?
    (usets :accessor usets :initarg :usets :initform nil)
-   (drawable :accessor drawable :initarg :drawable :initform nil)
-   ;; XXX Bundles?
-   (bundle :accessor bundle)))
+   (drawable :accessor drawable :initarg :drawable)))
+
 
 (defmethod initialize-instance :after ((obj shape) &key)
-  (setf (drawable obj) (make-instance 'drawable)))
+  (unless (slot-boundp obj 'drawable)
+    (setf (drawable obj) (make-instance 'drawable))))
 
 (defgeneric attribute (obj attribute-name))
 

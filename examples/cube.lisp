@@ -60,7 +60,8 @@ void main()
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:expose-event))
   (setf (cube window) (lpsg:make-cube-shape))
-  (let ((env (make-instance 'environment :program *shader-program*)))
+  (let ((env (make-instance 'environment :program *shader-program*
+                            :attribute-map '((gl:vertex . 0) (gl:normal . 1)))))
     (setf (projection-matrix *proj-uset*) (ortho-screen-matrix window))
     (setf (effect window) (make-instance 'simple-effect :environment env)))
   (lpsg:submit-with-effect (cube window) window (effect window))

@@ -8,7 +8,9 @@
 (in-package #:lpsg)
 
 (defclass effect ()
-  ())
+  ((attribute-map :accessor attribute-map :initarg :attribute-map :initform nil
+                  :documentation "Alist that maps from vertex attribute names
+  to indices or NIL for overall binding")))
 
 ;;; This shares a lot of slots with the environment class; should the two classes be more
 ;;; integrated?
@@ -16,10 +18,11 @@
   ((environment :accessor environment :initarg environment)))
 
 (defmethod submit-with-effect (shape renderer (effect simple-effect))
-  (let ((bundle (make-instance 'render-bundle :shape shape :gl-state (environment effect))))
+  (let ((bundle (make-instance 'render-bundle :shape shape :gl-state (environment effect)))
+        (attr-map (attribute-map effect)))
     ;; Make attribute set from shape and drawable attributes
     (setf (array-bindings bundle) (mapcar (lambda (entry)
-                                            (cons nil (cdr entry)))
+                                            (cons (assoc (car entry) attr-map) (cdr entry)))
                                           (attributes shape)))
     (when (typep (drawable shape) 'indexed-drawable)
       (setf (element-binding bundle) (element-array (drawable shape))))
