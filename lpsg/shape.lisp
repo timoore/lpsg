@@ -13,6 +13,10 @@
               :documentation "Function to upload Lisp data to a mapped buffer.
 Will be created automatically, but must be specified for now.")))
 
+(defmethod initialize-instance :after ((obj mirrored-resource) &key)
+  (unless (slot-boundp obj 'num-components)
+    (setf (num-components obj) (components obj))))
+
 ;;; An upload function that should work for floats
 
 (defun upload-resource-float (resource buffer-ptr)
@@ -80,7 +84,7 @@ Will be created automatically, but must be specified for now.")))
    ;; XXX Bundles?
    (bundle :accessor bundle)))
 
-(defmethod initialize-instance ((obj shape) &key)
+(defmethod initialize-instance :after ((obj shape) &key)
   (setf (drawable obj) (make-instance 'drawable)))
 
 (defgeneric attribute (obj attribute-name))

@@ -207,8 +207,7 @@
    (normalizedp :accessor normalizedp :initarg :normalizedp :initform nil)
    (stride :accessor stride :initarg :stride :initform 0)
    (offset :accessor offset :initarg :offset :initform 0))
-  (:documentation "class for formatted data stored somewhere in a buffer")
-  (:default-initargs :usage :static-draw))
+  (:documentation "class for formatted data stored somewhere in a buffer"))
 
 (defgeneric upload-fn (buffer-area)
   (:documentation "function taking (BUFFER-AREA POINTER) ???"))

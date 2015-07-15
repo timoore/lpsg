@@ -15,4 +15,5 @@
      (:file "render" :depends-on ("package" "uset" "assembly" "interface"))
      (:file "environment" :depends-on ("package" "render"))
      (:file "effect" :depends-on ("package" "render" "environment"))
-     (:file "shape" :depends-on ("package" "render" "environment"))))))
+     (:file "shape" :depends-on ("package" "render" "environment"))
+     (:file "solids" :depends-on ("package" "render" "shape"))))))

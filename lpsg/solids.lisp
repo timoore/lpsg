@@ -46,9 +46,9 @@
     (loop
        for i from 0 below 6
        ;; for each face, construct a surface normal
-       for idx0 = (aref *cube-faces* 0 i)         
-       for idx1 = (aref *cube-faces* 1 i)
-       for idx2 = (aref *cube-faces* 3 i)
+       for idx0 = (aref *cube-faces* i 0)
+       for idx1 = (aref *cube-faces* i 1)
+       for idx2 = (aref *cube-faces* i 3)
        do (progn
             (loop
                for j from 0 below 3
@@ -83,12 +83,12 @@
            (element-attr (make-instance 'mirrored-resource
                                         :data element-array :data-size 36
                                         :components 1 :buffer-type :short))
-          (cube-shape (make-instance 'shape
-                                     :drawable (make-instance 'indexed-drawable
-                                                              :mode :triangles
-                                                              :vertex-count 24
-                                                              :element-array element-attr))))
+           (cube-shape (make-instance 'shape
+                                      :drawable (make-instance 'indexed-drawable
+                                                               :mode :triangles
+                                                               :vertex-count 24
+                                                               :element-array element-attr))))
       (setf (attribute cube-shape 'vertex) vertex-attr)
       (setf (attribute cube-shape 'normal) normal-attr)
-      shape)))
+      cube-shape)))
 
