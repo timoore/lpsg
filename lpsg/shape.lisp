@@ -13,10 +13,6 @@
               :documentation "Function to upload Lisp data to a mapped buffer.
 Will be created automatically, but must be specified for now.")))
 
-(defmethod initialize-instance :after ((obj mirrored-resource) &key)
-  (unless (slot-boundp obj 'num-components)
-    (setf (num-components obj) (components obj))))
-
 ;;; An upload function that should work for floats
 
 (defun upload-resource-float (resource buffer-ptr)
@@ -29,8 +25,12 @@ Will be created automatically, but must be specified for now.")))
     (loop
        for i from 0 below (data-size resource) ; ??? Is this how limit should be specified?
        for src-idx = (+ (data-offset resource)  (* i real-data-stride))
-       for dest = (cffi:inc-pointer buffer-ptr (+ (* i effective-stride)))
-       do (setf (mem-aref dest :float) (float (row-major-aref data srd-idx) 1.0)))))
+       for dest = (cffi:inc-pointer buffer-ptr (* i effective-stride))
+       do (loop
+             for j from 0 below (num-components resource)
+             for dest-component = (cffi:inc-pointer dest (* j 4))
+             do (setf (mem-aref dest-component :float)
+                      (float (row-major-aref data (+ srd-idx j)) 1.0))))))
 
 (defun upload-resource-short (resource buffer-ptr)
   (let ((real-data-stride (if (zerop (data-stride resource))
@@ -42,17 +42,22 @@ Will be created automatically, but must be specified for now.")))
     (loop
        for i from 0 below (data-size resource) ; ??? Is this how limit should be specified?
        for src-idx = (+ (data-offset resource)  (* i real-data-stride))
-       for dest = (cffi:inc-pointer buffer-ptr (+ (* i effective-stride)))
-       do (setf (mem-aref dest :short) (row-major-aref data srd-idx)))))
+       for dest = (cffi:inc-pointer buffer-ptr (* i effective-stride))
+       do (loop
+             for j from 0 below (num-components resource)
+             for dest-component = (cffi:inc-pointer dest (* j 2))
+             do (setf (mem-aref dest-component :short)
+                      (float (row-major-aref data (+ srd-idx j)) 1.0))))))
 
 (defmethod initialize-instance :after ((obj mirrored-resource) &key)
-  (unless (slot-boundp obj 'upload-fn)
-    (when (slot-boundp obj 'buffer-type)
-      (case (buffer-type obj)
-        (:float
-         (setf (upload-fn obj) #'upload-resource-float))
-        (:short
-         (setf (upload-fn obj) #'upload-resource-short))))))
+  (unless (slot-boundp obj 'num-components)
+    (setf (num-components obj) (components obj)))
+  (when (and (not (slot-boundp obj 'upload-fn)) (slot-boundp obj 'buffer-type))
+    (case (buffer-type obj)
+      (:float
+       (setf (upload-fn obj) #'upload-resource-float))
+      (:short
+       (setf (upload-fn obj) #'upload-resource-short)))))
 
 ;;; Definition of an individual vertex attribute
 ;;;
