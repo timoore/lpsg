@@ -164,6 +164,12 @@ Will be created automatically, but must be specified for now.")))
       (add-bundle *renderer* (bundle obj)))))
 |#
 
+(defmethod compute-buffer-allocation ((shape shape) &key (base-offset 0))
+  (let ((total-size 0))
+    (loop
+       for (null .attr) in (attributes shape)
+         )))
+
 ;;; defmethod is here because it uses methods on SHAPE.
 
 (defmethod submit (assembly renderer)
