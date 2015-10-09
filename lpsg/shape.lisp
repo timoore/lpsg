@@ -178,7 +178,9 @@ Will be created automatically, but must be specified for now.")))
        for attr-offset = (* (ceiling current-offset aligned-size) aligned-size)
        do (progn
             (setf (offset attribute) attr-offset)
-            (setf current-offset)))))
+            (setf current-offset (+ attr-offset (* (data-count attr)
+                                                   buffer-element-size)))))
+    current-offset))
 
 ;;; defmethod is here because it uses methods on SHAPE.
 
