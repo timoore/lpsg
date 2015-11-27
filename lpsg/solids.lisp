@@ -75,10 +75,10 @@
                  do (setf (aref element-array (+ (* i 6) k)) (+ (* i 4) (mod k 4)))))))
     ;; Now we can construct the vertex attributes and the shape
     (let* ((vertex-attr (make-instance 'vertex-attribute
-                                      :data vertex-array :data-size (* 24 3)
+                                      :data vertex-array :data-count 24
                                       :components 3 :buffer-type :float))
            (normal-attr (make-instance 'vertex-attribute
-                                       :data normal-array :data-size (* 24 3)
+                                       :data normal-array :data-size 24
                                        :components 3 :buffer-type :float))
            (element-attr (make-instance 'mirrored-resource
                                         :data element-array :data-size 36
@@ -86,7 +86,7 @@
            (cube-shape (make-instance 'shape
                                       :drawable (make-instance 'indexed-drawable
                                                                :mode :triangles
-                                                               :vertex-count 24
+                                                               :vertex-count 36
                                                                :element-array element-attr))))
       (setf (attribute cube-shape 'vertex) vertex-attr)
       (setf (attribute cube-shape 'normal) normal-attr)

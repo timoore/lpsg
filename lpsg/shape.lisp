@@ -5,10 +5,13 @@
 (defclass mirrored-resource (buffer-area)
   ((data :accessor data :initarg :data)
    (data-offset :accessor data-offset :initarg :data-offset :initform 0)
-   (data-size :accessor data-size :initarg :data-size :initform 0)
+   (data-count :accessor data-count :initarg :data-count :initform 0
+               :documentation "number of elements")
    (data-stride :accessor data-stride :initarg :data-stride :initform 0
-                :documentation "number of elements")
-   (num-components :accessor num-components :initarg :num-components)
+                :documentation "offset between start of each element")
+   (num-components :accessor num-components :initarg :num-components
+                   :documentation "number of components per element. Redundant
+  with buffer-area components?")
    (upload-fn :accessor upload-fn :initarg :upload-fn
               :documentation "Function to upload Lisp data to a mapped buffer.
 Will be created automatically, but must be specified for now.")))
@@ -165,10 +168,19 @@ Will be created automatically, but must be specified for now.")))
 |#
 
 (defmethod compute-buffer-allocation ((shape shape) &key (base-offset 0))
-  (let ((total-size 0))
+  (let ((current-offset base-offset))
+        
     (loop
-       for (null .attr) in (attributes shape)
-         )))
+       for (nil .attr) in (attributes shape)
+       for component-size = (get-component-size (buffer-type attr))
+       for aligned-size = (max component-size 4)
+       for buffer-element-size = (* component-size (components attr))
+       for attr-offset = (* (ceiling current-offset aligned-size) aligned-size)
+       do (progn
+            (setf (offset attribute) attr-offset)
+            (setf current-offset (+ attr-offset (* (data-count attr)
+                                                   buffer-element-size)))))
+    current-offset))
 
 ;;; defmethod is here because it uses methods on SHAPE.
 
