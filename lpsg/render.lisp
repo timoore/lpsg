@@ -608,17 +608,17 @@
 ;;; size of data elements in VBOs.
 
 (defparameter *buffer-size-alist*
-  '((:half-float​ . 2)
-    (:float​ . 4)
-    (:double​ . 8)
-    (:fixed​ . 4)
-    (:byte​ . 1)
-    (:unsigned-byte​ . 1)
-    (:short​ . 2)
-    (:unsigned-short​ . 2)
-    (:int​ . 4)
-    (:unsigned-int​ . 4)
-    (:int-2-10-10-10-rev​ . 4)
+  '((:half-float . 2)
+    (:float . 4)
+    (:double . 8)
+    (:fixed . 4)
+    (:byte . 1)
+    (:unsigned-byte . 1)
+    (:short . 2)
+    (:unsigned-short . 2)
+    (:int . 4)
+    (:unsigned-int . 4)
+    (:int-2-10-10-10-rev . 4)
     (:unsigned-int-2-10-10-10-rev . 4)
     (:unsigned-int-10f-11f-11f-rev . 4)))
 
