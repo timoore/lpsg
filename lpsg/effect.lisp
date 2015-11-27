@@ -21,6 +21,8 @@
   (let ((bundle (make-instance 'render-bundle :shape shape :gl-state (environment effect)))
         (attr-map (attribute-map effect)))
     ;; Make attribute set from shape and drawable attributes
+    ;; The actual vertex attribute index for an attribute may not be known until the shader program
+    ;; is linked, so make it null for now (would -1 be better?)
     (setf (array-bindings bundle) (mapcar (lambda (entry)
                                             (cons (assoc (car entry) attr-map) (cdr entry)))
                                           (attributes shape)))
