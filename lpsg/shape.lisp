@@ -26,13 +26,13 @@ Will be created automatically, but must be specified for now.")))
                               (* (components resource) 4)
                               (stride resource))))
     (loop
-       for i from 0 below (data-size resource) ; ??? Is this how limit should be specified?
+       for i from 0 below (data-count resource)
        for src-idx = (+ (data-offset resource)  (* i real-data-stride))
        for dest = (cffi:inc-pointer buffer-ptr (* i effective-stride))
        do (loop
              for j from 0 below (num-components resource)
              for dest-component = (cffi:inc-pointer dest (* j 4))
-             do (setf (mem-aref dest-component :float)
+             do (setf (cffi:mem-aref dest-component :float)
                       (float (row-major-aref data (+ srd-idx j)) 1.0))))))
 
 (defun upload-resource-short (resource buffer-ptr)
@@ -43,13 +43,13 @@ Will be created automatically, but must be specified for now.")))
                               (* (components resource) 2)
                               (stride resource))))
     (loop
-       for i from 0 below (data-size resource) ; ??? Is this how limit should be specified?
+       for i from 0 below (data-count resource)
        for src-idx = (+ (data-offset resource)  (* i real-data-stride))
        for dest = (cffi:inc-pointer buffer-ptr (* i effective-stride))
        do (loop
              for j from 0 below (num-components resource)
              for dest-component = (cffi:inc-pointer dest (* j 2))
-             do (setf (mem-aref dest-component :short)
+             do (setf (cffi:mem-aref dest-component :short)
                       (float (row-major-aref data (+ srd-idx j)) 1.0))))))
 
 (defmethod initialize-instance :after ((obj mirrored-resource) &key)

@@ -40,10 +40,17 @@
    #:draw-render-groups
    #:shader
    #:program
+   #:gl-buffer
+   #:buffer
+   #:attributes
+   #:compute-buffer-allocation
    #:define-uset
    #:graphics-state
    #:uniform-sets
    #:with-mutable
+   #:environment
+   #:simple-environment
+   #:effect
    #:submit-with-effect
    ;; utilities
    #:ortho-matrix

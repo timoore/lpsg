@@ -510,7 +510,7 @@
 (defun remove-bundle (renderer bundle)
   (setf (new-bundles renderer) (delete bundle (new-bundles renderer)))
   (setf (bundles renderer) (delete bundle (bundles renderer)))
-  (setf (geometry bundle) nil)          ; dereferences geometry
+  (setf (shape bundle) nil)
   bundle)
 
 (defgeneric upload-bundles (renderer))
@@ -603,7 +603,7 @@
 (defmethod close-renderer ((renderer renderer))
   (loop
      for bundle in (bundles renderer)
-       do (setf (geometry bundle) nil)))
+       do (setf (shape bundle) nil)))
 
 ;;; size of data elements in VBOs.
 
