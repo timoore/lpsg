@@ -51,6 +51,7 @@
    #:environment
    #:simple-environment
    #:effect
+   #:simple-effect
    #:submit-with-effect
    ;; utilities
    #:ortho-matrix
