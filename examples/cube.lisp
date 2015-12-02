@@ -60,16 +60,16 @@ void main()
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:expose-event))
   (let ((cube (lpsg:make-cube-shape))
-        (env (make-instance 'environment :program *shader-program*
+        (env (make-instance 'lpsg:environment :program *shader-program*
                             :attribute-map '((gl:vertex . 0) (gl:normal . 1)))))
     (setf (cube window) cube)
     (setf (projection-matrix *proj-uset*) (ortho-screen-matrix window))
-    (setf (effect window) (make-instance 'simple-effect :environment env))
-    (let ((buffer (make-instance 'gl-buffer)) ;default size should be fine
-          (alloc-size (compute-buffer-allocation cube)))
+    (setf (effect window) (make-instance 'lpsg:simple-effect :environment env))
+    (let ((buffer (make-instance 'lpsg:gl-buffer)) ;default size should be fine
+          (alloc-size (lpsg:compute-buffer-allocation cube)))
       (loop
-         for (name . vertex-attrib) in (attributes cube)
-         do (setf (buffer vertex-attrib) buffer)))
+         for (name . vertex-attrib) in (lpsg:attributes cube)
+         do (setf (lpsg:buffer vertex-attrib) buffer)))
     (lpsg:submit-with-effect cube window (effect window)))
   (setf (exposed window) t))
 
