@@ -244,7 +244,9 @@
 (defclass buffer-map () ())
 
 (defclass attribute-set ()
-  ((array-bindings :accessor array-bindings :initarg :array-bindings :initform nil)
+  ((array-bindings :accessor array-bindings :initarg :array-bindings :initform nil
+                   :documentation "list of (name vertex-attribute index). NAME is the string name
+  in the shader program. INDEX is -1 if not valid.")
    (element-binding :accessor element-binding :initarg element-binding :initform nil)
    (vao :accessor vao))
   (:documentation "A collection of buffer mappings (buffer + offset) bound to specific attributes,
