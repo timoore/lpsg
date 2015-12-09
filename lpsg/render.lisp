@@ -283,11 +283,6 @@
     (gl:bind-vertex-array 0)
     attribute-set))
 
-(defclass render-bundle (attribute-set)
-  ((shape :accessor shape :initarg :shape)
-   ;; environment? Is gl-state for the moment
-   (gl-state :reader gl-state :initarg :gl-state)))
-
 (defclass graphics-state ()
   ((bindings)
    (program :accessor program :initarg :program :initform nil)
@@ -550,17 +545,25 @@
     (setf (upload-queue renderer) nil)
     (draw-bundles renderer)))
 
+(defclass render-bundle ()
+  ((attribute-set :accessor attribute-set :initarg :attribute-set)
+   (shape :accessor shape :initarg :shape)
+   ;; environment? Is gl-state for the moment
+   (gl-state :reader gl-state :initarg :gl-state)))
+
+
 (defgeneric draw-bundle (renderer bundle))
 
 (defmethod draw-bundle ((renderer renderer) bundle)
   (bind-state renderer (gl-state bundle))
-  (gl:bind-vertex-array (vao bundle))
-  (let ((drawable (drawable (shape bundle)))) ;XXX Should drawable be stored in bundle?
-    (if (element-binding bundle)
-        (let ((index-offset (offset (element-binding bundle))))
+  (let ((attr-set (attribute-set bundle))
+        (drawable (drawable (shape bundle))))
+    (gl:bind-vertex-array (vao attr-set))
+    (if (element-binding attr-set)
+        (let ((index-offset (offset (element-binding attr-set))))
           (%gl:draw-elements (mode drawable)
                              (number-vertices drawable)
-                             (buffer-type (element-binding bundle))
+                             (buffer-type (element-binding attr-set))
                              (cffi:inc-pointer (cffi:null-pointer) index-offset)))
         (gl:draw-arrays (mode drawable) 0 (number-vertices drawable)))))
 
