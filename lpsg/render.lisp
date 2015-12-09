@@ -553,17 +553,16 @@
 (defgeneric draw-bundle (renderer bundle))
 
 (defmethod draw-bundle ((renderer renderer) bundle)
-  (let ((geom (geometry bundle)))
-    (bind-state renderer (gl-state bundle))
-    (gl:bind-vertex-array (vao geom))
-    (if (indices geom)
-        (let ((index-offset (allocation-offset (element-buffer-allocation geom))))
-          (%gl:draw-elements (mode geom)
-                             (number-vertices geom)
-                             (gl::cffi-type-to-gl
-                              (gl::gl-array-type (indices geom)))
+  (bind-state renderer (gl-state bundle))
+  (gl:bind-vertex-array (vao bundle))
+  (let ((drawable (drawable (shape bundle)))) ;XXX Should drawable be stored in bundle?
+    (if (element-binding bundle)
+        (let ((index-offset (offset (element-binding bundle))))
+          (%gl:draw-elements (mode drawable)
+                             (number-vertices drawable)
+                             (buffer-type (element-binding bundle))
                              (cffi:inc-pointer (cffi:null-pointer) index-offset)))
-        (gl:draw-arrays (mode geom) 0 (number-vertices geom)))))
+        (gl:draw-arrays (mode drawable) 0 (number-vertices drawable)))))
 
 (defmethod draw-bundles ((renderer renderer))
   ;; XXX Should we set the state to something known here?
