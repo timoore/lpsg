@@ -551,6 +551,25 @@
    ;; environment? Is gl-state for the moment
    (gl-state :reader gl-state :initarg :gl-state)))
 
+(defmethod gl-finalized-p ((obj render-bundle))
+  (and (gl-finalized-p (attribute-set obj))
+       (gl-finalized-p (gl-state obj))))
+
+(defmethod gl-finalize ((obj render-bundle) &optional (errorp t))
+  (unless (gl-finalized-p (gl-state obj))
+    (gl-finalize (gl-state obj) errorp))
+  (let* ((program (program graphics-state))
+         (attrs (vertex-attribs program)))
+    (loop
+       for binding in (array-bindings obj)
+       for (name) = binding
+       for vertex-attrib = (find name attrs :key #'car :test #'string=)
+       do (when vertex-attrib
+            ;; XXX Test format of vertex attribute
+            ;; set attribute location from program
+            (set (caddr binding) (cadr vertex-attrib)))))
+  (unless (gl-finalized-p (attribute-set obj))
+    (gl-finalize attribute-set errorp)))
 
 (defgeneric draw-bundle (renderer bundle))
 

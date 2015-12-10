@@ -16,7 +16,7 @@
 (defun attribute-array-location (name environment)
   (let ((glsl-attrib-name (cadr (member name (attribute-map environment) :key #'car))))
     (unless glsl-attrib-name
-      return nil)
+      (return nil))
     (let ((attrib (member glsl-attrib-name (vertex-attribs (shader-program environment))
                          :key #'car :test #'string=)))
       (cadr attrib))))
