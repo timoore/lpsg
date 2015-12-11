@@ -35,7 +35,6 @@
    #:renderer
    #:close-renderer
    #:add-bundle
-   #:update-bundle
    #:draw
    #:draw-render-groups
    #:shader

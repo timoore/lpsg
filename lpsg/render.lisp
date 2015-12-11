@@ -50,7 +50,7 @@
 
 ;;; holds multiple render queues. These will be rendered in order.
 (defclass render-stage (render-queue)
-  ((render-queues :accessor render-queues)))
+  ((render-queues :accessor render-queues :initarg :render-queues :initform nil)))
 
 (defclass renderer ()
   ((buffers :accessor buffers :initform nil)
@@ -218,7 +218,7 @@
 (defgeneric add-to-upload-queue (renderer buffer-area))
 
 (defmethod add-to-upload-queue ((renderer renderer) (obj buffer-area))
-  (let* ((buffer (buffer buffer-area))
+  (let* ((buffer (buffer obj))
          (entry (assoc obj (upload-queue renderer))))
     (if entry
         (push obj (cdr entry))
@@ -256,7 +256,7 @@
   ())
 
 (defmethod gl-finalized-p ((obj attribute-set))
-  (not (null (vao attribute-set))))
+  (slot-boundp obj 'vao))
 
 (defmethod gl-finalize ((attribute-set attribute-set) &optional errorp)
   (declare (ignorable errorp))
@@ -267,7 +267,7 @@
     (setf (vao attribute-set) vao)
     (gl:bind-vertex-array vao-id)
     (loop
-       for (index . area) in (array-bindings attribute-set)
+       for (nil area index) in (array-bindings attribute-set)
        when index
        do (progn
             (gl:bind-buffer :array-buffer (buffer area))
@@ -523,10 +523,7 @@
 
 (defmethod draw ((renderer renderer))
   (let ((*renderer* renderer))
-    (mapc (lambda (obj)
-            (unless (gl-finalized-p obj)
-              (gl-finalize obj)))
-          (finalize-queue renderer))
+    (process-finalize-queue renderer)
     (setf (finalize-queue renderer) nil)
     (do-upload-queue renderer)
     (setf (upload-queue renderer) nil)

@@ -8,15 +8,15 @@
    (effect :accessor effect :initarg :effect :documentation "back pointer to effect object")))
 
 (defmethod gl-finalized-p ((obj environment))
-  (gl-finalized-p (shader-program obj)))
+  (gl-finalized-p (program obj)))
 
 (defmethod gl-finalize ((obj environment) &optional errorp)
-  (gl-finalize (shader-program obj) errorp))
+  (gl-finalize (program obj) errorp))
 
 (defun attribute-array-location (name environment)
   (let ((glsl-attrib-name (cadr (member name (attribute-map environment) :key #'car))))
     (unless glsl-attrib-name
-      (return nil))
-    (let ((attrib (member glsl-attrib-name (vertex-attribs (shader-program environment))
+      (return-from attribute-array-location nil))
+    (let ((attrib (member glsl-attrib-name (vertex-attribs (program environment))
                          :key #'car :test #'string=)))
       (cadr attrib))))
