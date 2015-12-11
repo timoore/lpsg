@@ -8,19 +8,21 @@
 
 in vec3 in_Position;
 in vec3 in_Normal;
-in vec3 in_color;
+// in vec3 in_Color;
 
 smooth out vec3 theColor;
 
-vec4 lightDir(-0.577350, -0.577350, 0.577350, 0);
+vec3 in_Color = vec3(1.0, 0.0, 1.0);
+vec4 lightDir = vec4(-0.577350, -0.577350, 0.577350, 0);
 
 uniform mat4 projectionMatrix;
 
 void main()
 {
   gl_Position = projectionMatrix * vec4(in_Position, 1.0);
-  vec3 intense = min(dot(-in_normal, lightDir), vec3(0.0, 0.0, 0.0));
-  theColor = intense * in_color;
+  float intense = min(dot(-in_Normal, lightDir.xyz), 0.0);
+  theColor = intense * in_Color;
+}
 ")
 
 (defparameter *fragment-shader-source* "
@@ -32,23 +34,12 @@ out vec4 out_Color;
 
 void main()
 {
-  out_Color = theColor;
+  out_Color = vec4(theColor, 1.0);
 }
 ")
 
 (lpsg:define-uset projection (("projectionMatrix" :float-mat4
                                projection-matrix :accessor projection-matrix)))
-
-(defparameter *shader-program*
-  (make-instance 'lpsg:program
-                 :shaders (list (make-instance 'lpsg:shader
-                                               :shader-type :vertex-shader
-                                               :source *vertex-shader-source*
-                                               :usets '(projection))
-                                (make-instance 'lpsg:shader
-                                               :shader-type :fragment-shader
-                                               :source *fragment-shader-source*
-                                               :usets ()))))
 
 (defclass cube-window (viewer-window lpsg:renderer)
   ((cube :accessor cube)
@@ -59,10 +50,21 @@ void main()
 (defvar *proj-uset* (make-instance 'projection))
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:expose-event))
-  (let ((cube (lpsg:make-cube-shape))
-        (env (make-instance 'lpsg:environment :program *shader-program*
-                            :attribute-map '((gl:vertex . "in_Position")
-                                             (gl:normal . "in_Normal")))))
+  (let* ((cube (lpsg:make-cube-shape))
+         (shader-program
+          (make-instance 'lpsg:program
+                         :shaders (list (make-instance 'lpsg:shader
+                                                       :shader-type :vertex-shader
+                                                       :source *vertex-shader-source*
+                                                       :usets '(projection))
+                                        (make-instance 'lpsg:shader
+                                                       :shader-type :fragment-shader
+                                                       :source *fragment-shader-source*
+                                                       :usets ()))))
+         (env (make-instance 'lpsg:environment :program shader-program
+                             :attribute-map '((gl:vertex . "in_Position")
+                                              (gl:normal . "in_Normal"))
+                             :uniform-sets (list *proj-uset*))))
     (setf (cube window) cube)
     (setf (projection-matrix *proj-uset*) (ortho-screen-matrix window))
     (setf (effect window) (make-instance 'lpsg:simple-effect :environment env))
