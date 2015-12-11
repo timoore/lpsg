@@ -499,19 +499,6 @@
                             :size index-size)))))
 |#
 
-(defun add-bundle (renderer bundle)
-  (push bundle (new-bundles renderer)))
-
-(defun update-bundle (renderer bundle))
-
-(defun remove-bundle (renderer bundle)
-  (setf (new-bundles renderer) (delete bundle (new-bundles renderer)))
-  (setf (bundles renderer) (delete bundle (bundles renderer)))
-  (setf (shape bundle) nil)
-  bundle)
-
-(defgeneric upload-bundles (renderer))
-
 (defgeneric draw (renderer))
 (defgeneric draw-bundles (renderer))
 
@@ -545,46 +532,7 @@
     (setf (upload-queue renderer) nil)
     (draw-bundles renderer)))
 
-(defclass render-bundle ()
-  ((attribute-set :accessor attribute-set :initarg :attribute-set)
-   (shape :accessor shape :initarg :shape)
-   ;; environment? Is gl-state for the moment
-   (gl-state :reader gl-state :initarg :gl-state)))
-
-(defmethod gl-finalized-p ((obj render-bundle))
-  (and (gl-finalized-p (attribute-set obj))
-       (gl-finalized-p (gl-state obj))))
-
-(defmethod gl-finalize ((obj render-bundle) &optional (errorp t))
-  (unless (gl-finalized-p (gl-state obj))
-    (gl-finalize (gl-state obj) errorp))
-  (let* ((program (program graphics-state))
-         (attrs (vertex-attribs program)))
-    (loop
-       for binding in (array-bindings obj)
-       for (name) = binding
-       for vertex-attrib = (find name attrs :key #'car :test #'string=)
-       do (when vertex-attrib
-            ;; XXX Test format of vertex attribute
-            ;; set attribute location from program
-            (set (caddr binding) (cadr vertex-attrib)))))
-  (unless (gl-finalized-p (attribute-set obj))
-    (gl-finalize attribute-set errorp)))
-
 (defgeneric draw-bundle (renderer bundle))
-
-(defmethod draw-bundle ((renderer renderer) bundle)
-  (bind-state renderer (gl-state bundle))
-  (let ((attr-set (attribute-set bundle))
-        (drawable (drawable (shape bundle))))
-    (gl:bind-vertex-array (vao attr-set))
-    (if (element-binding attr-set)
-        (let ((index-offset (offset (element-binding attr-set))))
-          (%gl:draw-elements (mode drawable)
-                             (number-vertices drawable)
-                             (buffer-type (element-binding attr-set))
-                             (cffi:inc-pointer (cffi:null-pointer) index-offset)))
-        (gl:draw-arrays (mode drawable) 0 (number-vertices drawable)))))
 
 (defmethod draw-bundles ((renderer renderer))
   ;; XXX Should we set the state to something known here?
@@ -612,13 +560,6 @@
     (gl:bind-vertex-array 0)
     (setf (vao geometry) vao)))
 
-(defmethod upload-bundles ((renderer renderer))
-  (loop
-     for bundle in (new-bundles renderer)
-     if (not (loadedp (geometry bundle)))
-     do (upload-geometry renderer (geometry bundle)))
-  (setf (bundles renderer) (nconc (new-bundles renderer) (bundles renderer)))
-  (setf (new-bundles renderer) nil))
 |#
 
 (defgeneric close-renderer (renderer))
