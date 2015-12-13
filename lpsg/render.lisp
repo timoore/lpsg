@@ -227,12 +227,14 @@
 (defun do-upload-queue (renderer)
   (loop
      for (buffer . uploads) in (upload-queue renderer)
+     for target = (target buffer)
      do (progn
-          (gl:bind-buffer :array-buffer (id buffer))
-          (let ((ptr (gl:map-buffer (target buffer) :write-only)))
+          (gl:bind-buffer target (id buffer))
+          (let ((ptr (gl:map-buffer target :write-only)))
             (mapc (lambda (area)
                     (funcall (upload-fn area) area ptr))
-                  uploads))))
+                  uploads))
+          (gl:unmap-buffer target)))
   (gl:bind-buffer :array-buffer 0))
 
 (defmethod gl-finalized-p ((obj buffer-area))
@@ -260,6 +262,13 @@
 
 (defmethod gl-finalize ((attribute-set attribute-set) &optional errorp)
   (declare (ignorable errorp))
+  (loop
+     for (nil area) in (array-bindings attribute-set)
+     unless (gl-finalized-p area)
+     do (gl-finalize area errorp))
+  (when (and (element-binding attribute-set)
+             (not (gl-finalized-p (element-binding attribute-set))))
+    (gl-finalize (element-binding attribute-set) errorp))
   (let* ((vao-id (gl:gen-vertex-array))
          (vao (make-instance 'vertex-array-object :id vao-id))
          (nullptr (cffi:null-pointer))
@@ -270,7 +279,7 @@
        for (nil area index) in (array-bindings attribute-set)
        when index
        do (progn
-            (gl:bind-buffer :array-buffer (buffer area))
+            (gl:bind-buffer :array-buffer (id (buffer area)))
             (gl:enable-vertex-attrib-array index)
             (gl:vertex-attrib-pointer index
                                       (components area)
@@ -279,7 +288,7 @@
                                       (stride area)
                                       (cffi:inc-pointer nullptr (offset area)))))
     (when element-binding
-      (gl:bind-buffer :element-array-buffer (buffer element-binding)))
+      (gl:bind-buffer :element-array-buffer (id (buffer element-binding))))
     (gl:bind-vertex-array 0)
     attribute-set))
 

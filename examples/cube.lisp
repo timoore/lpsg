@@ -72,7 +72,8 @@ void main()
           (alloc-size (lpsg:compute-buffer-allocation cube)))
       (loop
          for (name . vertex-attrib) in (lpsg:attributes cube)
-         do (setf (lpsg:buffer vertex-attrib) buffer)))
+         do (setf (lpsg:buffer vertex-attrib) buffer))
+      (setf (lpsg:buffer (lpsg::element-array (lpsg::drawable cube))) buffer))
     (lpsg:submit-with-effect cube window (effect window)))
   (setf (exposed window) t))
 
@@ -87,6 +88,7 @@ void main()
               while (glop:dispatch-events win :blocking nil :on-foo nil)
               when (exposed win)
               do (progn
+                   (%gl:clear-color .8 .8 .8 1.0)
                    (gl:clear :color-buffer)
                    (lpsg:draw win)
                    (glop:swap-buffers win))))

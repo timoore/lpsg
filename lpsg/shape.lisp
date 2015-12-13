@@ -170,10 +170,13 @@ Will be created automatically, but must be specified for now.")))
 |#
 
 (defmethod compute-buffer-allocation ((shape shape) &key (base-offset 0))
-  (let ((current-offset base-offset))
-        
+  (let ((current-offset base-offset)
+        ;; Allocate element array too if it exists
+        (attr-list (if (typep (drawable shape) 'indexed-drawable)
+                       (append (attributes shape) `((nil . ,(element-array (drawable shape)))))
+                       (attributes shape))))
     (loop
-       for (nil . attr) in (attributes shape)
+       for (nil . attr) in attr-list
        for component-size = (get-component-size (buffer-type attr))
        for aligned-size = (max component-size 4)
        for buffer-element-size = (* component-size (components attr))
