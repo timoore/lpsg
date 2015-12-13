@@ -32,7 +32,7 @@
     ;; so the polygon will always look square.
     (let* ((right (max (float (/ width height)) 1.0))
            (top (max (float (/ height width)) 1.0))
-           (ortho-mat (lpsg:ortho-matrix (- right) right (- top) top -1.0 1.0)))
+           (ortho-mat (lpsg:ortho-matrix (- right) right (- top) top 1.0 10.0)))
       (setf (ortho-screen-matrix w) ortho-mat))))
 
 (defmethod glop:on-event ((window viewer-window) (event glop:resize-event))

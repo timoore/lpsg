@@ -19,7 +19,8 @@ uniform mat4 projectionMatrix;
 
 void main()
 {
-  gl_Position = projectionMatrix * vec4(in_Position, 1.0);
+  vec3 modelPos = in_Position + vec3(-0.0, -0.0, -5.0);
+  gl_Position = projectionMatrix * vec4(modelPos, 1.0);
   float intense = min(dot(-in_Normal, lightDir.xyz), 0.0);
   theColor = intense * in_Color;
 }
@@ -89,6 +90,9 @@ void main()
               when (exposed win)
               do (progn
                    (%gl:clear-color .8 .8 .8 1.0)
+                   (gl:cull-face :back)
+                   (gl:depth-func :less)
+                   (gl:enable :cull-face :depth-test)
                    (gl:clear :color-buffer)
                    (lpsg:draw win)
                    (glop:swap-buffers win))))
