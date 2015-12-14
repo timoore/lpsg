@@ -202,4 +202,6 @@ Will be created automatically, but must be specified for now.")))
           ;; XXX Is vertex attrib mirrored? Does it actually need uploading?
           ;; Is there a better way than typep?
           (when (typep vertex-attrib 'mirrored-resource)
-            (add-to-upload-queue renderer vertex-attrib)))))
+            (add-to-upload-queue renderer vertex-attrib))))
+  (when (typep (drawable shape) 'indexed-drawable)
+    (add-to-upload-queue renderer (element-array (drawable shape)))))

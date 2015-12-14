@@ -50,6 +50,16 @@ void main()
 
 (defvar *proj-uset* (make-instance 'projection))
 
+(defun draw-window (win)
+  (when (exposed win)
+    (%gl:clear-color .8 .8 .8 1.0)
+    (gl:cull-face :back)
+    (gl:depth-func :less)
+    (gl:enable :cull-face :depth-test)
+    (gl:clear :color-buffer)
+    (lpsg:draw win)
+    (glop:swap-buffers win)))
+
 (defmethod glop:on-event :after ((window cube-window) (event glop:expose-event))
   (let* ((cube (lpsg:make-cube-shape))
          (shader-program
@@ -76,7 +86,8 @@ void main()
          do (setf (lpsg:buffer vertex-attrib) buffer))
       (setf (lpsg:buffer (lpsg::element-array (lpsg::drawable cube))) buffer))
     (lpsg:submit-with-effect cube window (effect window)))
-  (setf (exposed window) t))
+  (setf (exposed window) t)
+  (draw-window window))
 
 (defun cube-example ()
   (let* ((win (make-instance 'cube-window)))
@@ -86,15 +97,6 @@ void main()
            (unless win
              (return-from cube-example nil))
            (loop
-              while (glop:dispatch-events win :blocking nil :on-foo nil)
-              when (exposed win)
-              do (progn
-                   (%gl:clear-color .8 .8 .8 1.0)
-                   (gl:cull-face :back)
-                   (gl:depth-func :less)
-                   (gl:enable :cull-face :depth-test)
-                   (gl:clear :color-buffer)
-                   (lpsg:draw win)
-                   (glop:swap-buffers win))))
+              while (glop:dispatch-events win :blocking t :on-foo nil)))
       (and win (glop:destroy-window win)))))
 
