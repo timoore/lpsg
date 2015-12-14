@@ -81,6 +81,6 @@
 (defun cross (v1 v2)
   (let ((result (make-array '(3) :element-type (array-element-type v1))))
     (setf (aref result 0) (- (* (aref v1 1) (aref v2 2)) (* (aref v2 1) (aref v1 2))))
-    (setf (aref result 0) (- (* (aref v2 0) (aref v1 2)) (* (aref v1 0) (aref v2 2))))
-    (setf (aref result 0) (- (* (aref v1 0) (aref v2 1)) (* (aref v2 0) (aref v1 1))))
+    (setf (aref result 1) (- (* (aref v2 0) (aref v1 2)) (* (aref v1 0) (aref v2 2))))
+    (setf (aref result 2) (- (* (aref v1 0) (aref v2 1)) (* (aref v2 0) (aref v1 1))))
     result))
