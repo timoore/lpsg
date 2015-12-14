@@ -61,31 +61,32 @@ void main()
     (glop:swap-buffers win)))
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:expose-event))
-  (let* ((cube (lpsg:make-cube-shape))
-         (shader-program
-          (make-instance 'lpsg:program
-                         :shaders (list (make-instance 'lpsg:shader
-                                                       :shader-type :vertex-shader
-                                                       :source *vertex-shader-source*
-                                                       :usets '(projection))
-                                        (make-instance 'lpsg:shader
-                                                       :shader-type :fragment-shader
-                                                       :source *fragment-shader-source*
-                                                       :usets ()))))
-         (env (make-instance 'lpsg:environment :program shader-program
-                             :attribute-map '((gl:vertex . "in_Position")
-                                              (gl:normal . "in_Normal"))
-                             :uniform-sets (list *proj-uset*))))
-    (setf (cube window) cube)
-    (setf (projection-matrix *proj-uset*) (ortho-screen-matrix window))
-    (setf (effect window) (make-instance 'lpsg:simple-effect :environment env))
-    (let ((buffer (make-instance 'lpsg:gl-buffer)) ;default size should be fine
-          (alloc-size (lpsg:compute-buffer-allocation cube)))
-      (loop
-         for (name . vertex-attrib) in (lpsg:attributes cube)
-         do (setf (lpsg:buffer vertex-attrib) buffer))
-      (setf (lpsg:buffer (lpsg::element-array (lpsg::drawable cube))) buffer))
-    (lpsg:submit-with-effect cube window (effect window)))
+  (unless (exposed window)
+    (let* ((cube (lpsg:make-cube-shape))
+           (shader-program
+            (make-instance 'lpsg:program
+                           :shaders (list (make-instance 'lpsg:shader
+                                                         :shader-type :vertex-shader
+                                                         :source *vertex-shader-source*
+                                                         :usets '(projection))
+                                          (make-instance 'lpsg:shader
+                                                         :shader-type :fragment-shader
+                                                         :source *fragment-shader-source*
+                                                         :usets ()))))
+           (env (make-instance 'lpsg:environment :program shader-program
+                               :attribute-map '((gl:vertex . "in_Position")
+                                                (gl:normal . "in_Normal"))
+                               :uniform-sets (list *proj-uset*))))
+      (setf (cube window) cube)
+      (setf (projection-matrix *proj-uset*) (ortho-screen-matrix window))
+      (setf (effect window) (make-instance 'lpsg:simple-effect :environment env))
+      (let ((buffer (make-instance 'lpsg:gl-buffer)) ;default size should be fine
+            (alloc-size (lpsg:compute-buffer-allocation cube)))
+        (loop
+           for (name . vertex-attrib) in (lpsg:attributes cube)
+           do (setf (lpsg:buffer vertex-attrib) buffer))
+        (setf (lpsg:buffer (lpsg::element-array (lpsg::drawable cube))) buffer))
+      (lpsg:submit-with-effect cube window (effect window))))
   (setf (exposed window) t)
   (draw-window window))
 

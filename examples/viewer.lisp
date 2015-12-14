@@ -40,7 +40,6 @@
   (format t "Resize: ~Sx~S~%" (glop:width event) (glop:height event)))
 
 (defmethod glop:on-event ((window viewer-window) (event glop:expose-event))
-  (setf (exposed window) t)
   (update-for-window-change window event)
   (format t "Expose~%"))
 
