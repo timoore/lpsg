@@ -29,7 +29,7 @@ Will be created automatically, but must be specified for now.")))
     (loop
        for i from 0 below (data-count resource)
        for src-idx = (+ (data-offset resource)  (* i real-data-stride))
-       for dest = (cffi:inc-pointer buffer-ptr (* i effective-stride))
+       for dest = (cffi:inc-pointer buffer-ptr (+ (offset resource ) (* i effective-stride)))
        do (loop
              for j from 0 below (num-components resource)
              for dest-component = (cffi:inc-pointer dest (* j 4))
@@ -47,7 +47,7 @@ Will be created automatically, but must be specified for now.")))
     (loop
        for i from 0 below (data-count resource)
        for src-idx = (+ (data-offset resource)  (* i real-data-stride))
-       for dest = (cffi:inc-pointer buffer-ptr (* i effective-stride))
+       for dest = (cffi:inc-pointer buffer-ptr (+ (offset resource) (* i effective-stride)))
        do (loop
              for j from 0 below (num-components resource)
              for dest-component = (cffi:inc-pointer dest (* j 2))
