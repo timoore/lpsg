@@ -219,7 +219,7 @@
 
 (defmethod add-to-upload-queue ((renderer renderer) (obj buffer-area))
   (let* ((buffer (buffer obj))
-         (entry (assoc obj (upload-queue renderer))))
+         (entry (assoc buffer (upload-queue renderer))))
     (if entry
         (push obj (cdr entry))
         (setf (upload-queue renderer) (acons buffer (list obj) (upload-queue renderer))))))
@@ -227,14 +227,13 @@
 (defun do-upload-queue (renderer)
   (loop
      for (buffer . uploads) in (upload-queue renderer)
-     for target = (target buffer)
      do (progn
-          (gl:bind-buffer target (id buffer))
-          (let ((ptr (gl:map-buffer target :write-only)))
+          (gl:bind-buffer :array-buffer (id buffer))
+          (let ((ptr (gl:map-buffer :array-buffer :write-only)))
             (mapc (lambda (area)
                     (funcall (upload-fn area) area ptr))
                   uploads))
-          (gl:unmap-buffer target)))
+          (gl:unmap-buffer :array-buffer)))
   (gl:bind-buffer :array-buffer 0))
 
 (defmethod gl-finalized-p ((obj buffer-area))
