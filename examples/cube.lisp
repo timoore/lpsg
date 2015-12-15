@@ -21,7 +21,7 @@ void main()
 {
   vec3 modelPos = in_Position + vec3(-0.0, -0.0, -5.0);
   gl_Position = projectionMatrix * vec4(modelPos, 1.0);
-  float intense = min(dot(-in_Normal, lightDir.xyz), 0.0);
+  float intense = max(dot(-in_Normal, lightDir.xyz), 0.0);
   theColor = intense * in_Color;
 }
 ")
