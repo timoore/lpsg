@@ -71,7 +71,7 @@
                  for k from 0 below 3
                  do (setf (aref element-array (+ (* i 6) k)) (+ (* i 4) k)))
               (loop
-                 for k from 3 below 6
+                 for k from 2 below 5
                  do (setf (aref element-array (+ (* i 6) k)) (+ (* i 4) (mod k 4)))))))
     ;; Now we can construct the vertex attributes and the shape
     (let* ((vertex-attr (make-instance 'vertex-attribute
