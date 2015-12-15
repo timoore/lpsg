@@ -6,7 +6,10 @@
 (defclass viewer-window (glop:window)
   ((ortho-screen-matrix :accessor ortho-screen-matrix
                         :initarg :ortho-screen-matrix
-                        :initform (lpsg:identity-matrix))))
+                        :initform (lpsg:identity-matrix))
+   ;; For testing if a glop resize event is really a resize
+   (saved-width :accessor saved-width)
+   (saved-height :accessor saved-height)))
 
 (defmethod glop:on-event ((window viewer-window) (event glop:key-event))
   (when (eq (glop:keysym event) :escape)
@@ -35,9 +38,20 @@
            (ortho-mat (lpsg:ortho-matrix (- right) right (- top) top 1.0 10.0)))
       (setf (ortho-screen-matrix w) ortho-mat))))
 
+(defmethod glop:on-event :around ((window viewer-window) (event glop:resize-event))
+  (when (not (and (slot-boundp window 'saved-width)
+                  (slot-boundp window 'saved-height)
+                  (= (saved-width window) (glop:width event))
+                  (= (saved-height window) (glop:height event))))
+    (call-next-method)))
+
 (defmethod glop:on-event ((window viewer-window) (event glop:resize-event))
   (update-for-window-change window event)
-  (format t "Resize: ~Sx~S~%" (glop:width event) (glop:height event)))
+    (format t "Resize: ~Sx~S~%" (glop:width event) (glop:height event)))
+
+(defmethod glop:on-event :after ((window viewer-window) (event glop:resize-event))
+  (setf (saved-width window) (glop:width event)
+        (saved-height window) (glop:height event)))
 
 (defmethod glop:on-event ((window viewer-window) (event glop:expose-event))
   (update-for-window-change window event)

@@ -90,6 +90,10 @@ void main()
   (setf (exposed window) t)
   (draw-window window))
 
+(defmethod glop:on-event :after ((window cube-window) (event glop:resize-event))
+  (setf (projection-matrix *proj-uset*) (ortho-screen-matrix window))
+  (draw-window window))
+
 (defun cube-example ()
   (let* ((win (make-instance 'cube-window)))
     (open-viewer win "cube demo" 800 600)
