@@ -57,8 +57,7 @@
                           (- (aref *cube-verts* idx1 j) (aref *cube-verts* idx0 j)))
                     (setf (aref v2 j)
                           (- (aref *cube-verts* idx2 j) (aref *cube-verts* idx0 j)))))
-            (let ((normal (cross v1 v2))
-                  (vert-base-idx (* i 4 3)))
+            (let ((normal (cross v1 v2)))
               ;; Copy the geometry...
               (loop
                  for k from 0 below 4
