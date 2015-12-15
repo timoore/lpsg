@@ -13,7 +13,7 @@ in vec3 in_Normal;
 smooth out vec3 theColor;
 
 vec3 in_Color = vec3(1.0, 0.0, 1.0);
-vec4 lightDir = vec4(-0.577350, -0.577350, 0.577350, 0);
+vec4 lightDir = vec4(-0.577350, -0.577350, -0.577350, 0);
 
 uniform mat4 projectionMatrix;
 
@@ -56,7 +56,7 @@ void main()
     (gl:cull-face :back)
     (gl:depth-func :less)
     (gl:enable :cull-face :depth-test)
-    (gl:clear :color-buffer)
+    (gl:clear :color-buffer :depth-buffer)
     (lpsg:draw win)
     (glop:swap-buffers win)))
 
