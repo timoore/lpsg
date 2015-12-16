@@ -54,6 +54,7 @@
    #:submit-with-effect
    ;; utilities
    #:ortho-matrix
+   #:perspective-matrix
    #:identity-matrix
    #:make-cube-shape
    ))

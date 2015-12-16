@@ -60,6 +60,14 @@ void main()
     (lpsg:draw win)
     (glop:swap-buffers win)))
 
+(defun compute-projection-matrix (window proj-type near far)
+  (let* (width
+         (right (max (float (/ width height)) 1.0))
+         (top (max (float (/ height width)) 1.0)))
+    )
+  (if (eq proj-type :orthographic)
+      ))
+
 (defmethod glop:on-event :after ((window cube-window) (event glop:expose-event))
   (unless (exposed window)
     (let* ((cube (lpsg:make-cube-shape))
