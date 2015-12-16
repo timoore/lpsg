@@ -65,13 +65,14 @@
                       (copy-vec3-row vertex-array (+ (* i 4) k)
                                      *cube-verts* (aref *cube-faces* i k))
                       (copy-vec3-to-row normal-array (+ (* i 4) k) normal)))
-              ;; ... and now the indices for the triangles.
+              ;; ... and now the indices for the triangles. For each face, we want a
+              ;; pattern of [0 1 2 2 3 0]. It would be easier just to specify that!
               (loop
                  for k from 0 below 3
                  do (setf (aref element-array (+ (* i 6) k)) (+ (* i 4) k)))
               (loop
-                 for k from 2 below 5
-                 do (setf (aref element-array (+ (* i 6) k)) (+ (* i 4) (mod k 4)))))))
+                 for k from 3 below 6
+                 do (setf (aref element-array (+ (* i 6) k)) (+ (* i 4) (mod (1- k) 4)))))))
     ;; Now we can construct the vertex attributes and the shape
     (let* ((vertex-attr (make-instance 'vertex-attribute
                                       :data vertex-array :data-count 24
