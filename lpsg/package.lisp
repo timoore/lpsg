@@ -55,6 +55,7 @@
    ;; utilities
    #:ortho-matrix
    #:perspective-matrix
+   #:perspective
    #:identity-matrix
    #:make-cube-shape
    ))

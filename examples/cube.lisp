@@ -19,7 +19,8 @@ uniform mat4 projectionMatrix;
 
 void main()
 {
-  vec3 modelPos = in_Position + vec3(-0.0, -0.0, -5.0);
+  // add a temporary model and view transform
+  vec3 modelPos = in_Position + vec3(0.0, 0.0, -5.0) - vec3(0.25, 0.75, 0.0);
   gl_Position = projectionMatrix * vec4(modelPos, 1.0);
   float intense = max(dot(-in_Normal, lightDir.xyz), 0.0);
   theColor = intense * in_Color;
@@ -45,8 +46,9 @@ void main()
 (defclass cube-window (viewer-window lpsg:renderer)
   ((cube :accessor cube)
    (effect :accessor effect)
-   (exposed :accessor exposed :initarg :exposed))
-  (:default-initargs :exposed nil))
+   (exposed :accessor exposed :initarg :exposed)
+   (projection-type :accessor projection-type :initarg :projection-type))
+  (:default-initargs :exposed nil :projection-type 'orthographic))
 
 (defvar *proj-uset* (make-instance 'projection))
 
@@ -62,12 +64,13 @@ void main()
     (glop:swap-buffers win)))
 
 (defun compute-projection-matrix (window proj-type near far)
-  (let* (width
-         (right (max (float (/ width height)) 1.0))
-         (top (max (float (/ height width)) 1.0)))
-    )
-  (if (eq proj-type :orthographic)
-      ))
+  (let ((width (glop:window-width window))
+        (height (glop:window-height window)))
+    (if (eq proj-type 'orthographic)
+        (let* ((right (max (float (/ width height)) 1.0))
+               (top (max (float (/ height width)) 1.0)))
+          (lpsg:ortho-matrix (- right) right (- top) top 1.0 10.0))
+        (lpsg:perspective (/ (float pi 1.0) 4.0) (/ width height) 1.0 10.0))))
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:expose-event))
   (unless (exposed window)
@@ -87,7 +90,8 @@ void main()
                                                 (gl:normal . "in_Normal"))
                                :uniform-sets (list *proj-uset*))))
       (setf (cube window) cube)
-      (setf (projection-matrix *proj-uset*) (ortho-screen-matrix window))
+      (setf (projection-matrix *proj-uset*)
+            (compute-projection-matrix window (projection-type window) 1.0 10.0))
       (setf (effect window) (make-instance 'lpsg:simple-effect :environment env))
       (let ((buffer (make-instance 'lpsg:gl-buffer)) ;default size should be fine
             (alloc-size (lpsg:compute-buffer-allocation cube)))
@@ -100,11 +104,12 @@ void main()
   (draw-window window))
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:resize-event))
-  (setf (projection-matrix *proj-uset*) (ortho-screen-matrix window))
+  (setf (projection-matrix *proj-uset*)
+        (compute-projection-matrix window (projection-type window) 1.0 10.0))
   (draw-window window))
 
-(defun cube-example ()
-  (let* ((win (make-instance 'cube-window)))
+(defun cube-example (&rest args)
+  (let* ((win (apply #'make-instance 'cube-window args)))
     (open-viewer win "cube demo" 800 600)
     (unwind-protect
          (progn

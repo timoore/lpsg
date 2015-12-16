@@ -73,7 +73,17 @@
     (setf (aref result 3 0) 0.0)
     (setf (aref result 3 1) 0.0)
     (setf (aref result 3 2) (- (/ (* 2.0 far near) (- far near))))
-    (setf (aref result 3 3) 0.0)))
+    (setf (aref result 3 3) 0.0)
+    result))
+
+(defun perspective (fovy aspect near far)
+  "Create a perspective transform matrix. FOVY is the vertical angle of view; ASPECT is the aspect
+ratio of the viewing window.
+
+Like gluPerspective.1"
+  (let* ((height/2 (* near (tan (/ fovy 2.0))))
+         (width/2 (* height/2 aspect)))
+    (perspective-matrix (- width/2) width/2 (- height/2) height/2 near far)))
 
 (defun vec+ (v1 v2)
   (let ((result (make-array (list (length v1)) :element-type (array-element-type v1))))
