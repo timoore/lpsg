@@ -6,7 +6,7 @@
 (defparameter *vertex-shader-source* "
 #version 330
 
-in vec3 in_Position;
+in vec4 in_Position;
 in vec3 in_Normal;
 // in vec3 in_Color;
 
@@ -16,12 +16,13 @@ vec3 in_Color = vec3(1.0, 0.0, 1.0);
 vec4 lightDir = vec4(-0.577350, -0.577350, -0.577350, 0);
 
 uniform mat4 projectionMatrix;
+uniform mat4 modelMatrix;
 
 void main()
 {
   // add a temporary model and view transform
-  vec3 modelPos = in_Position + vec3(0.0, 0.0, -5.0) - vec3(0.25, 0.75, 0.0);
-  gl_Position = projectionMatrix * vec4(modelPos, 1.0);
+  vec4 modelPos = modelMatrix * in_Position - vec4(0.25, 0.75, 0.0, 0.0);
+  gl_Position = projectionMatrix * modelPos;
   float intense = max(dot(-in_Normal, lightDir.xyz), 0.0);
   theColor = intense * in_Color;
 }
@@ -41,7 +42,10 @@ void main()
 ")
 
 (lpsg:define-uset projection (("projectionMatrix" :float-mat4
-                               projection-matrix :accessor projection-matrix)))
+                                                  projection-matrix :accessor projection-matrix)))
+
+(lpsg:define-uset model (("modelMatrix" :float-mat4
+                                        model-matrix :accessor model-matrix)))
 
 (defclass cube-window (viewer-window lpsg:renderer)
   ((cube :accessor cube)
@@ -51,6 +55,7 @@ void main()
   (:default-initargs :exposed nil :projection-type 'orthographic))
 
 (defvar *proj-uset* (make-instance 'projection))
+(defvar *model-uset* (make-instance 'model))
 
 (defun draw-window (win)
   (when (exposed win)
@@ -80,7 +85,7 @@ void main()
                            :shaders (list (make-instance 'lpsg:shader
                                                          :shader-type :vertex-shader
                                                          :source *vertex-shader-source*
-                                                         :usets '(projection))
+                                                         :usets '(projection model))
                                           (make-instance 'lpsg:shader
                                                          :shader-type :fragment-shader
                                                          :source *fragment-shader-source*
@@ -88,10 +93,11 @@ void main()
            (env (make-instance 'lpsg:environment :program shader-program
                                :attribute-map '((gl:vertex . "in_Position")
                                                 (gl:normal . "in_Normal"))
-                               :uniform-sets (list *proj-uset*))))
+                               :uniform-sets (list *proj-uset* *model-uset*))))
       (setf (cube window) cube)
       (setf (projection-matrix *proj-uset*)
             (compute-projection-matrix window (projection-type window) 1.0 10.0))
+      (setf (model-matrix *model-uset*) (sb-cga:translate* 0.0 0.0 -5.0))
       (setf (effect window) (make-instance 'lpsg:simple-effect :environment env))
       (let ((buffer (make-instance 'lpsg:gl-buffer)) ;default size should be fine
             (alloc-size (lpsg:compute-buffer-allocation cube)))
