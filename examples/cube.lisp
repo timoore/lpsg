@@ -108,6 +108,18 @@ void main()
         (compute-projection-matrix window (projection-type window) 1.0 10.0))
   (draw-window window))
 
+(defmethod glop:on-event ((window cube-window) (event glop:key-event))
+  (if (and (glop:pressed event) (eq (glop:keysym event) :p))
+      (progn
+        (setf (projection-type window)
+              (if (eq (projection-type window) 'orthographic)
+                  'perspective
+                  'orthographic))
+        (setf (projection-matrix *proj-uset*)
+              (compute-projection-matrix window (projection-type window) 1.0 10.0))
+        (draw-window window))
+      (call-next-method)))
+
 (defun cube-example (&rest args)
   (let* ((win (apply #'make-instance 'cube-window args)))
     (open-viewer win "cube demo" 800 600)
