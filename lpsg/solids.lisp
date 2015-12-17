@@ -41,8 +41,8 @@
         (normal-array (make-array '(24 3) :element-type 'single-float))
         (element-array (make-array 36)) ; 6 vertices per face
         ;; Scratch vectors for normal computation
-        (v1 (make-array 3 :element-type 'single-float))
-        (v2 (make-array 3 :element-type 'single-float)))
+        (v1 (alloc-vec))
+        (v2 (alloc-vec)))
     (loop
        for i from 0 below 6
        ;; for each face, construct a surface normal
@@ -57,7 +57,7 @@
                           (- (aref *cube-verts* idx1 j) (aref *cube-verts* idx0 j)))
                     (setf (aref v2 j)
                           (- (aref *cube-verts* idx2 j) (aref *cube-verts* idx0 j)))))
-            (let ((normal (cross v1 v2)))
+            (let ((normal (cross-product v1 v2)))
               ;; Copy the geometry...
               (loop
                  for k from 0 below 4

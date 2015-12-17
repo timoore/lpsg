@@ -6,7 +6,7 @@
 (defclass viewer-window (glop:window)
   ((ortho-screen-matrix :accessor ortho-screen-matrix
                         :initarg :ortho-screen-matrix
-                        :initform (lpsg:identity-matrix))
+                        :initform sb-cga:+identity-matrix+)
    ;; For testing if a glop resize event is really a resize
    (saved-width :accessor saved-width)
    (saved-height :accessor saved-height)))
@@ -35,7 +35,7 @@
     ;; so the polygon will always look square.
     (let* ((right (max (float (/ width height)) 1.0))
            (top (max (float (/ height width)) 1.0))
-           (ortho-mat (lpsg:ortho-matrix (- right) right (- top) top 1.0 10.0)))
+           (ortho-mat (kit.math:ortho-matrix (- right) right (- top) top 1.0 10.0)))
       (setf (ortho-screen-matrix w) ortho-mat))))
 
 (defmethod glop:on-event :around ((window viewer-window) (event glop:resize-event))

@@ -2,14 +2,13 @@
 
 (defsystem lpsg
   :description "OpenGL rendering pipeline."
-  :depends-on (cl-opengl)
+  :depends-on (cl-opengl sb-cga mathkit)
   :components
   ((:module "lpsg"
     :components
     ((:file "package")
      (:file "interface" :depends-on ("package"))
      (:file "incremental-comp" :depends-on ("package"))
-     (:file "utils" :depends-on ("package"))
      (:file "assembly" :depends-on ("package"))
      (:file "uset" :depends-on ("package"))
      (:file "render" :depends-on ("package" "uset" "assembly" "interface"))

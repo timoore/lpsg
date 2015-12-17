@@ -28,7 +28,14 @@
 ;;; POSSIBILITY OF SUCH DAMAGE.
 
 (defpackage #:lpsg
-  (:use #:cl #:gl)
+  ;; Some symbols conflict with cl-opengl's.
+  (:shadowing-import-from #:sb-cga
+                          #:translate
+                          #:rotate
+                          #:scale)
+  (:shadowing-import-from #:kit.math
+                          #:frustum)
+  (:use #:cl #:gl #:sb-cga #:kit.math)
   (:export
    #:render-bundle
    #:geometry
@@ -53,9 +60,5 @@
    #:simple-effect
    #:submit-with-effect
    ;; utilities
-   #:ortho-matrix
-   #:perspective-matrix
-   #:perspective
-   #:identity-matrix
    #:make-cube-shape
    ))

@@ -150,11 +150,9 @@
 
 (defun write-uniform-local-float-mat4 (ptr val)
   (loop
-     for i from 0 below 4
-     do (loop
-             for j from 0 below 4
-             do (setf (cffi:mem-aref ptr '%gl:float (+ (* i 4) j))
-                      (aref val i j)))))
+     for i from 0 below 16
+     do (setf (cffi:mem-aref ptr '%gl:float i) (row-major-aref val i))))
+
 (defun upload-uniform-float-mat4 (location ptr)
   (%gl:uniform-matrix-4fv location 1 nil ptr))
 (define-uniform-type :float-mat4 "mat4" 64 4 16 64)
