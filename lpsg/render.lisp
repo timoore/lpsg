@@ -166,36 +166,6 @@
    (element-array :accessor element-array :initarg :element-array))
   (:default-initargs :index-type :unsigned-short :base-vertex 0))
 
-#|
-(defclass geometry (indexed-drawable)
-  ((indices :accessor indices :initarg :indices :initform nil
-            :documentation "A gl-array (:unsigned-short) of indices into the vertex
-   attributes, for each vertex of each geometry element. This can be NULL, in
-   which case the geometry will be drawn using %gl:draw-array.")
-   (index-usage :accessor index-usage :initarg :index-usage
-                :initform :static-draw
-                :documentation "A hint for allocation of the index buffer
-   storage")
-   (vertex-attributes :accessor vertex-attributes :initarg :vertex-attributes
-                      :documentation "A symbol (cl-opengl gl-array-format) or a
-  list of (attrib-number type size")
-   (vertex-data :accessor vertex-data :initarg :vertex-data
-                :documentation "a single gl-array, or a list of gl-array
-  objects corresponding to the vertex attributes")
-   (vertex-usage :accessor vertex-usage :initarg :vertex-usage
-                 :initform :static-draw
-                 :documentation "A hint for allocation of the vertex data buffer
-   storage")
-   (array-buffer :accessor array-buffer)
-   (array-buffer-allocation :accessor array-buffer-allocation :initform nil)
-   (element-buffer :accessor element-buffer)
-   (element-buffer-allocation :accessor element-buffer-allocation :initform nil)
-   (vao :accessor vao :initarg :vao :initform 0
-        :documentation "OpenGL object for binding vertex attributes for
-   rendering."))
-  (:documentation "Deprecated."))
-|#
-
 (defclass buffer-area ()
   ((buffer :accessor buffer :initarg :buffer)
    (resource-size :accessor resource-size :initarg :resource-size
@@ -437,30 +407,6 @@
          finally (setf (vertex-attribs obj) attributes))
       obj)))
 
-(defun make-shader (stage uset-descriptors source)
-  (let ((descriptors (ensure-descriptors uset-descriptors))
-        )))
-
-;;;TODO: not dereferenced anymore
-#|
-(defmethod dereferenced :after ((obj geometry))
-  (with-slots ((array-alloc array-buffer-allocation)
-               (element-alloc element-buffer-allocation))
-      obj
-    (when array-alloc
-      (deallocate-in-buffer (allocation-buffer array-alloc) array-alloc)
-      (setf array-alloc nil))
-    (when element-alloc
-      (deallocate-in-buffer (allocation-buffer element-alloc)
-                            element-alloc)
-      (setf element-alloc nil))))
-
-(defgeneric loadedp (obj))
-
-(defmethod loadedp ((obj geometry))
-  (slot-boundp obj 'array-buffer))
-|#
-
 (defgeneric upload-buffers (renderer obj))
 
 (defgeneric allocate-buffer-storage (renderer size target usage))
@@ -477,35 +423,6 @@
     (push new-buf (buffers renderer))
     (push new-buf (finalize-queue renderer))
     (allocate-from-buffer new-buf size)))
-
-#|
-(defmethod upload-buffers (renderer (obj geometry))
-  (let* ((data-size (gl-array-byte-size (vertex-data obj)))
-         (data-alloc (allocate-buffer-storage renderer
-                                              data-size
-                                              :array-buffer
-                                              (vertex-usage obj)))
-         (data-buffer (allocation-buffer data-alloc)))
-    (gl:bind-buffer :array-buffer (id data-buffer))
-    (gl:buffer-sub-data :array-buffer (vertex-data obj)
-                        :buffer-offset (allocation-offset data-alloc)
-                        :size data-size)
-    (setf (array-buffer obj) data-buffer)
-    (setf (array-buffer-allocation obj) data-alloc)
-    (when (indices obj)
-      (let* ((index-size (gl-array-byte-size (indices obj)))
-             (index-alloc (allocate-buffer-storage renderer
-                                                   index-size
-                                                   :element-array-buffer
-                                                   (index-usage obj)))
-            (index-buffer (allocation-buffer index-alloc)))
-        (setf (element-buffer obj) index-buffer)
-        (setf (element-buffer-allocation obj) index-alloc)
-        (gl:bind-buffer :element-array-buffer (id index-buffer))
-        (gl:buffer-sub-data :element-array-buffer (indices obj)
-                            :buffer-offset (allocation-offset index-alloc)
-                            :size index-size)))))
-|#
 
 (defgeneric draw (renderer))
 (defgeneric draw-bundles (renderer))
@@ -549,23 +466,6 @@
            do (loop
                  for bundle in (bundles rq)
                  do (draw-bundle renderer bundle)))))
-#|
-(defgeneric upload-geometry (renderer geometry))
-
-(defmethod upload-geometry ((renderer renderer) geometry)
-  (let ((nullptr (cffi:null-pointer))
-        (vao (gl:gen-vertex-array))
-        (binder (gl::find-vertex-array-binder (vertex-attributes geometry))))
-    (gl:bind-vertex-array vao)
-    ;; This call binds buffers
-    (upload-buffers renderer geometry)
-    (let ((array-offset
-           (allocation-offset (array-buffer-allocation geometry))))
-      (funcall binder (cffi:inc-pointer nullptr array-offset)))
-    (gl:bind-vertex-array 0)
-    (setf (vao geometry) vao)))
-
-|#
 
 (defgeneric close-renderer (renderer))
 

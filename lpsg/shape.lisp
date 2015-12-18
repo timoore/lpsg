@@ -129,46 +129,6 @@ Will be created automatically, but must be specified for now.")))
 (defmethod (setf number-vertices) (num (obj shape))
   (setf (number-vertices (drawable obj)) num))
 
-#|
-;;; Turn a shape into something that can be rendered.
-
-(defmethod gl-finalized-p ((obj shape))
-  (and (bundle obj)
-       (gl-finalized-p (environment obj))
-       (gl-finalized-p (attributes obj))
-       (gl-finalized-p (bundle obj))))
-
-;;; Allocate buffers for attributes
-;;; upload?
-;;; Finalize environment: shader, textures
-;;; create the vertex attribute binding
-;;; finish bundle
-
-(defmethod gl-finalize ((obj shape) &optional errorp)
-  (flet ((maybe-finalize (obj)
-           (or (gl-finalized-p obj) (gl-finalize obj errorp))))
-    (maybe-finalize (environment obj))
-    (mapc (lambda (attr-pair) (maybe-finalize (cdr attr-pair))) (attributes obj))
-    ;; Find location of each vertex attribute
-    (let* ((locations (mapcar (lambda (attr-pair)
-                                (cons (attribute-array-location (car attr-pair)
-                                                                (environment obj))
-                                      (cadr attr-pair)))
-                              (attributes obj)))
-           ;; What about attributes that are not active in the environment's shader?
-           (attr-set (make-instance 'attribute-set :array-binding locations)))
-      (when (bundle obj)
-        (remove-bundle *renderer* bundle)) ;?? necessary?
-      (maybe-finalize attr-set)
-      (let ((gl-state (make-state environment)))
-        ;; hook up usets
-        (setf (bundle obj) (make-instance 'render-bundle
-                                          :drawable (drawable obj)
-                                          :gl-state gl-state
-                                          :attribute-set attr-set)))
-      (add-bundle *renderer* (bundle obj)))))
-|#
-
 (defmethod compute-buffer-allocation ((shape shape) &key (base-offset 0))
   (let ((current-offset base-offset)
         ;; Allocate element array too if it exists
