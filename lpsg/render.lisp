@@ -78,43 +78,29 @@
 (defmethod gl-valid-p ((obj gl-object))
   (not (zerop (id obj))))
 
-(defclass allocator ()
-  ((free-list :accessor free-list :initform nil)))
+(defconstant +default-buffer-size+ 104856
+  "The default size of a buffer object allocated with GL-BUFFER.")
 
-(defmethod initialize-instance :after ((obj allocator) &key size)
-  (when size
-    (push (list 0 size) (free-list obj))))
+(defclass gl-buffer (gl-object)
+  ((size :accessor size :initarg :size
+         :documentation "The size of the buffer object in OpenGL. Note: this value is mutable until
+  GL-FINALIZE is called on the GL-BUFFER object.")
+   (usage :accessor usage :initarg :usage
+          :documentation "Usage hint for the buffer object. Value is a CL-OPENGL keyword e.g.,
+  :STATIC-DRAW.")
+   (target :accessor target :initarg :target
+           :documentation "OpenGL targert for the buffer object. Value is a CL-OPENGL keyword e.g.,
+  :ARRAY-BUFFER."))
+  (:default-initargs :target :array-buffer :usage :static-draw :size +default-buffer-size+)
+  (:documentation "A buffer object allocated in OpenGL.
 
-(defgeneric allocate (allocator size &optional alignment))
-
-(defun round-up (val divisor)
-  (* (ceiling val divisor) divisor))
-
-(defmethod allocate ((allocator allocator) size &optional (alignment 4))
-  (let ((rounded-size (* (ceiling size alignment) alignment)))
-    (loop
-       for region in (free-list allocator)
-       for (offset region-size) = region
-       if (>= region-size rounded-size)
-       do (progn
-            (if (eql rounded-size region-size)
-                (setf (free-list allocator) (delete region (free-list allocator)))
-                (setf (car region) (+ offset rounded-size)
-                      (cadr region) (- region-size rounded-size)))
-            (return-from allocate (values offset rounded-size))))
-    nil))
-
-(defconstant +default-buffer-size+ 104856)
-
-(defclass gl-buffer (allocator gl-object)
-  ((size :accessor size :initarg :size)
-   (usage :accessor usage :initarg :usage)
-   (target :accessor target :initarg :target))
-  (:default-initargs :target :array-buffer :usage :static-draw :size +default-buffer-size+))
+In OpenGL, the USAGE and TARGET parameters are hints and it is legal to use a buffer differently,
+but that can impact performance."))
 
 (defmethod gl-finalized-p ((obj gl-buffer))
   (gl-valid-p obj))
-  
+
+;;; XXX make this gl-finalize
 (defgeneric gl-finalize-buffer (buffer target &optional errorp)
   (:documentation "Finalize BUFFER while bound to a TARGET."))
 
@@ -124,30 +110,6 @@
     (setf (id buffer) id)
     (gl:bind-buffer target id)
     (%gl:buffer-data target (size buffer) (cffi:null-pointer) (usage buffer))))
-  
-(defun allocation-offset (alloc)
-  (car alloc))
-
-(defun allocation-size (alloc)
-  (cadr alloc))
-
-(defun allocation-buffer (alloc)
-  (caddr alloc))
-
-(defun allocate-from-buffer (buffer size &optional (alignment 4))
-  (let ((rounded-size (* (ceiling size alignment) alignment)))
-    (multiple-value-bind (offset rounded-size)
-        (allocate buffer size alignment)
-      (list offset rounded-size buffer))
-    nil))
-
-(defun deallocate-in-buffer (buffer allocation)
-  (push allocation (free-list buffer)))
-
-(defun release-buffer (buffer)
-  (gl:delete-buffers (list (id buffer)))
-  (setf (id buffer) 0)
-  nil)
 
 (defclass drawable ()
   ((mode :accessor mode :initarg :mode
@@ -197,20 +159,22 @@
 (defun do-upload-queue (renderer)
   (loop
      for (buffer . uploads) in (upload-queue renderer)
+     for target = (target buffer)
      do (progn
-          (gl:bind-buffer :array-buffer (id buffer))
-          (let ((ptr (gl:map-buffer :array-buffer :write-only)))
+          (gl:bind-buffer target (id buffer))
+          (let ((ptr (gl:map-buffer target :write-only)))
             (mapc (lambda (area)
                     (funcall (upload-fn area) area ptr))
                   uploads))
-          (gl:unmap-buffer :array-buffer)))
+          (gl:unmap-buffer target)))
+  ;; Is this necessary? Should all the targets be set to 0?
   (gl:bind-buffer :array-buffer 0))
 
 (defmethod gl-finalized-p ((obj buffer-area))
   (gl-finalized-p (buffer obj)))
 
 (defmethod gl-finalize ((obj buffer-area) &optional errorp)
-  (gl-finalize-buffer (buffer obj) :array-buffer errorp))
+  (gl-finalize-buffer (buffer obj) (target (buffer obj)) errorp))
 
 (defclass buffer-map () ())
 

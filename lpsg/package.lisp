@@ -49,7 +49,6 @@
    #:gl-buffer
    #:buffer
    #:attributes
-   #:compute-buffer-allocation
    #:define-uset
    #:graphics-state
    #:uniform-sets
@@ -59,6 +58,12 @@
    #:effect
    #:simple-effect
    #:submit-with-effect
+   ;; allocators and allocation
+   #:compute-buffer-allocation
+   #:simple-allocator
+   #:open-allocator
+   #:allocate-target
+   #:close-allocator
    ;; utilities
    #:make-cube-shape
    ))

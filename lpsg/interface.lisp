@@ -11,11 +11,7 @@
 
 (defgeneric add-object (parent child))
 
-(defgeneric compute-buffer-allocation (shape &key base-offset)
+(defgeneric compute-buffer-allocation (shape allocator)
   (:documentation "Compute the storage needed by the attributes of a
-  shape. This function assigns values to the BUFFER-AREA slots of each
-  attribute, but doesn't create or assign a buffer object.
-
-  XXX For now it is assumed that all data is placed in one buffer object
-  starting at BASE-OFFSET."))
-
+  shape and allocate their buffers in the BUFFER-AREA slots of each of the shape's
+  attributes.."))

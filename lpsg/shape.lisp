@@ -129,23 +129,22 @@ Will be created automatically, but must be specified for now.")))
 (defmethod (setf number-vertices) (num (obj shape))
   (setf (number-vertices (drawable obj)) num))
 
-(defmethod compute-buffer-allocation ((shape shape) &key (base-offset 0))
-  (let ((current-offset base-offset)
-        ;; Allocate element array too if it exists
-        (attr-list (if (typep (drawable shape) 'indexed-drawable)
-                       (append (attributes shape) `((nil . ,(element-array (drawable shape)))))
-                       (attributes shape))))
+(defmethod compute-buffer-allocation ((shape shape) allocator)
+  (flet ((allocate-attr (attr target)
+           (let* ((component-size (get-component-size (buffer-type attr)))
+                  (aligned-size (max component-size 4)))
+             (multiple-value-bind (buffer offset)
+                 (allocate-target allocator
+                                  target
+                                  (* component-size (components attr) (data-count attr))
+                                  aligned-size)
+               (setf (buffer attr) buffer
+                     (offset attr) offset)))))
     (loop
-       for (nil . attr) in attr-list
-       for component-size = (get-component-size (buffer-type attr))
-       for aligned-size = (max component-size 4)
-       for buffer-element-size = (* component-size (components attr))
-       for attr-offset = (* (ceiling current-offset aligned-size) aligned-size)
-       do (progn
-            (setf (offset attr) attr-offset)
-            (setf current-offset (+ attr-offset (* (data-count attr)
-                                                   buffer-element-size)))))
-    current-offset))
+       for (nil . attr) in (attributes shape)
+       do (allocate-attr attr :array-buffer))
+    (when (typep (drawable shape) 'indexed-drawable)
+      (allocate-attr (element-array (drawable shape)) :element-array-buffer))))
 
 ;;; defmethod is here because it uses methods on SHAPE.
 
