@@ -229,6 +229,12 @@ but that can impact performance."))
   ((bindings)
    (program :accessor program :initarg :program :initform nil)))
 
+(defmethod gl-finalized-p ((obj graphics-state))
+  (gl-finalized-p (program obj)))
+
+(defmethod gl-finalize ((obj graphics-state) &optional errorp)
+  (gl-finalize (program obj) errorp))
+
 (defclass shader-source ()
   ((shader-type :accessor shader-type :initarg :shader-type )
    (source :accessor source :initarg :source :initform nil)

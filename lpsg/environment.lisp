@@ -10,10 +10,10 @@
    (uniform-sets :accessor uniform-sets :initarg :uniform-sets :initform nil)))
 
 (defmethod gl-finalized-p ((obj environment))
-  (gl-finalized-p (program (gl-state obj))))
+  (gl-finalized-p (gl-state obj)))
 
 (defmethod gl-finalize ((obj environment) &optional errorp)
-  (gl-finalize (program (gl-state obj)) errorp))
+  (gl-finalize (gl-state obj) errorp))
 
 (defun attribute-array-location (name environment)
   (let ((glsl-attrib-name (cadr (member name (attribute-map environment) :key #'car))))
