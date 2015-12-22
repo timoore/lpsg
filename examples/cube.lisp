@@ -13,8 +13,8 @@ in vec3 in_Normal;
 smooth out vec3 theColor;
 
 vec3 in_Color = vec3(1.0, 0.0, 1.0);
-vec4 lightDir = vec4(-0.577350, -0.577350, -0.577350, 0);
 
+uniform vec4 lightDir;
 uniform mat4 projectionMatrix;
 uniform mat4 cameraMatrix;
 uniform mat4 modelMatrix;
@@ -24,7 +24,7 @@ void main()
   // add a temporary model and view transform
   vec4 modelPos = cameraMatrix * modelMatrix * in_Position;
   gl_Position = projectionMatrix * modelPos;
-  float intense = max(dot(-in_Normal, lightDir.xyz), 0.0);
+  float intense = max(dot(in_Normal, -lightDir.xyz), 0.0);
   theColor = intense * in_Color;
 }
 ")
@@ -50,6 +50,8 @@ void main()
 (lpsg:define-uset model (("modelMatrix" :float-mat4
                                         model-matrix :accessor model-matrix)))
 
+(lpsg:define-uset light (("lightDir" :float-vec4 light-direction :accessor light-direction)))
+
 (defclass cube-window (viewer-window lpsg:renderer)
   ((cube :accessor cube)
    (effect :accessor effect)
@@ -59,6 +61,7 @@ void main()
 
 (defvar *camera-uset* (make-instance 'camera))
 (defvar *model-uset* (make-instance 'model))
+(defvar *light-uset* (make-instance 'light))
 
 (defun draw-window (win)
   (when (exposed win)
@@ -85,6 +88,16 @@ void main()
                     (sb-cga:vec 0.0 0.0 -5.0)
                     (sb-cga:vec 0.0 1.0 0.0)))
 
+;;; Compute a high light, slightly to the side and front.
+
+(defun compute-light-vector ()
+  (let* ((angle (kit.math:deg-to-rad 15.0))
+         (down (sb-cga:vec 0.0 -1.0 0.0))
+         (mat (sb-cga:matrix* (sb-cga:rotate-around (sb-cga:vec 0.0 1.0 0.0) angle)
+                              (sb-cga:rotate-around (sb-cga:vec 1.0 0.0 0.0) angle)))
+         (light-vec3 (sb-cga:transform-direction down mat)))
+    (kit.math:vec4 light-vec3)))
+
 (defmethod glop:on-event :after ((window cube-window) (event glop:expose-event))
   (unless (exposed window)
     (let* ((cube (lpsg:make-cube-shape))
@@ -93,7 +106,7 @@ void main()
                            :shaders (list (make-instance 'lpsg:shader
                                                          :shader-type :vertex-shader
                                                          :source *vertex-shader-source*
-                                                         :usets '(camera model))
+                                                         :usets '(camera model light))
                                           (make-instance 'lpsg:shader
                                                          :shader-type :fragment-shader
                                                          :source *fragment-shader-source*
@@ -101,12 +114,13 @@ void main()
            (env (make-instance 'lpsg:environment :program shader-program
                                :attribute-map '((gl:vertex . "in_Position")
                                                 (gl:normal . "in_Normal"))
-                               :uniform-sets (list *camera-uset* *model-uset*))))
+                               :uniform-sets (list *camera-uset* *model-uset* *light-uset*))))
       (setf (cube window) cube)
       (setf (projection-matrix *camera-uset*)
             (compute-projection-matrix window (projection-type window) 1.0 10.0))
       (setf (camera-matrix *camera-uset*) (compute-view-matrix))
       (setf (model-matrix *model-uset*) (sb-cga:translate* 0.0 0.0 -5.0))
+      (setf (light-direction *light-uset*) (compute-light-vector))
       (setf (effect window) (make-instance 'lpsg:simple-effect :environment env))
       (let ((allocator (make-instance 'lpsg:simple-allocator)))
         (lpsg:open-allocator allocator)
