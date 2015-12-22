@@ -111,7 +111,8 @@ void main()
                                                          :shader-type :fragment-shader
                                                          :source *fragment-shader-source*
                                                          :usets ()))))
-           (env (make-instance 'lpsg:environment :program shader-program
+           (gl-state (make-instance 'lpsg:graphics-state :program shader-program))
+           (env (make-instance 'lpsg:environment :gl-state gl-state
                                :attribute-map '((gl:vertex . "in_Position")
                                                 (gl:normal . "in_Normal"))
                                :uniform-sets (list *camera-uset* *model-uset* *light-uset*))))

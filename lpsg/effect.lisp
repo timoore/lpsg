@@ -36,7 +36,7 @@
     (when (typep (drawable shape) 'indexed-drawable)
       (setf (element-binding attrib-set) (element-array (drawable shape))))
     (let ((bundle (make-instance 'render-bundle
-                                 :attribute-set attrib-set :shape shape :gl-state env)))
+                                 :attribute-set attrib-set :shape shape :environment env)))
       (push bundle (finalize-queue renderer))
       ;; For now, just use one render-stage / render-queue
       (unless (render-stages renderer)

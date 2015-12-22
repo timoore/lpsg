@@ -227,10 +227,7 @@ but that can impact performance."))
 
 (defclass graphics-state ()
   ((bindings)
-   (program :accessor program :initarg :program :initform nil)
-   (uniform-sets :accessor uniform-sets :initarg :uniform-sets :initform nil)))
-
-
+   (program :accessor program :initarg :program :initform nil)))
 
 (defclass shader-source ()
   ((shader-type :accessor shader-type :initarg :shader-type )
@@ -403,9 +400,6 @@ but that can impact performance."))
       (unless (eq new-program old-program)
         (gl:use-program (id new-program)))
         ;; XXX bindings
-      (loop
-         for uset in (uniform-sets state)
-         do (upload-uset-to-program uset new-program))
       (setf (current-state renderer) state))))
 
 (defvar *renderer*)
