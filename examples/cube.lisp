@@ -16,12 +16,13 @@ vec3 in_Color = vec3(1.0, 0.0, 1.0);
 vec4 lightDir = vec4(-0.577350, -0.577350, -0.577350, 0);
 
 uniform mat4 projectionMatrix;
+uniform mat4 cameraMatrix;
 uniform mat4 modelMatrix;
 
 void main()
 {
   // add a temporary model and view transform
-  vec4 modelPos = modelMatrix * in_Position - vec4(0.25, 0.75, 0.0, 0.0);
+  vec4 modelPos = cameraMatrix * modelMatrix * in_Position;
   gl_Position = projectionMatrix * modelPos;
   float intense = max(dot(-in_Normal, lightDir.xyz), 0.0);
   theColor = intense * in_Color;
@@ -41,8 +42,10 @@ void main()
 }
 ")
 
-(lpsg:define-uset projection (("projectionMatrix" :float-mat4
-                                                  projection-matrix :accessor projection-matrix)))
+(lpsg:define-uset camera (("projectionMatrix" :float-mat4
+                                              projection-matrix :accessor projection-matrix)
+                          ("cameraMatrix" :float-mat4
+                                          camera-matrix :accessor camera-matrix)))
 
 (lpsg:define-uset model (("modelMatrix" :float-mat4
                                         model-matrix :accessor model-matrix)))
@@ -54,7 +57,7 @@ void main()
    (projection-type :accessor projection-type :initarg :projection-type))
   (:default-initargs :exposed nil :projection-type 'orthographic))
 
-(defvar *proj-uset* (make-instance 'projection))
+(defvar *camera-uset* (make-instance 'camera))
 (defvar *model-uset* (make-instance 'model))
 
 (defun draw-window (win)
@@ -74,8 +77,13 @@ void main()
     (if (eq proj-type 'orthographic)
         (let* ((right (max (float (/ width height)) 1.0))
                (top (max (float (/ height width)) 1.0)))
-          (kit.math:ortho-matrix (- right) right (- top) top 1.0 10.0))
-        (kit.math:perspective-matrix (/ (float pi 1.0) 4.0) (/ width height) 1.0 10.0))))
+          (kit.math:ortho-matrix (- right) right (- top) top near far))
+        (kit.math:perspective-matrix (/ (float pi 1.0) 4.0) (/ width height) near far))))
+
+(defun compute-view-matrix ()
+  (kit.math:look-at (sb-cga:vec 1.0 1.0 0.0)
+                    (sb-cga:vec 0.0 0.0 -5.0)
+                    (sb-cga:vec 0.0 1.0 0.0)))
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:expose-event))
   (unless (exposed window)
@@ -85,7 +93,7 @@ void main()
                            :shaders (list (make-instance 'lpsg:shader
                                                          :shader-type :vertex-shader
                                                          :source *vertex-shader-source*
-                                                         :usets '(projection model))
+                                                         :usets '(camera model))
                                           (make-instance 'lpsg:shader
                                                          :shader-type :fragment-shader
                                                          :source *fragment-shader-source*
@@ -93,10 +101,11 @@ void main()
            (env (make-instance 'lpsg:environment :program shader-program
                                :attribute-map '((gl:vertex . "in_Position")
                                                 (gl:normal . "in_Normal"))
-                               :uniform-sets (list *proj-uset* *model-uset*))))
+                               :uniform-sets (list *camera-uset* *model-uset*))))
       (setf (cube window) cube)
-      (setf (projection-matrix *proj-uset*)
+      (setf (projection-matrix *camera-uset*)
             (compute-projection-matrix window (projection-type window) 1.0 10.0))
+      (setf (camera-matrix *camera-uset*) (compute-view-matrix))
       (setf (model-matrix *model-uset*) (sb-cga:translate* 0.0 0.0 -5.0))
       (setf (effect window) (make-instance 'lpsg:simple-effect :environment env))
       (let ((allocator (make-instance 'lpsg:simple-allocator)))
@@ -108,7 +117,7 @@ void main()
   (draw-window window))
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:resize-event))
-  (setf (projection-matrix *proj-uset*)
+  (setf (projection-matrix *camera-uset*)
         (compute-projection-matrix window (projection-type window) 1.0 10.0))
   (draw-window window))
 
@@ -119,7 +128,7 @@ void main()
               (if (eq (projection-type window) 'orthographic)
                   'perspective
                   'orthographic))
-        (setf (projection-matrix *proj-uset*)
+        (setf (projection-matrix *camera-uset*)
               (compute-projection-matrix window (projection-type window) 1.0 10.0))
         (draw-window window))
       (call-next-method)))
