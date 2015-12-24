@@ -38,12 +38,10 @@
   (:use #:cl #:gl #:sb-cga #:kit.math)
   (:export
    #:render-bundle
-   #:geometry
    #:renderer
    #:close-renderer
    #:add-bundle
    #:draw
-   #:draw-render-groups
    #:shader
    #:program
    #:gl-buffer
@@ -52,9 +50,7 @@
    #:define-uset
    #:graphics-state
    #:uniform-sets
-   #:with-mutable
    #:environment
-   #:simple-environment
    #:effect
    #:simple-effect
    #:submit-with-effect

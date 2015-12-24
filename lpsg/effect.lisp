@@ -10,12 +10,21 @@
 (defclass effect ()
   ((attribute-map :accessor attribute-map :initarg :attribute-map :initform nil
                   :documentation "Alist that maps from vertex attribute names
-  to indices or NIL for overall binding. XXX Not clear if this will be used.")))
+  to indices or NIL for overall binding. XXX Not clear if this will be used.")
+   )
+  (:documentation "Class that represents the rendered appearance of a shape.
+
+ EFFECT is responsable for creating bundles and their environments and putting them in the
+  appropriate render queues. The effect object contains graphics environments. The SIMPLE-EFFECT
+  class only has one environment, but other effects might have different environments for different
+  passes."))
 
 ;;; This shares a lot of slots with the environment class; should the two classes be more
 ;;; integrated?
 (defclass simple-effect (effect)
-  ((environment :accessor environment :initarg :environment)))
+  ((environment :accessor environment :initarg :environment))
+  (:documentation "This class supports effects which are simply the application of OpenGL state,
+with uset parameters, to a shape. XXX probably can't work as is."))
 
 (defmethod submit-with-effect (shape renderer (effect simple-effect))
   (let* ((env (environment effect))

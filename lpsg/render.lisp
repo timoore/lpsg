@@ -43,7 +43,10 @@
 (defclass render-queue ()
   ((bundles :accessor bundles :initarg :bundles :initform nil)))
 
-(defgeneric add-bundle (render-queue bundle))
+(defgeneric add-bundle (render-queue bundle)
+  (:documentation "Add BUNDLE to RENDER-QUEUE.
+
+This function is used in the implementation of SUBMIT-WITH-EFFECT."))
 
 (defmethod add-bundle ((render-queue render-queue) bundle)
   (push bundle (bundles render-queue)))
@@ -60,7 +63,8 @@
    (finalize-queue :accessor finalize-queue :initform nil)
    ;; alist of (buffer . buffer-areas)
    (upload-queue :accessor upload-queue :initform nil)
-   (render-stages :accessor render-stages :initform nil)))
+   (render-stages :accessor render-stages :initform nil))
+  (:documentation "The class responsible for all rendering."))
 
 (defun process-finalize-queue (renderer)
   (loop
@@ -227,7 +231,8 @@ but that can impact performance."))
 
 (defclass graphics-state ()
   ((bindings)
-   (program :accessor program :initarg :program :initform nil)))
+   (program :accessor program :initarg :program :initform nil))
+  (:documentation "Class that stores all OpenGL state."))
 
 (defmethod gl-finalized-p ((obj graphics-state))
   (gl-finalized-p (program obj)))
@@ -252,7 +257,9 @@ but that can impact performance."))
 
 (defclass shader (shader-source gl-object)
   ((status :accessor status :initarg :status)
-   (compiler-log :accessor compiler-log :initarg :compiler-log :initform nil)))
+   (compiler-log :accessor compiler-log :initarg :compiler-log :initform nil))
+  (:documentation "The LPSG object that holds the source code for an OpenGL shader, information
+  about its usets, ID in OpenGL, and any errors that result from its compilation."))
 
 (defmethod gl-finalized-p ((obj shader))
   (slot-boundp obj 'status))
@@ -391,7 +398,12 @@ but that can impact performance."))
     (push new-buf (finalize-queue renderer))
     (allocate-from-buffer new-buf size)))
 
-(defgeneric draw (renderer))
+(defgeneric draw (renderer)
+  (:documentation "Perform all outstanding operations in RENDERER.
+
+Finalize all objects on the finalize queue(s), do any upload operations in the upload queue, then
+traverse the render stages and their render queues to render all bundles."))
+
 (defgeneric draw-bundles (renderer))
 
 (defgeneric bind-state (renderer state))

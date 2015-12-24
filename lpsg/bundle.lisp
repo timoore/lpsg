@@ -5,9 +5,13 @@
 (defclass render-bundle ()
   ((attribute-set :accessor attribute-set :initarg :attribute-set)
    (shape :accessor shape :initarg :shape)
-   (environment :accessor environment :initarg :environment)
-   ;; environment? Is gl-state for the moment
-   ))
+   (environment :accessor environment :initarg :environment))
+  (:documentation "Class that ties together attributes and a graphics environment.
+
+A RENDER-BUNDLE is the lowest level object processed by a RENDERER that produces graphics output
+via OpenGL. It groups the ATTRIBUTES from a SHAPE into an ATTRIBUTE-SET that can be bound quickly
+in OpenGL. It also stores an ENVIRONMENT that holds all the graphics state needed to render the
+geometry of the associated SHAPE. "))
 
 (defmethod gl-finalized-p ((obj render-bundle))
   (and (gl-finalized-p (attribute-set obj))

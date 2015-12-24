@@ -382,6 +382,19 @@
 
 (defmacro define-uset (name variables &rest desc-args
                        &key (strategy :default strategyp) descriptor-class)
+  "Define a uset.
+
+  A uset is a set of variables that parameterize a shader program. In OpenGL, these variables are
+  called `uniforms', and change infrequently. DEFINE-USET defines a class that stores the values,
+  and for each value specifies how to load the value into the program.
+
+  VARIABLES is a list of uniform definitions, much like slot definitions in DEFCLASS. A uniform
+  definition looks like:
+  (gl-namestring uniform-type slot-name &rest slot-args)
+
+  GL-NAMESTRING is the name of the uniform in the OpenGL shader program, as a string. UNIFORM-TYPE
+  is an OpenGL uniform type, specified as a keyword from cl-opengl. SLOT-NAME and SLOT-ARGS are the
+  same as in DEFCLASS."
   (let* ((uset-slots (parse-uniform-slots variables)))
     `(progn
        (ensure-uset ',name ',variables

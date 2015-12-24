@@ -37,6 +37,9 @@
      do (setf (aref dest dest-row i) (aref src i))))
 
 (defun make-cube-shape ()
+  "Create a cube shape.
+
+The cube has VERTEX and NORMAL vertex attributes. The resulting shape has an indexed drawable."
   (let ((vertex-array (make-array '(24 3) :element-type 'single-float))
         (normal-array (make-array '(24 3) :element-type 'single-float))
         (element-array (make-array 36)) ; 6 vertices per face

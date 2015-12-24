@@ -6,8 +6,11 @@
 
 (defgeneric submit (assembly renderer))
 
-(defgeneric submit-with-effect (shape renderer effect))
+(defgeneric submit-with-effect (shape renderer effect)
+  (:documentation "Submit SHAPE to RENDERER.
 
+This function creates all the bundles necessary to render SHAPE with the appearance defined by
+EFFECT."))
 
 (defgeneric add-object (parent child))
 
