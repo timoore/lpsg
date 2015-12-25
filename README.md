@@ -17,6 +17,9 @@ include support for common features in 3D graphical applications,
 such as simple text, rendering to a texture, rendering high-quality
 transparency, GPU-based selection, and more.
 
+## Example
+
+A commented example is found in [cube.lisp](examples/cube.lisp).
 
 ## License
 

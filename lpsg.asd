@@ -2,6 +2,9 @@
 
 (defsystem lpsg
   :description "OpenGL rendering pipeline."
+  :version "0.0.0"
+  :author "Tim Moore <timoore33@gmail.com>"
+  :license "Revised BSD"
   :depends-on (cl-opengl sb-cga mathkit)
   :components
   ((:module "lpsg"
