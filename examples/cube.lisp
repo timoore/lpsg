@@ -3,6 +3,7 @@
 
 (in-package #:lpsg-examples)
 
+;;; Source for the vertex and fragment shaders. This is pretty standard OpenGL.
 (defparameter *vertex-shader-source* "
 #version 330
 
@@ -21,7 +22,6 @@ uniform mat4 modelMatrix;
 
 void main()
 {
-  // add a temporary model and view transform
   vec4 modelPos = cameraMatrix * modelMatrix * in_Position;
   gl_Position = projectionMatrix * modelPos;
   float intense = max(dot(in_Normal, -lightDir.xyz), 0.0);
@@ -42,6 +42,9 @@ void main()
 }
 ")
 
+;;; Usets are sets of uniforms that can be set in shader programs. DEFINE-USET defines a CLOS class
+;;; to hold values in lisp, as well as functions for uploading the values into a shader
+;;; program. Note that the names in strings refer to uniforms in the above shaders.
 (lpsg:define-uset camera (("projectionMatrix" :float-mat4
                                               projection-matrix :accessor projection-matrix)
                           ("cameraMatrix" :float-mat4
@@ -59,18 +62,23 @@ void main()
    (projection-type :accessor projection-type :initarg :projection-type))
   (:default-initargs :exposed nil :projection-type 'orthographic))
 
+;;; Instances of usets
 (defvar *camera-uset* (make-instance 'camera))
 (defvar *model-uset* (make-instance 'model))
 (defvar *light-uset* (make-instance 'light))
 
 (defun draw-window (win)
   (when (exposed win)
+    ;; All the OpenGL state set by theese calls will eventually be stored in a LPSG:GL-STATE
+    ;; object.
     (%gl:clear-color .8 .8 .8 1.0)
     (gl:cull-face :back)
     (gl:depth-func :less)
     (gl:enable :cull-face :depth-test)
     (gl:disable :dither)
     (gl:clear :color-buffer :depth-buffer)
+    ;; Initialize any OpenGL objects, upload any new data to OpenGL buffers, and draw all the
+    ;; shapes.
     (lpsg:draw win)
     (glop:swap-buffers win)))
 
@@ -88,7 +96,8 @@ void main()
                     (sb-cga:vec 0.0 0.0 -5.0)
                     (sb-cga:vec 0.0 1.0 0.0)))
 
-;;; Compute a high light, slightly to the side and front.
+;;; Compute a high light, slightly to the side and front. This is the standard Lambert shading
+;;; model, for diffuse shading only.
 
 (defun compute-light-vector ()
   (let* ((angle (kit.math:deg-to-rad 15.0))
@@ -100,6 +109,7 @@ void main()
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:expose-event))
   (unless (exposed window)
+    ;; Create a cube with correct face normals.
     (let* ((cube (lpsg:make-cube-shape))
            (shader-program
             (make-instance 'lpsg:program
@@ -111,22 +121,26 @@ void main()
                                                          :shader-type :fragment-shader
                                                          :source *fragment-shader-source*
                                                          :usets ()))))
+           ;; The shader program is the only OpenGL state we care about.
            (gl-state (make-instance 'lpsg:graphics-state :program shader-program))
            (env (make-instance 'lpsg:environment :gl-state gl-state
                                :attribute-map '((gl:vertex . "in_Position")
                                                 (gl:normal . "in_Normal"))
                                :uniform-sets (list *camera-uset* *model-uset* *light-uset*))))
       (setf (cube window) cube)
+      ;; Initialize all the usets
       (setf (projection-matrix *camera-uset*)
             (compute-projection-matrix window (projection-type window) 1.0 10.0))
       (setf (camera-matrix *camera-uset*) (compute-view-matrix))
       (setf (model-matrix *model-uset*) (sb-cga:translate* 0.0 0.0 -5.0))
       (setf (light-direction *light-uset*) (compute-light-vector))
       (setf (effect window) (make-instance 'lpsg:simple-effect :environment env))
+      ;; Allocate storage  in OpenGL buffer objects for the cube's geometry.
       (let ((allocator (make-instance 'lpsg:simple-allocator)))
         (lpsg:open-allocator allocator)
         (lpsg:compute-buffer-allocation cube allocator)
         (lpsg:close-allocator allocator))
+      ;; Register the shape with the renderer.
       (lpsg:submit-with-effect cube window (effect window))))
   (setf (exposed window) t)
   (draw-window window))
@@ -149,6 +163,9 @@ void main()
       (call-next-method)))
 
 (defun cube-example (&rest args)
+  "Draw a cube in a window.
+
+The `p' key switches between orthographic and perspective views."
   (let* ((win (apply #'make-instance 'cube-window args)))
     (open-viewer win "cube demo" 800 600)
     (unwind-protect

@@ -30,4 +30,5 @@
 (defpackage #:lpsg-examples
   (:use #:cl)
   (:export
-   #:rotator))
+   #:cube-example))
+
