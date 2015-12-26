@@ -1,4 +1,7 @@
 ;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
+
+(cl:in-package #:asdf-user)
+
 (defsystem lpsg-examples
   :description "OpenGL rendering pipeline examples"
   :depends-on (lpsg glop cl-opengl)

@@ -1,5 +1,7 @@
 ;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 
+(cl:in-package #:asdf-user)
+
 (defsystem lpsg
   :description "OpenGL rendering pipeline."
   :version "0.0.0"
