@@ -60,6 +60,18 @@
    #:open-allocator
    #:allocate-target
    #:close-allocator
+   ;; incremental computation
+   #:consumer-node
+   #:add-source
+   #:delete-source
+   #:computation-node
+   #:add-sink
+   #:delete-sink
+   #:value
+   #:compute
+   #:invalidate-calculation
+   #:input-value-node
+   #:connect
    ;; utilities
    #:make-cube-shape
    ))
