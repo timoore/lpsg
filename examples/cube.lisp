@@ -123,10 +123,11 @@ void main()
                                                          :usets ()))))
            ;; The shader program is the only OpenGL state we care about.
            (gl-state (make-instance 'lpsg:graphics-state :program shader-program))
-           (env (make-instance 'lpsg:environment :gl-state gl-state
-                               :attribute-map '((gl:vertex . "in_Position")
-                                                (gl:normal . "in_Normal"))
-                               :uniform-sets (list *camera-uset* *model-uset* *light-uset*))))
+           (effect (make-instance 'lpsg:simple-effect
+                                  :gl-state gl-state
+                                  :attribute-map '((gl:vertex . "in_Position")
+                                                   (gl:normal . "in_Normal"))
+                                  :uniform-sets (list *camera-uset* *model-uset* *light-uset*))))
       (setf (cube window) cube)
       ;; Initialize all the usets
       (setf (projection-matrix *camera-uset*)
@@ -134,7 +135,7 @@ void main()
       (setf (camera-matrix *camera-uset*) (compute-view-matrix))
       (setf (model-matrix *model-uset*) (sb-cga:translate* 0.0 0.0 -5.0))
       (setf (light-direction *light-uset*) (compute-light-vector))
-      (setf (effect window) (make-instance 'lpsg:simple-effect :environment env))
+      (setf (effect window) effect)
       ;; Allocate storage  in OpenGL buffer objects for the cube's geometry.
       (let ((allocator (make-instance 'lpsg:simple-allocator)))
         (lpsg:open-allocator allocator)

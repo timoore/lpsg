@@ -86,11 +86,12 @@ Will be created automatically, but must be specified for now.")))
 (defclass shape (consumer-node)
   ((attributes :accessor attributes :initarg :attributes :initform nil
                :documentation "Alist of (name . attribute). The names are later mapped to a vertex binding index.")
-   (environment :accessor environment :initarg :environment :initform nil)
    (effect :accessor effect :initarg :effect)
    ;; XXX uset computation nodes?
    (usets :accessor usets :initarg :usets :initform nil)
-   (drawable :accessor drawable :initarg :drawable)))
+   (drawable :accessor drawable :initarg :drawable)
+   (bundles :accessor bundles :initform nil
+            :documentation "The bundles that are created by EFFECT for this shape.")))
 
 
 (defmethod initialize-instance :after ((obj shape) &key)
