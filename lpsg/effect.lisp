@@ -23,15 +23,18 @@
   ((attribute-map :accessor attribute-map :initform nil :initarg :attribute-map
                   :documentation "list of (symbol glsl-name) where glsl-name is a string")
    (gl-state :accessor gl-state :initarg :gl-state)
-   (uniform-sets :accessor uniform-sets :initarg :uniform-sets :initform nil))
+   (uset-names :accessor uset-names :initarg :uset-names :initform nil))
   (:documentation "This class supports effects which are simply the application of OpenGL state,
 with uset parameters, to a shape."))
 
 (defmethod submit-with-effect (shape renderer (effect simple-effect))
-  (let* ((env (make-instance 'environment
+  (let* ((shape-usets (value shape))
+         (env (make-instance 'environment
                              :attribute-map (attribute-map effect)
                              :gl-state (gl-state effect)
-                             :uniform-sets (uniform-sets effect)))
+                             :uniform-sets (mapcar (lambda (uset-name)
+                                                     (cdr (assoc uset-name shape-usets)))
+                                                   (uset-names effect))))
          (attr-map (attribute-map env))
          (attrib-set (make-instance 'attribute-set)))
     ;; Make attribute set from shape and drawable attributes The actual vertex
@@ -61,3 +64,12 @@ with uset parameters, to a shape."))
         (add-bundle rq bundle)))))
 
 
+(defgeneric invalidate-uset (effect node source input-name))
+
+;;; XXX This forces the update of all the usets used by a node.
+(defmethod invalidate-uset ((effect simple-effect) node source input-name)
+  (declare (ignore source input-name))
+  (when (slot-boundp node 'renderer)
+    (push (lambda (renderer)
+            (value node))
+          (predraw-queue (renderer node)))))
