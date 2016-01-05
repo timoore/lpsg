@@ -19,15 +19,22 @@
   class only has one environment, but other effects might have different environments for different
   passes."))
 
-;;; This shares a lot of slots with the environment class; should the two classes be more
-;;; integrated?
 (defclass simple-effect (effect)
-  ((environment :accessor environment :initarg :environment))
+  ((attribute-map :accessor attribute-map :initform nil :initarg :attribute-map
+                  :documentation "list of (symbol glsl-name) where glsl-name is a string")
+   (gl-state :accessor gl-state :initarg :gl-state)
+   (uset-names :accessor uset-names :initarg :uset-names :initform nil))
   (:documentation "This class supports effects which are simply the application of OpenGL state,
-with uset parameters, to a shape. XXX probably can't work as is."))
+with uset parameters, to a shape."))
 
 (defmethod submit-with-effect (shape renderer (effect simple-effect))
-  (let* ((env (environment effect))
+  (let* ((shape-usets (value shape))
+         (env (make-instance 'environment
+                             :attribute-map (attribute-map effect)
+                             :gl-state (gl-state effect)
+                             :uniform-sets (mapcar (lambda (uset-name)
+                                                     (cdr (assoc uset-name shape-usets)))
+                                                   (uset-names effect))))
          (attr-map (attribute-map env))
          (attrib-set (make-instance 'attribute-set)))
     ;; Make attribute set from shape and drawable attributes The actual vertex
@@ -46,6 +53,7 @@ with uset parameters, to a shape. XXX probably can't work as is."))
       (setf (element-binding attrib-set) (element-array (drawable shape))))
     (let ((bundle (make-instance 'render-bundle
                                  :attribute-set attrib-set :shape shape :environment env)))
+      (push bundle (bundles shape))
       (push bundle (finalize-queue renderer))
       ;; For now, just use one render-stage / render-queue
       (unless (render-stages renderer)
@@ -56,3 +64,12 @@ with uset parameters, to a shape. XXX probably can't work as is."))
         (add-bundle rq bundle)))))
 
 
+(defgeneric invalidate-uset (effect node source input-name))
+
+;;; XXX This forces the update of all the usets used by a node.
+(defmethod invalidate-uset ((effect simple-effect) node source input-name)
+  (declare (ignore source input-name))
+  (when (slot-boundp node 'renderer)
+    (push (lambda (renderer)
+            (value node))
+          (predraw-queue (renderer node)))))

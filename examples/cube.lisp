@@ -56,8 +56,7 @@ void main()
 (lpsg:define-uset light (("lightDir" :float-vec4 light-direction :accessor light-direction)))
 
 (defclass cube-window (viewer-window lpsg:renderer)
-  ((cube :accessor cube)
-   (effect :accessor effect)
+  ((effect :accessor effect)
    (exposed :accessor exposed :initarg :exposed)
    (projection-type :accessor projection-type :initarg :projection-type))
   (:default-initargs :exposed nil :projection-type 'orthographic))
@@ -66,6 +65,12 @@ void main()
 (defvar *camera-uset* (make-instance 'camera))
 (defvar *model-uset* (make-instance 'model))
 (defvar *light-uset* (make-instance 'light))
+(defvar *model-uset2* (make-instance 'model))
+
+(defvar *camera-input* (make-instance 'lpsg:input-value-node :value *camera-uset*))
+(defvar *model-input* (make-instance 'lpsg:input-value-node :value *model-uset*))
+(defvar *light-input* (make-instance 'lpsg:input-value-node :value *light-uset*))
+(defvar *model-input2* (make-instance 'lpsg:input-value-node :value *model-uset2*))
 
 (defun draw-window (win)
   (when (exposed win)
@@ -107,11 +112,25 @@ void main()
          (light-vec3 (sb-cga:transform-direction down mat)))
     (kit.math:vec4 light-vec3)))
 
+(defparameter *allocator* (make-instance 'lpsg:simple-allocator))
+
+(defun make-cube (model-input)
+  (let ((cube (lpsg:make-cube-shape)))
+    (lpsg:connect *camera-input* cube 'camera)
+    (lpsg:connect model-input cube 'model)
+    (lpsg:connect *light-input* cube 'light)
+    ;; Allocate storage  in OpenGL buffer objects for the cube's geometry.  Allocate an array
+    ;; buffer and element buffer for each cube because we don't support gl:draw-elements-base-index
+    ;; yet.
+    (lpsg:open-allocator *allocator*)
+    (lpsg:compute-buffer-allocation cube *allocator*)
+    (lpsg:close-allocator *allocator*)
+    cube))
+
 (defmethod glop:on-event :after ((window cube-window) (event glop:expose-event))
   (unless (exposed window)
     ;; Create a cube with correct face normals.
-    (let* ((cube (lpsg:make-cube-shape))
-           (shader-program
+    (let* ((shader-program
             (make-instance 'lpsg:program
                            :shaders (list (make-instance 'lpsg:shader
                                                          :shader-type :vertex-shader
@@ -123,31 +142,30 @@ void main()
                                                          :usets ()))))
            ;; The shader program is the only OpenGL state we care about.
            (gl-state (make-instance 'lpsg:graphics-state :program shader-program))
-           (env (make-instance 'lpsg:environment :gl-state gl-state
-                               :attribute-map '((gl:vertex . "in_Position")
-                                                (gl:normal . "in_Normal"))
-                               :uniform-sets (list *camera-uset* *model-uset* *light-uset*))))
-      (setf (cube window) cube)
+           (effect (make-instance 'lpsg:simple-effect
+                                  :gl-state gl-state
+                                  :attribute-map '((gl:vertex . "in_Position")
+                                                   (gl:normal . "in_Normal"))
+                                  :uset-names '(camera model light))))
       ;; Initialize all the usets
       (setf (projection-matrix *camera-uset*)
             (compute-projection-matrix window (projection-type window) 1.0 10.0))
       (setf (camera-matrix *camera-uset*) (compute-view-matrix))
-      (setf (model-matrix *model-uset*) (sb-cga:translate* 0.0 0.0 -5.0))
+      (setf (model-matrix *model-uset*) (sb-cga:translate* 1.0 0.0 -5.0))
+      (setf (model-matrix *model-uset2*) (sb-cga:translate* -1.0 0.0 -5.0))
       (setf (light-direction *light-uset*) (compute-light-vector))
-      (setf (effect window) (make-instance 'lpsg:simple-effect :environment env))
-      ;; Allocate storage  in OpenGL buffer objects for the cube's geometry.
-      (let ((allocator (make-instance 'lpsg:simple-allocator)))
-        (lpsg:open-allocator allocator)
-        (lpsg:compute-buffer-allocation cube allocator)
-        (lpsg:close-allocator allocator))
-      ;; Register the shape with the renderer.
-      (lpsg:submit-with-effect cube window (effect window))))
+      (setf (effect window) effect)
+      (let ((cube1 (make-cube *model-input*))
+            (cube2 (make-cube *model-input2*)))
+        (lpsg:submit-with-effect cube1 window (effect window))
+        (lpsg:submit-with-effect cube2 window (effect window)))))
   (setf (exposed window) t)
   (draw-window window))
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:resize-event))
   (setf (projection-matrix *camera-uset*)
         (compute-projection-matrix window (projection-type window) 1.0 10.0))
+  (setf (lpsg:value *camera-input*) *camera-uset*)
   (draw-window window))
 
 (defmethod glop:on-event ((window cube-window) (event glop:key-event))
@@ -159,6 +177,7 @@ void main()
                   'orthographic))
         (setf (projection-matrix *camera-uset*)
               (compute-projection-matrix window (projection-type window) 1.0 10.0))
+        (setf (lpsg:value *camera-input*) *camera-uset*)
         (draw-window window))
       (call-next-method)))
 

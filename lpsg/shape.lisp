@@ -83,14 +83,18 @@ Will be created automatically, but must be specified for now.")))
 
 ;;; attributes - alist of (name . vertex-attribute). 
 
-(defclass shape (consumer-node)
+(defclass shape (computation-node)
   ((attributes :accessor attributes :initarg :attributes :initform nil
                :documentation "Alist of (name . attribute). The names are later mapped to a vertex binding index.")
-   (environment :accessor environment :initarg :environment :initform nil)
    (effect :accessor effect :initarg :effect)
    ;; XXX uset computation nodes?
    (usets :accessor usets :initarg :usets :initform nil)
-   (drawable :accessor drawable :initarg :drawable)))
+   (drawable :accessor drawable :initarg :drawable)
+   (bundles :accessor bundles :initform nil
+            :documentation "The bundles that are created by EFFECT for this shape.")
+   ;; It seems to be necessary to store the renderer in order to support incremental update of
+   ;; usets. XXX needs more thought
+   (renderer :accessor renderer)))
 
 
 (defmethod initialize-instance :after ((obj shape) &key)
@@ -153,6 +157,11 @@ Will be created automatically, but must be specified for now.")))
     (lambda (shape)
       (submit-with-effect shape renderer (effect shape)))))
 
+(defmethod submit-with-effect :before ((shape shape) renderer effect)
+  (setf (renderer shape) renderer)
+  (setf (effect shape) effect)
+  (invalidate-uset effect shape nil nil))
+
 (defmethod submit-with-effect :after ((shape shape) renderer effect)
   (declare (ignore effect))
   (loop
@@ -164,3 +173,14 @@ Will be created automatically, but must be specified for now.")))
             (add-to-upload-queue renderer vertex-attrib))))
   (when (typep (drawable shape) 'indexed-drawable)
     (add-to-upload-queue renderer (element-array (drawable shape)))))
+
+;;; incremental computation stuff
+;;; The "value" of a shape node is a list of (uset-name . uset-value).
+
+(defmethod invalidate-calculation ((node shape) source input-name)
+  (invalidate-uset (effect node) node source input-name))
+
+(defmethod compute ((node shape))
+  (mapcar (lambda (input-entry)
+            (cons (car input-entry) (value (cdr input-entry))))
+          (inputs node)))

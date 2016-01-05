@@ -4,6 +4,8 @@
 
 ;;; Classes for the nodes in an incremental computation graph
 
+;;; Source nodes supply a value to the named input of another node which is called a "sink node."
+
 ;;; A named source can contain a list i.e., the conceptual source is a list of
 ;;; values.
 
@@ -12,22 +14,48 @@
 ;;; source or sink in a slot for convenient access.
 
 (defclass consumer-node ()
-  ((validp :accessor validp :initform t)))
+  ((validp :accessor validp :initform nil)
+   (inputs :accessor inputs :initarg :inputs :initform nil
+           :documentation "alist of (input-name . source-node)."))
+  (:documentation "Node that consumes values via named inputs."))
+
+(defgeneric add-source (node source input-name))
+(defgeneric delete-source (node source input-name))
+
+(defmethod add-source ((node consumer-node) source input-name)
+  (let ((source-entry (assoc input-name (inputs node))))
+    (if source-entry
+        (setf (cdr source-entry) source)
+        (setf (inputs node) (acons input-name source (inputs node)))))
+  (inputs node))
+
+(defmethod delete-source ((node consumer-node) source input-name)
+  (let ((source-entry (assoc input-name (inputs node))))
+    (when source-entry
+      (setf (cdr source-entry) nil))))
 
 (defclass computation-node (consumer-node)
-  ((sinks :accessor sinks :initform nil)
-   (cached-value :accessor cached-value :initarg :inital-value)))
+  ((sinks :accessor sinks :initform nil :documentation "list of (node . input-names)")
+   (cached-value :accessor cached-value :initarg :inital-value))
+  (:documentation "Note: the input names belong to the sink nodes of this node."))
 
-(defgeneric add-sink (node sink))
+(defgeneric add-sink (node sink input-name))
 
-(defgeneric delete-sink (node))
+(defgeneric delete-sink (node sink input-name))
 
-(defmethod add-sink ((node computation-node) sink)
-  (pushnew sink (sinks node))
-  sink)
+(defmethod add-sink ((node computation-node) sink input-name)
+  (let ((node-entry (find sink (sinks node) :key #'car)))
+    (if node-entry
+        (pushnew input-name (cdr node-entry))
+        (push (list sink input-name) (sinks node)))
+    (values sink input-name)))
 
-(defmethod delete-sink ((node computation-node))
-  (delete node (sinks node)))
+(defmethod delete-sink ((node computation-node) sink input-name)
+  (let ((node-entry (find sink (sinks node) :key #'car)))
+    (when node-entry
+      (setf (cdr node-entry) (delete input-name (cdr node-entry)))
+      (when (null (cdr node-entry))
+        (setf (sinks node) (delete sink (sinks node) :key #'car))))))
 
 (defgeneric value (node))
 
@@ -41,67 +69,85 @@
 
 (defgeneric compute (node))
 
-(defgeneric invalidate-calculation (node invalid-source))
+(defgeneric invalidate-calculation (node invalid-source input-name))
 
-(defmethod invalidate-calculation ((node consumer-node) invalid-source)
-  (declare (ignorable invalid-source)))
+(defmethod invalidate-calculation ((node consumer-node) invalid-source input-name)
+  (declare (ignorable invalid-source input-name)))
 
-(defmethod invalidate-calculation :after ((node consumer-node) invalid-source)
-  (declare (ignorable invalid-source))
+(defmethod invalidate-calculation :after ((node consumer-node) invalid-source input-name)
+  (declare (ignorable invalid-source input-name))
   (setf (validp node) nil))
 
-(defmethod invalidate-calculation ((node computation-node) invalid-source)
-  (declare (ignorable invalid-source))
+(defmethod invalidate-calculation ((node computation-node) invalid-source input-name)
+  (declare (ignorable invalid-source input-name))
   (when (validp node)
-    (mapc (lambda (sink) (invalidate-calculation sink node))
-          (sinks node))))
+    (loop
+       for (sink . inputs) in (sinks node)
+       do (mapc (lambda (name) (invalidate-calculation sink node name))
+                inputs))))
 
 (defclass input-value-node (computation-node)
   ())
+
+(defmethod initialize-instance :after ((node input-value-node) &key (value nil valuep))
+  (when valuep
+    (setf (value node) value)))
 
 (defgeneric (setf value) (value node))
 
 (defmethod (setf value) (value (node input-value-node))
   (setf (cached-value node) value)
-  (invalidate-calculation node node)
+  (invalidate-calculation node node nil)
+  (setf (validp node) t)
   value)
+
+(defgeneric connect (source sink input-name)
+  (:documentation "Connect the output of SOURCE to the input of SINK named INPUT-NAME."))
+
+(defmethod connect ((source computation-node) (sink consumer-node) input-name)
+  (add-source sink source input-name)
+  (add-sink source sink input-name))
 
 ;;; Testing
 
 #+(or)
 (progn
-(defclass plus-node (computation-node)
-  ((arg1 :accessor arg1)
-   (arg2 :accessor arg2)))
+  (defclass plus-node (computation-node)
+    ()
+    (:default-initargs :inputs (list (list 'arg1) (list 'arg2))))
 
-(defmethod compute ((node plus-node))
-  (+ (value (arg1 node) frame)
-     (value (arg2 node) frame)))
+  (defmethod compute ((node plus-node))
+    (let ((arg1 (value (cdr (assoc 'arg1 (inputs node)))))
+          (arg2 (value (cdr (assoc 'arg2 (inputs node))))))
+      (+ arg1 arg2)))
 
-(defclass mult-node (computation-node)
-  ((arg1 :accessor arg1)
-   (arg2 :accessor arg2)))
+  (defclass mult-node (computation-node)
+    ()
+    (:default-initargs :inputs (list (list 'arg1) (list 'arg2))))
 
-(defmethod compute ((node mult-node))
-  (* (value (arg1 node) frame)
-     (value (arg2 node) frame)))
+  (defmethod compute ((node mult-node))
+    (let ((arg1 (value (cdr (assoc 'arg1 (inputs node)))))
+          (arg2 (value (cdr (assoc 'arg2 (inputs node))))))
+      (* arg1 arg2)))
 
-(defvar *source1* (make-instance 'input-value-node))
-(defvar *source2* (make-instance 'input-value-node))
+  (defparameter *source1* (make-instance 'input-value-node))
+  (defparameter *source2* (make-instance 'input-value-node))
 
-(defvar *plus-node* (make-instance 'plus-node))
-(defvar *mult-node* (make-instance 'mult-node))
+  (defparameter *plus-node* (make-instance 'plus-node))
+  (defparameter *mult-node* (make-instance 'mult-node))
 
-(setf (arg1 *plus-node*) *source1*)
-(add-sink *source1* *plus-node*)
-(setf (arg2 *plus-node*) *source2*)
-(add-sink *source2* *plus-node*)
+  (connect *source1* *plus-node* 'arg1)
+  (connect *source2* *plus-node* 'arg2)
 
-(setf (arg1 *mult-node*) *source1*)
-(add-sink *source1* *mult-node*)
-(setf (arg2 *mult-node*) *source2*)
-(add-sink *source2* *mult-node*)
+  (connect *source1* *mult-node* 'arg1)
+  (connect *source2* *mult-node* 'arg2)
 
-(setf (value *source1*) 4)
-(setf (value *source2*) 8)
-)
+
+  (setf (value *source1*) 4)
+  (setf (value *source2*) 8)
+
+  (defparameter *mult-node2* (make-instance 'mult-node))
+  (connect *plus-node* *mult-node2* 'arg1)
+  (connect *mult-node* *mult-node2* 'arg2)
+  ;; Value of *mult-node2* should be 384.
+  )
