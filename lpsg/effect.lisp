@@ -28,15 +28,18 @@
 with uset parameters, to a shape."))
 
 (defmethod submit-with-effect (shape renderer (effect simple-effect))
-  (let* ((shape-usets (value shape))
-         (env (make-instance 'environment
+  (let* ((env (make-instance 'environment
                              :attribute-map (attribute-map effect)
                              :gl-state (gl-state effect)
+                             :renderer renderer
+                             :inputs (inputs shape)
                              :uniform-sets (mapcar (lambda (uset-name)
-                                                     (cdr (assoc uset-name shape-usets)))
+                                                     (input-value shape uset-name))
                                                    (uset-names effect))))
          (attr-map (attribute-map env))
          (attrib-set (make-instance 'attribute-set)))
+    ;; Enqueue initial update of usets
+    (invalidate-calculation env nil nil)
     ;; Make attribute set from shape and drawable attributes The actual vertex
     ;; attribute index for an attribute may not be known until the shader
     ;; program is linked, so make it invalid for now and let gl-finalize sort
@@ -63,13 +66,3 @@ with uset parameters, to a shape."))
       (let ((rq (car (render-queues (car (render-stages renderer))))))
         (add-bundle rq bundle)))))
 
-
-(defgeneric invalidate-uset (effect node source input-name))
-
-;;; XXX This forces the update of all the usets used by a node.
-(defmethod invalidate-uset ((effect simple-effect) node source input-name)
-  (declare (ignore source input-name))
-  (when (slot-boundp node 'renderer)
-    (push (lambda (renderer)
-            (value node))
-          (predraw-queue (renderer node)))))

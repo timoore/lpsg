@@ -91,11 +91,7 @@ Will be created automatically, but must be specified for now.")))
    (usets :accessor usets :initarg :usets :initform nil)
    (drawable :accessor drawable :initarg :drawable)
    (bundles :accessor bundles :initform nil
-            :documentation "The bundles that are created by EFFECT for this shape.")
-   ;; It seems to be necessary to store the renderer in order to support incremental update of
-   ;; usets. XXX needs more thought
-   (renderer :accessor renderer)))
-
+            :documentation "The bundles that are created by EFFECT for this shape.")))
 
 (defmethod initialize-instance :after ((obj shape) &key)
   (unless (slot-boundp obj 'drawable)
@@ -157,11 +153,6 @@ Will be created automatically, but must be specified for now.")))
     (lambda (shape)
       (submit-with-effect shape renderer (effect shape)))))
 
-(defmethod submit-with-effect :before ((shape shape) renderer effect)
-  (setf (renderer shape) renderer)
-  (setf (effect shape) effect)
-  (invalidate-uset effect shape nil nil))
-
 (defmethod submit-with-effect :after ((shape shape) renderer effect)
   (declare (ignore effect))
   (loop
@@ -178,10 +169,6 @@ Will be created automatically, but must be specified for now.")))
 ;;; The "value" of a shape node is a list of (uset-name . uset-value).
 
 (defmethod invalidate-calculation ((node shape) source input-name)
-  (when (slot-boundp node 'effect)
-    (invalidate-uset (effect node) node source input-name)))
+  nil)
 
-(defmethod compute ((node shape))
-  (mapcar (lambda (input-entry)
-            (cons (car input-entry) (value (cdr input-entry))))
-          (inputs node)))
+
