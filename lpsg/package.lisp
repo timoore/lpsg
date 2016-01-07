@@ -71,7 +71,8 @@
    #:compute
    #:invalidate-calculation
    #:input-value-node
-   #:connect
+   #:input
+   #:input-value
    ;; utilities
    #:make-cube-shape
    ))

@@ -116,9 +116,9 @@ void main()
 
 (defun make-cube (model-input)
   (let ((cube (lpsg:make-cube-shape)))
-    (lpsg:connect *camera-input* cube 'camera)
-    (lpsg:connect model-input cube 'model)
-    (lpsg:connect *light-input* cube 'light)
+    (setf (lpsg:input cube 'camera) *camera-input*)
+    (setf (lpsg:input cube 'model) model-input)
+    (setf (lpsg:input cube 'light) *light-input*)
     ;; Allocate storage  in OpenGL buffer objects for the cube's geometry.  Allocate an array
     ;; buffer and element buffer for each cube because we don't support gl:draw-elements-base-index
     ;; yet.

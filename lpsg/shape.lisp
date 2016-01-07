@@ -178,7 +178,8 @@ Will be created automatically, but must be specified for now.")))
 ;;; The "value" of a shape node is a list of (uset-name . uset-value).
 
 (defmethod invalidate-calculation ((node shape) source input-name)
-  (invalidate-uset (effect node) node source input-name))
+  (when (slot-boundp node 'effect)
+    (invalidate-uset (effect node) node source input-name)))
 
 (defmethod compute ((node shape))
   (mapcar (lambda (input-entry)
