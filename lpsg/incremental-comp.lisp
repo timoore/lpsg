@@ -23,41 +23,45 @@
 ;;; other than subclasses of COMPUTATION-GRAPH-NODE.
 
 (defgeneric value (node)
-  (:documentation "Compute NODE's value."))
+  (:documentation "Return NODE's value."))
 
+;;; Any list object has a value -- itself.
 (defmethod value ((node t))
   node)
 
 (defgeneric validp (node)
   (:documentation "Returns T if a node's value is valid. "))
 
-(defclass consumer-node ()
-  ((inputs :accessor inputs :initarg :inputs :initform nil
-           :documentation "alist of (input-name . source-node)."))
-  (:documentation "Node that consumes values via named inputs."))
-
-(defclass computation-node (consumer-node)
-  ((validp :accessor validp :initform nil)
-   (sinks :accessor sinks :initform nil :documentation "list of (node . input-names)")
-   (cached-value :accessor cached-value :initarg :inital-value))
-  (:documentation "Note: the input names belong to the sink nodes of this node."))
-
-(defgeneric computation-node-p (node))
-
-(defmethod computation-node-p ((node computation-node))
+(defmethod validp ((node t))
   t)
 
-(defmethod computation-node-p ((node t))
-  nil)
+(define-protocol-class sink-node ()
+  ((:accessor inputs :documentation "alist of (input-name . source-node).")
+   (:accessor input :lambda-list (node name)
+              :documentation "Returns the value of a node's input. Second value indicates if input
+exists or not.")
+   (:generic delete-input (node input-name)))
+  (:documentation "Node that consumes values via named inputs."))
 
-(defgeneric input (node name)
-  (:documentation "Returns the value of a node's input. Second value indicates if input exists or
-  not."))
+(defclass simple-sink-node (sink-node)
+  ((inputs :accessor inputs :initform nil :initarg :inputs)))
+
+(define-protocol-class source-node ()
+  ((:accessor validp)
+   (:accessor sinks :documentation "list of (node . input-names)")
+   (:accessor cached-value))
+  (:documentation "Note: the input names belong to the sink nodes of this node."))
+
+(defclass simple-source-node (source-node)
+  ((validp :accessor validp :initform nil)
+   (sinks :accessor sinks :initform nil)
+   (cached-value :accessor cached-value :initarg :inital-value)))
+
 
 (defgeneric add-source (node source input-name))
 (defgeneric delete-source (node source input-name))
 
-(defmethod input ((node consumer-node) input-name)
+(defmethod input ((node simple-sink-node) input-name)
   (let ((input-entry (assoc input-name (inputs node))))
     (if input-entry
         (values (cdr input-entry) t)
@@ -70,7 +74,7 @@
         (value source)
         (error "Input ~S does not exist." input-name))))
 
-(defgeneric (setf input) (new-val node input-name))
+
 (defgeneric add-sink (node sink input-name))
 
 (defmethod add-sink ((node t) sink input-name)
@@ -81,7 +85,7 @@
 (defmethod delete-sink ((node t) sink input-name)
   nil)
 
-(defmethod (setf input) (new-val (node consumer-node) input-name)
+(defmethod (setf input) (new-val (node simple-sink-node) input-name)
   (let ((input-entry (assoc input-name (inputs node))))
     (if input-entry
         (setf (cdr input-entry) new-val)
@@ -91,7 +95,7 @@
 
 (defgeneric delete-input (node input-name))
 
-(defmethod delete-input ((node consumer-node) input-name)
+(defmethod delete-input ((node simple-sink-node) input-name)
   (multiple-value-bind (source sourcep)
       (input node input-name)
     (when sourcep
@@ -99,20 +103,23 @@
       (delete-sink source node input-name)))
   nil)
 
+(defclass computation-node (simple-source-node simple-sink-node)
+  ())
+
 (defgeneric compute (node))
-(defgeneric invalidate-calculation (node invalid-source input-name))
+(defgeneric notify-invalid-input (node invalid-source input-name))
 
 (defmethod (setf input) :after (new-val (node computation-node) input-name)
-  (invalidate-calculation node new-val input-name))
+  (notify-invalid-input node new-val input-name))
 
-(defmethod add-sink ((node computation-node) sink input-name)
+(defmethod add-sink ((node simple-source-node) sink input-name)
   (let ((node-entry (find sink (sinks node) :key #'car)))
     (if node-entry
         (pushnew input-name (cdr node-entry))
         (push (list sink input-name) (sinks node)))
     (values sink input-name)))
 
-(defmethod delete-sink ((node computation-node) sink input-name)
+(defmethod delete-sink ((node simple-source-node) sink input-name)
   (let ((node-entry (find sink (sinks node) :key #'car)))
     (when node-entry
       (setf (cdr node-entry) (delete input-name (cdr node-entry)))
@@ -127,16 +134,16 @@
         (setf (validp node) t)
         new-value)))
 
-(defmethod invalidate-calculation ((node computation-node) invalid-source input-name)
+(defmethod notify-invalid-input ((node simple-source-node) invalid-source input-name)
   (declare (ignorable invalid-source input-name))
   (when (validp node)
     (setf (validp node) nil)
     (loop
        for (sink . inputs) in (sinks node)
-       do (mapc (lambda (name) (invalidate-calculation sink node name))
+       do (mapc (lambda (name) (notify-invalid-input sink node name))
                 inputs))))
 
-(defclass input-value-node (computation-node)
+(defclass input-value-node (simple-source-node)
   ()
   (:documentation "A node whose value can be set. Useful as the source to multiple nodes."))
 
@@ -145,20 +152,17 @@
     (setf (value node) value)
     (setf (validp node) t)))
 
+(defmethod value ((node input-value-node))
+  (cached-value node))
+
 (defgeneric (setf value) (value node))
 
 (defmethod (setf value) (value (node input-value-node))
   (setf (cached-value node) value)
-  (invalidate-calculation node node nil)
+  (notify-invalid-input node node nil)
   (setf (validp node) t)
   value)
 
-(defgeneric connect (source sink input-name)
-  (:documentation "Connect the output of SOURCE to the input of SINK named INPUT-NAME."))
-
-(defmethod connect ((source computation-node) (sink consumer-node) input-name)
-  (add-source sink source input-name)
-  (add-sink source sink input-name))
 
 ;;; Testing
 

@@ -39,7 +39,7 @@ with uset parameters, to a shape."))
          (attr-map (attribute-map env))
          (attrib-set (make-instance 'attribute-set)))
     ;; Enqueue initial update of usets
-    (invalidate-calculation env nil nil)
+    (notify-invalid-input env nil nil)
     ;; Make attribute set from shape and drawable attributes The actual vertex
     ;; attribute index for an attribute may not be known until the shader
     ;; program is linked, so make it invalid for now and let gl-finalize sort
