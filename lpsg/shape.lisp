@@ -83,7 +83,7 @@ Will be created automatically, but must be specified for now.")))
 
 ;;; attributes - alist of (name . vertex-attribute). 
 
-(defclass shape (computation-node)
+(defclass shape (sink-node sink-node-mixin)
   ((attributes :accessor attributes :initarg :attributes :initform nil
                :documentation "Alist of (name . attribute). The names are later mapped to a vertex binding index.")
    (effect :accessor effect :initarg :effect)
@@ -168,7 +168,7 @@ Will be created automatically, but must be specified for now.")))
 ;;; incremental computation stuff
 ;;; The "value" of a shape node is a list of (uset-name . uset-value).
 
-(defmethod invalidate-calculation ((node shape) source input-name)
+(defmethod notify-invalid-input ((node shape) source input-name)
   nil)
 
 

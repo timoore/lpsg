@@ -5,7 +5,7 @@
 ;;; The inputs of an ENVIRONMENT are the usets. The INVALIDATE-COMPUTATION/COMPUTE protocol is used
 ;;; to update them. The usets are also stored seperately for simplicity (or no good reason...)
 
-(defclass environment (consumer-node)
+(defclass environment (sink-node sink-node-mixin)
   ((attribute-map :accessor attribute-map :initform nil :initarg :attribute-map
                   :documentation "list of (symbol glsl-name) where glsl-name is a string")
    (effect :accessor effect :initarg :effect :documentation "back pointer to effect object")
@@ -27,7 +27,7 @@
                          :key #'car :test #'string=)))
       (cadr attrib))))
 
-(defmethod invalidate-calculation ((node environment) source input-name)
+(defmethod notify-invalid-input ((node environment) source input-name)
   (declare (ignore source input-name))
   (push (lambda (renderer)
           (declare (ignore renderer))

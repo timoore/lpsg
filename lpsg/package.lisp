@@ -61,15 +61,16 @@
    #:allocate-target
    #:close-allocator
    ;; incremental computation
-   #:consumer-node
-   #:add-source
-   #:delete-source
+   #:sink-node
+   #:sink-node-mixin
+   #:source-node
+   #:source-node-mixin
    #:computation-node
-   #:add-sink
+   #:computation-node-mixin
    #:delete-sink
    #:value
    #:compute
-   #:invalidate-calculation
+   #:notify-invalid-input
    #:input-value-node
    #:input
    #:input-value
