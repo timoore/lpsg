@@ -45,7 +45,9 @@ exists or not.")
   (:documentation "Node that consumes values via named inputs."))
 
 (defclass sink-node-mixin ()
-  ((inputs :accessor inputs :initform nil :initarg :inputs)))
+  ((inputs :accessor inputs :initform nil :initarg :inputs))
+  (:documentation "Mixin class that provides slots and some methods for the SINK-NODE protocol
+class"))
 
 (defmethod input ((node sink-node-mixin) input-name)
   (let ((input-entry (assoc input-name (inputs node))))
@@ -85,7 +87,9 @@ exists or not.")
 
 (defclass source-node-mixin ()
   ((validp :accessor validp :initform nil)
-   (sinks :accessor sinks :initform nil)))
+   (sinks :accessor sinks :initform nil))
+  (:documentation "Mixin class that provides slots and some methods for the SOURCE-NODE protocol
+class."))
 
 (defmethod (setf input) :after ((new-val source-node-mixin) sink input-name)
   (let ((node-entry (find sink (sinks new-val) :key #'car)))
@@ -116,6 +120,10 @@ exists or not.")
       (setf (inputs node) (delete input-name (inputs node) :key #'car))
       (delete-sink source node input-name)))
   nil)
+
+(defclass source-sink-mixin (source-node-mixin sink-node-mixin)
+  ()
+  (:documentation "Convenience mixin class the slots necessary to implement sources and sinks."))
 
 (define-protocol-class computation-node (source-node sink-node)
   (( :accessor cached-value)
@@ -153,7 +161,7 @@ exists or not.")
 
 #+(or)
 (progn
-  (defclass plus-node (computation-node computation-node-mixin source-node-mixin sink-node-mixin)
+  (defclass plus-node (computation-node computation-node-mixin source-sink-mixin)
     ())
 
   (defmethod compute ((node plus-node))
@@ -161,7 +169,7 @@ exists or not.")
           (arg2 (input-value node 'arg2)))
       (+ arg1 arg2)))
 
-  (defclass mult-node (computation-node computation-node-mixin source-node-mixin sink-node-mixin)
+  (defclass mult-node (computation-node computation-node-mixin source-sink-mixin)
     ())
 
   (defmethod compute ((node mult-node))
