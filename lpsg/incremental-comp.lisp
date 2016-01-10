@@ -38,34 +38,27 @@
 (define-protocol-class sink-node ()
   ((:accessor inputs :documentation "alist of (input-name . source-node).")
    (:accessor input :lambda-list (node name)
-              :documentation "Returns the value of a node's input. Second value indicates if input
+              :documentation "Returns a NODE's input named NAME. Second value indicates if input
 exists or not.")
-   (:generic delete-input (node input-name)))
+   (:generic delete-input (node input-name))
+   (:generic notify-invalid-input (node invalid-source input-name)))
   (:documentation "Node that consumes values via named inputs."))
 
-(defclass simple-sink-node (sink-node)
+(defclass sink-node-mixin ()
   ((inputs :accessor inputs :initform nil :initarg :inputs)))
 
-(define-protocol-class source-node ()
-  ((:accessor validp)
-   (:accessor sinks :documentation "list of (node . input-names)")
-   (:accessor cached-value))
-  (:documentation "Note: the input names belong to the sink nodes of this node."))
-
-(defclass simple-source-node (source-node)
-  ((validp :accessor validp :initform nil)
-   (sinks :accessor sinks :initform nil)
-   (cached-value :accessor cached-value :initarg :inital-value)))
-
-
-(defgeneric add-source (node source input-name))
-(defgeneric delete-source (node source input-name))
-
-(defmethod input ((node simple-sink-node) input-name)
+(defmethod input ((node sink-node-mixin) input-name)
   (let ((input-entry (assoc input-name (inputs node))))
     (if input-entry
         (values (cdr input-entry) t)
         (values nil nil))))
+
+(defmethod (setf input) (new-val (node sink-node-mixin) input-name)
+  (let ((input-entry (assoc input-name (inputs node))))
+    (if input-entry
+        (setf (cdr input-entry) new-val)
+        (setf (inputs node) (acons input-name new-val (inputs node)))))
+  new-val)
 
 (defun input-value (node input-name)
   (multiple-value-bind (source sourcep)
@@ -74,28 +67,49 @@ exists or not.")
         (value source)
         (error "Input ~S does not exist." input-name))))
 
-
-(defgeneric add-sink (node sink input-name))
-
-(defmethod add-sink ((node t) sink input-name)
+(defmethod notify-invalid-input ((node sink-node) invalid-source input-name)
+  (declare (ignore invalid-source input-name))
   nil)
 
-(defgeneric delete-sink (node sink input-name))
+(define-protocol-class source-node ()
+  ((:accessor validp)
+   (:accessor sinks :documentation "list of (node . input-names)")
+   (:generic delete-sink (node sink input-name)))
+  
+  (:documentation "Note: the input names belong to the sink nodes of this node."))
+
+;;; Let arbitrary Lisp objects serve as inputs.
 
 (defmethod delete-sink ((node t) sink input-name)
   nil)
 
-(defmethod (setf input) (new-val (node simple-sink-node) input-name)
-  (let ((input-entry (assoc input-name (inputs node))))
-    (if input-entry
-        (setf (cdr input-entry) new-val)
-        (setf (inputs node) (acons input-name new-val (inputs node)))))
-  (add-sink new-val node input-name)
-  new-val)
+(defclass source-node-mixin ()
+  ((validp :accessor validp :initform nil)
+   (sinks :accessor sinks :initform nil)))
 
-(defgeneric delete-input (node input-name))
+(defmethod (setf input) :after ((new-val source-node-mixin) sink input-name)
+  (let ((node-entry (find sink (sinks new-val) :key #'car)))
+    (if node-entry
+        (pushnew input-name (cdr node-entry))
+        (push (list sink input-name) (sinks new-val)))))
 
-(defmethod delete-input ((node simple-sink-node) input-name)
+(defmethod delete-sink ((node source-node-mixin) sink input-name)
+  (let ((node-entry (find sink (sinks node) :key #'car)))
+    (when node-entry
+      (setf (cdr node-entry) (delete input-name (cdr node-entry)))
+      (when (null (cdr node-entry))
+        (setf (sinks node) (delete sink (sinks node) :key #'car))))))
+
+(defmethod notify-invalid-input :after ((node source-node-mixin) invalid-source input-name)
+  (declare (ignorable invalid-source input-name))
+  (when (validp node)
+    (setf (validp node) nil)
+    (loop
+       for (sink . inputs) in (sinks node)
+       do (mapc (lambda (name) (notify-invalid-input sink node name))
+                inputs))))
+
+(defmethod delete-input ((node sink-node-mixin) input-name)
   (multiple-value-bind (source sourcep)
       (input node input-name)
     (when sourcep
@@ -103,28 +117,9 @@ exists or not.")
       (delete-sink source node input-name)))
   nil)
 
-(defclass computation-node (simple-source-node simple-sink-node)
-  ())
-
-(defgeneric compute (node))
-(defgeneric notify-invalid-input (node invalid-source input-name))
-
-(defmethod (setf input) :after (new-val (node computation-node) input-name)
-  (notify-invalid-input node new-val input-name))
-
-(defmethod add-sink ((node simple-source-node) sink input-name)
-  (let ((node-entry (find sink (sinks node) :key #'car)))
-    (if node-entry
-        (pushnew input-name (cdr node-entry))
-        (push (list sink input-name) (sinks node)))
-    (values sink input-name)))
-
-(defmethod delete-sink ((node simple-source-node) sink input-name)
-  (let ((node-entry (find sink (sinks node) :key #'car)))
-    (when node-entry
-      (setf (cdr node-entry) (delete input-name (cdr node-entry)))
-      (when (null (cdr node-entry))
-        (setf (sinks node) (delete sink (sinks node) :key #'car))))))
+(define-protocol-class computation-node (source-node sink-node)
+  (( :accessor cached-value)
+   (:generic compute (node))))
 
 (defmethod value ((node computation-node))
   (if (validp node)
@@ -134,41 +129,31 @@ exists or not.")
         (setf (validp node) t)
         new-value)))
 
-(defmethod notify-invalid-input ((node simple-source-node) invalid-source input-name)
-  (declare (ignorable invalid-source input-name))
-  (when (validp node)
-    (setf (validp node) nil)
-    (loop
-       for (sink . inputs) in (sinks node)
-       do (mapc (lambda (name) (notify-invalid-input sink node name))
-                inputs))))
+(defclass computation-node-mixin ()
+  ((cached-value :accessor cached-value)))
 
-(defclass input-value-node (simple-source-node)
-  ()
+(defclass input-value-node (source-node source-node-mixin)
+  ((value :accessor value))
   (:documentation "A node whose value can be set. Useful as the source to multiple nodes."))
 
 (defmethod initialize-instance :after ((node input-value-node) &key (value nil valuep))
   (when valuep
-    (setf (value node) value)
+    (setf (slot-value node 'value) value)
     (setf (validp node) t)))
 
-(defmethod value ((node input-value-node))
-  (cached-value node))
-
-(defgeneric (setf value) (value node))
-
-(defmethod (setf value) (value (node input-value-node))
-  (setf (cached-value node) value)
+(defmethod (setf value) :after (value (node input-value-node))
+  (setf (validp node) nil)
   (notify-invalid-input node node nil)
-  (setf (validp node) t)
-  value)
+  (setf (validp node) t))
 
-
+(defmethod notify-invalid-input ((node input-value-node) source input-name)
+  (declare (ignore source input-name))
+  nil)
 ;;; Testing
 
 #+(or)
 (progn
-  (defclass plus-node (computation-node)
+  (defclass plus-node (computation-node computation-node-mixin source-node-mixin sink-node-mixin)
     ())
 
   (defmethod compute ((node plus-node))
@@ -176,7 +161,7 @@ exists or not.")
           (arg2 (input-value node 'arg2)))
       (+ arg1 arg2)))
 
-  (defclass mult-node (computation-node)
+  (defclass mult-node (computation-node computation-node-mixin source-node-mixin sink-node-mixin)
     ())
 
   (defmethod compute ((node mult-node))

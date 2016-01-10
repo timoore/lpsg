@@ -62,13 +62,11 @@
    #:close-allocator
    ;; incremental computation
    #:sink-node
-   #:simple-sink-node
+   #:sink-node-mixin
    #:source-node
-   #:simple-source-node
-   #:add-source
-   #:delete-source
+   #:source-node-mixin
    #:computation-node
-   #:add-sink
+   #:computation-node-mixin
    #:delete-sink
    #:value
    #:compute

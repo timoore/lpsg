@@ -83,7 +83,7 @@ Will be created automatically, but must be specified for now.")))
 
 ;;; attributes - alist of (name . vertex-attribute). 
 
-(defclass shape (simple-sink-node)
+(defclass shape (sink-node sink-node-mixin)
   ((attributes :accessor attributes :initarg :attributes :initform nil
                :documentation "Alist of (name . attribute). The names are later mapped to a vertex binding index.")
    (effect :accessor effect :initarg :effect)
