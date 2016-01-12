@@ -12,6 +12,8 @@
    (num-components :accessor num-components :initarg :num-components
                    :documentation "number of components per element. Redundant
   with buffer-area components?")
+   (buffer-offset :accessor buffer-offset :initarg :buffer-offset :initform 0
+                  :documentation "Offset of the data in the target buffer when it is mapped.")
    (upload-fn :accessor upload-fn :initarg :upload-fn
               :documentation "Function to upload Lisp data to a mapped buffer.
 Will be created automatically, but must be specified for now.")))
@@ -29,7 +31,7 @@ Will be created automatically, but must be specified for now.")))
     (loop
        for i from 0 below (data-count resource)
        for src-idx = (+ (data-offset resource)  (* i real-data-stride))
-       for dest = (cffi:inc-pointer buffer-ptr (+ (offset resource ) (* i effective-stride)))
+       for dest = (cffi:inc-pointer buffer-ptr (+ (buffer-offset resource) (* i effective-stride)))
        do (loop
              for j from 0 below (num-components resource)
              for dest-component = (cffi:inc-pointer dest (* j 4))
@@ -47,7 +49,7 @@ Will be created automatically, but must be specified for now.")))
     (loop
        for i from 0 below (data-count resource)
        for src-idx = (+ (data-offset resource)  (* i real-data-stride))
-       for dest = (cffi:inc-pointer buffer-ptr (+ (offset resource) (* i effective-stride)))
+       for dest = (cffi:inc-pointer buffer-ptr (+ (buffer-offset resource) (* i effective-stride)))
        do (loop
              for j from 0 below (num-components resource)
              for dest-component = (cffi:inc-pointer dest (* j 2))
@@ -128,6 +130,78 @@ Will be created automatically, but must be specified for now.")))
 
 (defmethod (setf number-vertices) (num (obj shape))
   (setf (number-vertices (drawable obj)) num))
+
+;;; Utilities for allocation
+
+(defun attributes-descriptor (shape)
+  (mapcar (lambda (attr-entry)
+            (let ((attr (cdr attr-entry)))
+              (list (buffer-type attr) (components attr) (normalizedp attr))))
+          (attributes shape)))
+
+(defun max-attribute-alignment (descriptor)
+   (reduce #'max descriptor
+           :key (lambda (e) (get-component-size (car e)))
+           :initial-value 4))
+
+(defvar *open-allocators* nil)
+
+(defun open-interleaved-allocators ()
+  (setq *open-allocators* nil))
+(defun close-interleaved-allocators ()
+  (setq *open-allocators* nil))
+;;; Interleaved allocation
+
+
+(defun attribute-offsets (attr-desc)
+  "Returns list-of-strides, total padded size"
+  (let ((total-alignment (max-attribute-alignment attr-desc)))
+    (loop
+       with current-size = 0
+       for (buf-type num-components) in attr-desc
+       for component-size = (get-component-size buf-type)
+       for alignment = (min 4 component-size)
+       for element-size = (* component-size num-components)
+       for offset = (round-up current-size alignment)
+       collect offset into offsets
+       do (incf current-size element-size)
+       finally (let ((padded-size (round-up current-size total-alignment)))
+                 (return (values offsets padded-size))))))
+
+(defun compute-interleaved-shape-allocation (shape)
+  (let* ((attr-descriptor (attributes-descriptor shape))
+         (allocator (cdr (assoc attr-descriptor *open-allocators* :test #'equal)))
+         (drawable (drawable shape)))
+    (unless allocator
+      (setq allocator (make-instance 'simple-allocator))
+      (setq *open-allocators* (acons attr-descriptor allocator *open-allocators*)))
+    (multiple-value-bind (offsets vertex-size)
+        (attribute-offsets attr-descriptor)
+      (multiple-value-bind (buffer offset)
+          (allocate-target allocator
+                           :array-buffer
+                           (* vertex-size (data-count (cdar (attributes shape)))) ;XXX
+                           4)
+        ;; The arrays are allocated as if they start at the beginning of the buffer...
+        (loop
+           for (nil . attr) in (attributes shape)
+           for attr-offset in offsets
+           do (setf (buffer attr) buffer
+                    (offset attr) attr-offset
+                    (buffer-offset attr) (+ offset attr-offset)
+                    (stride attr) vertex-size))
+        ;; ... and the base-vertex is set to make the indices point to the actual location of the
+        ;; data.
+        (when (typep drawable 'indexed-drawable)
+          (let* ((attr (element-array drawable))
+                 (index-size (get-component-size (buffer-type attr))))
+            (multiple-value-bind (index-buffer index-offset)
+                (allocate-target
+                 allocator :element-array-buffer (* index-size (data-count attr)) index-size)
+              (setf (buffer attr) index-buffer
+                    (buffer-offset attr) index-offset
+                    (base-vertex drawable) (/ offset vertex-size)))))))))
+
 
 (defmethod compute-buffer-allocation ((shape shape) allocator)
   (flet ((allocate-attr (attr target)

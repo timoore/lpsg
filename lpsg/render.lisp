@@ -143,7 +143,8 @@ but that can impact performance."))
                 :documentation "GL format of data in buffer")
    (normalizedp :accessor normalizedp :initarg :normalizedp :initform nil)
    (stride :accessor stride :initarg :stride :initform 0)
-   (offset :accessor offset :initarg :offset :initform 0))
+   (offset :accessor offset :initarg :offset :initform 0
+           :documentation "Offset used when binding a buffer with e.g., %gl:vertex-attrib-pointer."))
   (:documentation "class for formatted data stored somewhere in a buffer"))
 
 (defgeneric upload-fn (buffer-area)
@@ -383,21 +384,6 @@ but that can impact performance."))
       obj)))
 
 (defgeneric upload-buffers (renderer obj))
-
-(defgeneric allocate-buffer-storage (renderer size target usage))
-
-(defmethod allocate-buffer-storage ((renderer renderer) size target usage)
-  (loop
-     for buffer in (buffers renderer)
-     if (eql (usage buffer) usage)
-     do (let ((alloc (allocate-from-buffer buffer size)))
-          (when alloc
-            (return-from allocate-buffer-storage alloc))))
-  (let ((new-buf (make-instance 'gl-buffer :target target :usage usage
-                                :size (max +default-buffer-size+ size))))
-    (push new-buf (buffers renderer))
-    (push new-buf (finalize-queue renderer))
-    (allocate-from-buffer new-buf size)))
 
 (defgeneric draw (renderer)
   (:documentation "Perform all outstanding operations in RENDERER.
