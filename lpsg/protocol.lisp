@@ -13,7 +13,7 @@
       (destructuring-bind (name &key (lambda-list nil lambda-list-p)
                                 (documentation nil documentationp))
           (cdr gf-form)
-        (let ((doc-list (and documentationp `((:documentation (,documentation))))))
+        (let ((doc-list (and documentationp `((:documentation ,documentation)))))
           (when (or (eq gf-option :reader) (eq gf-option :accessor)))
           (let ((ll (if lambda-list-p
                         lambda-list
