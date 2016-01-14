@@ -64,8 +64,12 @@ This function is used in the implementation of SUBMIT-WITH-EFFECT."))
    (finalize-queue :accessor finalize-queue :initform nil)
    ;; alist of (buffer . buffer-areas)
    (upload-queue :accessor upload-queue :initform nil)
-   (render-stages :accessor render-stages :initform nil))
+   (render-stages :accessor render-stages :initform nil)
+   ;; XXX Should be weak
+   (vao-cache :accessor vao-cache :initform (make-hash-table :test 'equal)))
   (:documentation "The class responsible for all rendering."))
+
+(defvar *renderer*)
 
 (defun process-finalize-queue (renderer)
   (loop
@@ -196,6 +200,22 @@ but that can impact performance."))
 (defclass vertex-array-object (gl-object)
   ())
 
+(defun make-attribute-set-key (attr-set)
+  (let ((vertex-keys (mapcar (lambda (binding)
+                               (destructuring-bind (name area index)
+                                   binding
+                                 (declare (ignore name))
+                                 (list (id (buffer area))
+                                       index
+                                       (components area)
+                                       (normalizedp area)
+                                       (stride area)
+                                       (offset area))))
+                             (array-bindings attr-set))))
+    (if (element-binding attr-set)
+        (cons (id (buffer (element-binding attr-set))) vertex-keys)
+        vertex-keys)))
+
 (defmethod gl-finalized-p ((obj attribute-set))
   (slot-boundp obj 'vao))
 
@@ -205,31 +225,36 @@ but that can impact performance."))
      for (nil area) in (array-bindings attribute-set)
      unless (gl-finalized-p area)
      do (gl-finalize area errorp))
-  (when (and (element-binding attribute-set)
-             (not (gl-finalized-p (element-binding attribute-set))))
-    (gl-finalize (element-binding attribute-set) errorp))
-  (let* ((vao-id (gl:gen-vertex-array))
-         (vao (make-instance 'vertex-array-object :id vao-id))
-         (nullptr (cffi:null-pointer))
-         (element-binding (element-binding attribute-set)))
-    (setf (vao attribute-set) vao)
-    (gl:bind-vertex-array vao-id)
-    (loop
-       for (nil area index) in (array-bindings attribute-set)
-       when index
-       do (progn
-            (gl:bind-buffer :array-buffer (id (buffer area)))
-            (gl:enable-vertex-attrib-array index)
-            (gl:vertex-attrib-pointer index
-                                      (components area)
-                                      (buffer-type area)
-                                      (normalizedp area)
-                                      (stride area)
-                                      (cffi:inc-pointer nullptr (offset area)))))
-    (when element-binding
-      (gl:bind-buffer :element-array-buffer (id (buffer element-binding))))
-    (gl:bind-vertex-array 0)
-    attribute-set))
+  (let ((element-binding (element-binding attribute-set)))
+    (when (and element-binding (not (gl-finalized-p (element-binding attribute-set))))
+      (gl-finalize (element-binding attribute-set) errorp))
+    (let* ((attr-set-key (make-attribute-set-key attribute-set)))
+      (multiple-value-bind (vao presentp)
+          (gethash attr-set-key (vao-cache *renderer*))
+        (unless presentp
+          (let* ((vao-id (gl:gen-vertex-array))
+                 (nullptr (cffi:null-pointer)))
+            (setq vao (make-instance 'vertex-array-object :id vao-id))
+            (gl:bind-vertex-array vao-id)
+            (loop
+               for (nil area index) in (array-bindings attribute-set)
+               when index
+               do (progn
+                    (gl:bind-buffer :array-buffer (id (buffer area)))
+                    (gl:enable-vertex-attrib-array index)
+                    (gl:vertex-attrib-pointer index
+                                              (components area)
+                                              (buffer-type area)
+                                              (normalizedp area)
+                                              (stride area)
+                                              (cffi:inc-pointer nullptr (offset area)))))
+            (when element-binding
+              (gl:bind-buffer :element-array-buffer (id (buffer element-binding))))
+            (gl:bind-vertex-array 0)
+            (setf (gethash attr-set-key (vao-cache *renderer*)) vao)))
+        (setf (vao attribute-set) vao))))
+  attribute-set)
+
 
 (defclass graphics-state ()
   ((bindings)
@@ -406,8 +431,6 @@ traverse the render stages and their render queues to render all bundles."))
         (gl:use-program (id new-program)))
         ;; XXX bindings
       (setf (current-state renderer) state))))
-
-(defvar *renderer*)
 
 (defmethod draw ((renderer renderer))
   (let ((*renderer* renderer))
