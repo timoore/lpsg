@@ -47,6 +47,7 @@ available through QuickLisp:
 -   [cl-opengl](<https://common-lisp.net/project/cl-opengl/>) OpenGL interface
 -   [sb-cga](<http://nikodemus.github.io/sb-cga/>) matrix library
 -   [mathkit](<https://github.com/lispgames/mathkit>) graphics math library
+-   [alexandria](<https://common-lisp.net/project/alexandria/>) utility library
 
 ## License<a id="orgheadline5"></a>
 

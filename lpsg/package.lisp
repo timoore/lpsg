@@ -55,11 +55,13 @@
    #:simple-effect
    #:submit-with-effect
    ;; allocators and allocation
-   #:compute-buffer-allocation
+   #:compute-shape-allocation
    #:simple-allocator
+   #:interleaved-attribute-allocator
    #:open-allocator
    #:allocate-target
    #:close-allocator
+   #:with-allocator
    ;; incremental computation
    #:sink-node
    #:sink-node-mixin
