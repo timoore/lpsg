@@ -144,12 +144,21 @@ Will be created automatically, but must be specified for now.")))
            :key (lambda (e) (get-component-size (car e)))
            :initial-value 4))
 
+(defclass interleaved-attribute-allocator ()
+  ((allocator-alist :accessor allocator-alist :initform nil)))
+
+(defgeneric compute-shape-allocation (allocator shape))
+
+
+(defmethod open-allocator ((allocator interleaved-attribute-allocator))
+  (setf (allocator-alist allocator) nil))
+
+(defmethod close-allocator ((allocator interleaved-attribute-allocator))
+  (mapc (lambda (cell) (close-allocator (cdr cell))) (allocator-alist allocator)))
+
 (defvar *open-allocators* nil)
 
-(defun open-interleaved-allocators ()
-  (setq *open-allocators* nil))
-(defun close-interleaved-allocators ()
-  (setq *open-allocators* nil))
+
 ;;; Interleaved allocation
 
 
@@ -168,13 +177,16 @@ Will be created automatically, but must be specified for now.")))
        finally (let ((padded-size (round-up current-size total-alignment)))
                  (return (values offsets padded-size))))))
 
-(defun compute-interleaved-shape-allocation (shape)
+(defmethod compute-shape-allocation ((interleaved-allocator interleaved-attribute-allocator)
+                                     (shape shape))
   (let* ((attr-descriptor (attributes-descriptor shape))
-         (allocator (cdr (assoc attr-descriptor *open-allocators* :test #'equal)))
+         (allocator (cdr (assoc attr-descriptor (allocator-alist interleaved-allocator)
+                                :test #'equal)))
          (drawable (drawable shape)))
     (unless allocator
       (setq allocator (make-instance 'simple-allocator))
-      (setq *open-allocators* (acons attr-descriptor allocator *open-allocators*)))
+      (setf (allocator-alist interleaved-allocator)
+            (acons attr-descriptor allocator (allocator-alist interleaved-allocator))))
     (multiple-value-bind (offsets vertex-size)
         (attribute-offsets attr-descriptor)
       (multiple-value-bind (buffer offset)
@@ -183,13 +195,13 @@ Will be created automatically, but must be specified for now.")))
                            (* vertex-size (data-count (cdar (attributes shape)))) ;XXX
                            4)
         ;; The arrays are allocated as if they start at the beginning of the buffer...
-        (loop
-           for (nil . attr) in (attributes shape)
-           for attr-offset in offsets
-           do (setf (buffer attr) buffer
-                    (offset attr) attr-offset
-                    (buffer-offset attr) (+ offset attr-offset)
-                    (stride attr) vertex-size))
+        (mapc (lambda (cell attr-offset)
+                (let ((attr (cdr cell)))
+                  (setf (buffer attr) buffer
+                        (offset attr) attr-offset
+                        (buffer-offset attr) (+ offset attr-offset)
+                        (stride attr) vertex-size)))
+              (attributes shape) offsets)
         ;; ... and the base-vertex is set to make the indices point to the actual location of the
         ;; data.
         (when (typep drawable 'indexed-drawable)
@@ -203,7 +215,7 @@ Will be created automatically, but must be specified for now.")))
                     (base-vertex drawable) (/ offset vertex-size)))))))))
 
 
-(defmethod compute-buffer-allocation ((shape shape) allocator)
+(defmethod compute-shape-allocation ((allocator simple-allocator) (shape shape))
   (flet ((allocate-attr (attr target)
            (let* ((component-size (get-component-size (buffer-type attr)))
                   (aligned-size (max component-size 4)))

@@ -114,7 +114,7 @@ void main()
 
 (defparameter *allocator* (make-instance 'lpsg:simple-allocator))
 
-(defun make-cube (model-input)
+(defun make-cube (model-input allocator)
   (let ((cube (lpsg:make-cube-shape)))
     (setf (lpsg:input cube 'camera) *camera-input*)
     (setf (lpsg:input cube 'model) model-input)
@@ -122,7 +122,7 @@ void main()
     ;; Allocate storage  in OpenGL buffer objects for the cube's geometry.  Allocate an array
     ;; buffer and element buffer for each cube because we don't support gl:draw-elements-base-index
     ;; yet.
-    (lpsg::compute-interleaved-shape-allocation cube)
+    (lpsg:compute-shape-allocation allocator cube)
     cube))
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:expose-event))
@@ -153,10 +153,10 @@ void main()
       (setf (model-matrix *model-uset2*) (sb-cga:translate* -1.0 0.0 -5.0))
       (setf (light-direction *light-uset*) (compute-light-vector))
       (setf (effect window) effect)
-      (lpsg::open-interleaved-allocators)
-      (let ((cube1 (make-cube *model-input*))
-            (cube2 (make-cube *model-input2*)))
-        (lpsg::close-interleaved-allocators)
+      (let* ((allocator (make-instance 'lpsg:interleaved-attribute-allocator))
+             (cube1 (make-cube *model-input* allocator))
+             (cube2 (make-cube *model-input2* allocator)))
+        (lpsg:close-allocator allocator)
         (lpsg:submit-with-effect cube1 window (effect window))
         (lpsg:submit-with-effect cube2 window (effect window)))))
   (setf (exposed window) t)
