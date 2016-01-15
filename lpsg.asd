@@ -7,11 +7,12 @@
   :version "0.0.0"
   :author "Tim Moore <timoore33@gmail.com>"
   :license "Revised BSD"
-  :depends-on (cl-opengl sb-cga mathkit)
+  :depends-on (cl-opengl sb-cga mathkit alexandria)
   :components
   ((:module "lpsg"
     :components
     ((:file "package")
+     (:file "macros")
      (:file "interface" :depends-on ("package"))
      (:file "protocol" :depends-on ("package"))
      (:file "incremental-comp" :depends-on ("package" "protocol"))
