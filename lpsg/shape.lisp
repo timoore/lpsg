@@ -243,12 +243,8 @@ visiblep - true if shape is visible, false if not
     (when (typep (drawable shape) 'indexed-drawable)
       (allocate-attr (element-array (drawable shape)) :element-array-buffer))))
 
-;;; defmethod is here because it uses methods on SHAPE.
-
-(defmethod submit (assembly renderer)
-  (do-shapes assembly
-    (lambda (shape)
-      (submit-with-effect shape renderer (effect shape)))))
+(defmethod submit ((object shape) renderer)
+  (submit-with-effect object renderer (effect object)))
 
 (defmethod submit-with-effect :after ((shape shape) renderer effect)
   (declare (ignore effect))

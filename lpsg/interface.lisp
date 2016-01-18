@@ -4,7 +4,8 @@
 
 (in-package #:lpsg)
 
-(defgeneric submit (assembly renderer))
+(defgeneric submit (object renderer)
+  (:documentation "Submit OBJECT to RENDERER."))
 
 (defgeneric submit-with-effect (shape renderer effect)
   (:documentation "Submit SHAPE to RENDERER.

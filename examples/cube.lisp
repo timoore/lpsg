@@ -116,8 +116,9 @@ void main()
 
 (defparameter *allocator* (make-instance 'lpsg:simple-allocator))
 
-(defun make-cube (model-input allocator)
+(defun make-cube (model-input allocator effect)
   (let ((cube (lpsg:make-cube-shape)))
+    (setf (lpsg:effect cube) effect)
     (setf (lpsg:input cube 'camera) *camera-input*)
     (setf (lpsg:input cube 'model) model-input)
     (setf (lpsg:input cube 'light) *light-input*)
@@ -159,13 +160,13 @@ void main()
         (loop
            for model-input in (list *model-input* *model-input2*)
            for i from 0
-           for cube = (make-cube model-input allocator)
+           for cube = (make-cube model-input allocator effect)
            for cube-visible = (make-instance 'lpsg:input-value-node :value t)
            do (progn
                 (setf (lpsg:input cube 'lpsg::visiblep) cube-visible)
                 (setf (aref (cubes window) i) cube)
                 (setf (aref (visible-inputs window) i) cube-visible)
-                (lpsg:submit-with-effect cube window (effect window)))))))
+                (lpsg:submit cube window))))))
   (setf (exposed window) t)
   (draw-window window))
 

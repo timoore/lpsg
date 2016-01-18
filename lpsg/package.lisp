@@ -53,6 +53,7 @@
    #:environment
    #:effect
    #:simple-effect
+   #:submit
    #:submit-with-effect
    ;; allocators and allocation
    #:compute-shape-allocation

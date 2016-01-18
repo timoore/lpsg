@@ -13,3 +13,9 @@
      for obj in (children assembly)
      if (typep obj 'shape)
      do (funcall func obj)))
+
+(defmethod submit ((assembly assembly) renderer)
+  (do-shapes assembly
+    (lambda (shape)
+      (submit-with-effect shape renderer (effect shape)))))
+
