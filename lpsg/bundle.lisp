@@ -40,6 +40,8 @@ geometry of the associated SHAPE. "))
 (defmethod draw-bundle ((renderer renderer) bundle)
   (let* ((env (environment bundle))
          (gl-state (gl-state env)))
+    (unless (input-value env 'visiblep)
+      (return-from draw-bundle nil))
     (bind-state renderer gl-state)
     (loop
        with program = (program gl-state)

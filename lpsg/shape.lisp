@@ -93,11 +93,22 @@ Will be created automatically, but must be specified for now.")))
    (usets :accessor usets :initarg :usets :initform nil)
    (drawable :accessor drawable :initarg :drawable)
    (bundles :accessor bundles :initform nil
-            :documentation "The bundles that are created by EFFECT for this shape.")))
+            :documentation "The bundles that are created by EFFECT for this shape."))
+  (:documentation "Class for geometry coupled with an effect.
 
-(defmethod initialize-instance :after ((obj shape) &key)
+When a shape is submitted to the renderer, all its input nodes are copied into the
+environment objects that might be created. This means that a shape's inputs cannot be setf'ed after
+submission.
+
+Inputs
+
+visiblep - true if shape is visible, false if not
+"))
+
+(defmethod initialize-instance :after ((obj shape) &key (visiblep t))
   (unless (slot-boundp obj 'drawable)
-    (setf (drawable obj) (make-instance 'drawable))))
+    (setf (drawable obj) (make-instance 'drawable)))
+  (setf (input obj 'visiblep) visiblep))
 
 (defgeneric attribute (obj attribute-name))
 
@@ -232,12 +243,8 @@ Will be created automatically, but must be specified for now.")))
     (when (typep (drawable shape) 'indexed-drawable)
       (allocate-attr (element-array (drawable shape)) :element-array-buffer))))
 
-;;; defmethod is here because it uses methods on SHAPE.
-
-(defmethod submit (assembly renderer)
-  (do-shapes assembly
-    (lambda (shape)
-      (submit-with-effect shape renderer (effect shape)))))
+(defmethod submit ((object shape) renderer)
+  (submit-with-effect object renderer (effect object)))
 
 (defmethod submit-with-effect :after ((shape shape) renderer effect)
   (declare (ignore effect))

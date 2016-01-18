@@ -58,7 +58,9 @@ void main()
 (defclass cube-window (viewer-window lpsg:renderer)
   ((effect :accessor effect)
    (exposed :accessor exposed :initarg :exposed)
-   (projection-type :accessor projection-type :initarg :projection-type))
+   (projection-type :accessor projection-type :initarg :projection-type)
+   (cubes :accessor cubes :initform (make-array 2))
+   (visible-inputs :accessor visible-inputs :initform (make-array 2)))
   (:default-initargs :exposed nil :projection-type 'orthographic))
 
 ;;; Instances of usets
@@ -114,8 +116,9 @@ void main()
 
 (defparameter *allocator* (make-instance 'lpsg:simple-allocator))
 
-(defun make-cube (model-input allocator)
+(defun make-cube (model-input allocator effect)
   (let ((cube (lpsg:make-cube-shape)))
+    (setf (lpsg:effect cube) effect)
     (setf (lpsg:input cube 'camera) *camera-input*)
     (setf (lpsg:input cube 'model) model-input)
     (setf (lpsg:input cube 'light) *light-input*)
@@ -153,14 +156,17 @@ void main()
       (setf (model-matrix *model-uset2*) (sb-cga:translate* -1.0 0.0 -5.0))
       (setf (light-direction *light-uset*) (compute-light-vector))
       (setf (effect window) effect)
-      (let (cube1
-            cube2)
-        (lpsg:with-allocator (allocator 'lpsg:interleaved-attribute-allocator)
-          (declare (dynamic-extent allocator)) ; Just testing the macro...
-          (setq cube1 (make-cube *model-input* allocator))
-          (setq cube2 (make-cube *model-input2* allocator)))
-        (lpsg:submit-with-effect cube1 window (effect window))
-        (lpsg:submit-with-effect cube2 window (effect window)))))
+      (lpsg:with-allocator (allocator 'lpsg:interleaved-attribute-allocator)
+        (loop
+           for model-input in (list *model-input* *model-input2*)
+           for i from 0
+           for cube = (make-cube model-input allocator effect)
+           for cube-visible = (make-instance 'lpsg:input-value-node :value t)
+           do (progn
+                (setf (lpsg:input cube 'lpsg::visiblep) cube-visible)
+                (setf (aref (cubes window) i) cube)
+                (setf (aref (visible-inputs window) i) cube-visible)
+                (lpsg:submit cube window))))))
   (setf (exposed window) t)
   (draw-window window))
 
@@ -171,16 +177,25 @@ void main()
   (draw-window window))
 
 (defmethod glop:on-event ((window cube-window) (event glop:key-event))
-  (if (and (glop:pressed event) (eq (glop:keysym event) :p))
-      (progn
-        (setf (projection-type window)
-              (if (eq (projection-type window) 'orthographic)
-                  'perspective
-                  'orthographic))
-        (setf (projection-matrix *camera-uset*)
-              (compute-projection-matrix window (projection-type window) 1.0 10.0))
-        (setf (lpsg:value *camera-input*) *camera-uset*)
-        (draw-window window))
+  (if (glop:pressed event)
+      (case (glop:keysym event)
+        (:p
+         (setf (projection-type window)
+               (if (eq (projection-type window) 'orthographic)
+                   'perspective
+                   'orthographic))
+         (setf (projection-matrix *camera-uset*)
+               (compute-projection-matrix window (projection-type window) 1.0 10.0))
+         (setf (lpsg:value *camera-input*) *camera-uset*)
+         (draw-window window))
+        ((:1 :2)
+         (let ((input-node (aref (visible-inputs window) (if (eq (glop:keysym event) :1)
+                                                             0
+                                                             1))))
+           (setf (lpsg:value input-node) (not (lpsg:value input-node))))
+         (draw-window window))
+        (t
+         (call-next-method)))
       (call-next-method)))
 
 (defun cube-example (&rest args)
