@@ -51,6 +51,11 @@ This function is used in the implementation of SUBMIT-WITH-EFFECT."))
 (defmethod add-bundle ((render-queue render-queue) bundle)
   (push bundle (bundles render-queue)))
 
+(defgeneric remove-bundle (render-queue bundle))
+
+(defmethod remove-bundle ((render-queue render-queue) bundle)
+  (setf (bundles render-queue) (delete bundle (bundles render-queue))))
+
 ;;; holds multiple render queues. These will be rendered in order.
 (defclass render-stage (render-queue)
   ((render-queues :accessor render-queues :initarg :render-queues :initform nil)))
@@ -460,9 +465,8 @@ traverse the render stages and their render queues to render all bundles."))
 (defgeneric close-renderer (renderer))
 
 (defmethod close-renderer ((renderer renderer))
-  (loop
-     for bundle in (bundles renderer)
-       do (setf (shape bundle) nil)))
+  ;;; XXX Do what, exactly?
+  )
 
 ;;; size of data elements in VBOs.
 

@@ -55,6 +55,8 @@
    #:simple-effect
    #:submit
    #:submit-with-effect
+   #:retract
+   #:retract-with-effect
    ;; allocators and allocation
    #:compute-shape-allocation
    #:simple-allocator

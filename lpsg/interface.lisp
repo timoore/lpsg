@@ -11,7 +11,15 @@
   (:documentation "Submit SHAPE to RENDERER.
 
 This function creates all the bundles necessary to render SHAPE with the appearance defined by
-EFFECT."))
+EFFECT. Usually the effect is stored in the shape, so this method doesn't need to be called
+directly; (submit shape renderer) is equivalent.")) 
+
+(defgeneric retract (object renderer)
+  (:documentation "Remove OBJECT from consideration by RENDERER. This may deallocate graphics API
+resources."))
+
+(defgeneric retract-with-effect (shape renderer effect)
+  (:documentation "Called by RETRACT with a shape argument."))
 
 (defgeneric add-object (parent child))
 
