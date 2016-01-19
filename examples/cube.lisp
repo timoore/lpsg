@@ -163,7 +163,7 @@ void main()
            for cube = (make-cube model-input allocator effect)
            for cube-visible = (make-instance 'lpsg:input-value-node :value t)
            do (progn
-                (setf (lpsg:input cube 'lpsg::visiblep) cube-visible)
+                (setf (lpsg:input cube 'lpsg:visiblep) cube-visible)
                 (setf (aref (cubes window) i) cube)
                 (setf (aref (visible-inputs window) i) cube-visible)
                 (lpsg:submit cube window))))))

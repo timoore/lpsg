@@ -77,6 +77,8 @@
    #:input-value-node
    #:input
    #:input-value
+   ;; inputs
+   #:visiblep
    ;; utilities
    #:make-cube-shape
    ))
