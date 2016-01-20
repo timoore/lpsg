@@ -71,6 +71,9 @@ OpenGL object"))
   (declare (ignore obj errorp)
   nil))
 
+(defmethod gl-finalize :after (object target &optional errorp)
+  (push object (cons (gl-proxy object))  (gl-objects *renderer*)))
+
 (defmethod gl-finalized-p (obj)
   (declare (ignore obj))
   t)
@@ -107,7 +110,9 @@ This function is used in the implementation of SUBMIT-WITH-EFFECT."))
    (upload-queue :accessor upload-queue :initform nil)
    (render-stages :accessor render-stages :initform nil)
    ;; XXX Should be weak
-   (vao-cache :accessor vao-cache :initform (make-hash-table :test 'equal)))
+   (vao-cache :accessor vao-cache :initform (make-hash-table :test 'equal))
+   (gl-objects :accessor gl-objects :initform nil :documentation "list of all OpenGL objects
+allocated by calls in LPSG." ))
   (:documentation "The class responsible for all rendering."))
 
 (defvar *renderer*)
@@ -148,6 +153,7 @@ but that can impact performance."))
 ;;; XXX make this gl-finalize
 (defgeneric gl-finalize-buffer (buffer target &optional errorp)
   (:documentation "Finalize BUFFER while bound to a TARGET."))
+
 
 (defmethod gl-finalize-buffer ((buffer gl-buffer) target &optional errorp)
   (declare (ignorable errorp))          ; TODO: handle errorp
