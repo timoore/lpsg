@@ -23,6 +23,42 @@
    (log :reader render-error-log :initarg :error-log :initform nil))
   (:report report-render-error))
 
+(define-protocol-class gl-object ()
+  ((:accessor id :documentation "The OpenGL ID of an object.")
+   (:accessor gl-proxy :documentation "Object for accessing the associated
+OpenGL object"))
+  (:documentation "Class representing any OpenGL object."))
+
+(defclass %gl-object ()
+  ((%id :accessor %id :initform 0)))
+
+(defclass gl-object-mixin ()
+  ((gl-proxy :accessor gl-proxy :initarg :gl-proxy)))
+
+(defmethod initialize-instance :after ((obj gl-object-mixin) &key (id 0 idp))
+  (when idp
+    (setf (id obj) id)))
+
+(defmethod id ((obj gl-object-mixin))
+  (%id (gl-proxy obj)))
+
+(defmethod (setf id) (val (obj gl-object-mixin))
+  (setf (%id (gl-proxy obj)) val))
+
+(defmacro define-gl-object (name super-classes slots &rest options)
+  (let* ((sym-name (symbol-name name))
+         (proxy-name (intern (concatenate 'string "%" sym-name)))
+         (init-mixin-name (intern (concatenate 'string
+                                               "%"
+                                               sym-name
+                                               (symbol-name '#:-proxy-init-mixin)))))
+    `(progn
+       (defclass ,proxy-name (%gl-object) ())
+       (defclass ,init-mixin-name () () (:default-initargs :gl-proxy (make-instance ',proxy-name)))
+       (defclass ,name (,@super-classes gl-object ,init-mixin-name gl-object-mixin)
+         ,slots
+         ,@options))))
+
 (defgeneric gl-finalize (obj &optional errorp)
   (:documentation "Allocate any OpenGL resources needed for OBJ and perform any
   tasks needed to use it (e.g. link a shader program)"))
@@ -82,11 +118,6 @@ This function is used in the implementation of SUBMIT-WITH-EFFECT."))
      if (not (gl-finalized-p obj))
      do (gl-finalize obj)))
 
-(defclass gl-object ()
-  ((id :accessor id :initarg :id :initform 0
-       :documentation "ID from OpenGL of object"))
-  (:documentation "Abstract class for objects allocated in OpenGL."))
-
 (defgeneric gl-valid-p (obj))
 
 (defmethod gl-valid-p ((obj gl-object))
@@ -95,7 +126,7 @@ This function is used in the implementation of SUBMIT-WITH-EFFECT."))
 (defconstant +default-buffer-size+ 104856
   "The default size of a buffer object allocated with GL-BUFFER.")
 
-(defclass gl-buffer (gl-object)
+(define-gl-object gl-buffer ()
   ((size :accessor size :initarg :size
          :documentation "The size of the buffer object in OpenGL. Note: this value is mutable until
   GL-FINALIZE is called on the GL-BUFFER object.")
@@ -202,7 +233,7 @@ but that can impact performance."))
   (:documentation "A collection of buffer mappings (buffer + offset) bound to specific attributes,
   along with an associated VAO."))
 
-(defclass vertex-array-object (gl-object)
+(define-gl-object vertex-array-object ()
   ())
 
 (defun make-attribute-set-key (attr-set)
@@ -287,7 +318,7 @@ but that can impact performance."))
 ;;; strategies might be different. Should we keep a cache of objects for a set
 ;;; of uset strategies?
 
-(defclass shader (shader-source gl-object)
+(define-gl-object shader (shader-source)
   ((status :accessor status :initarg :status)
    (compiler-log :accessor compiler-log :initarg :compiler-log :initform nil))
   (:documentation "The LPSG object that holds the source code for an OpenGL shader, information
@@ -314,7 +345,7 @@ but that can impact performance."))
                      :format-control "The shader ~S has compile errors.")))
           status))))
 
-(defclass program (gl-object)
+(define-gl-object program ()
   ((shaders :accessor shaders :initarg :shaders :initform nil)
    (compiled-shaders :accessor compiled-shaders :initform nil)
    ;; (name location type size)
