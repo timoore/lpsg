@@ -20,8 +20,7 @@ geometry of the associated SHAPE. "))
 (defmethod gl-finalize ((obj render-bundle) &optional (errorp t))
   (let* ((env (environment obj))
          (gl-state (gl-state env)))
-    (unless (gl-finalized-p env)
-      (gl-finalize env errorp))
+    (gl-finalize env errorp)
     (let* ((program (program gl-state))
            (attrs (vertex-attribs program))
            (attribute-set (attribute-set obj)))
@@ -33,8 +32,8 @@ geometry of the associated SHAPE. "))
               ;; XXX Test format of vertex attribute
               ;; set attribute location from program
               (setf (caddr binding) (cadr vertex-attrib))))
-      (unless (gl-finalized-p attribute-set)
-        (gl-finalize attribute-set errorp)))))
+      (gl-finalize attribute-set errorp)
+      t)))
 
 
 (defmethod draw-bundle ((renderer renderer) bundle)

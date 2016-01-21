@@ -23,6 +23,8 @@
    (log :reader render-error-log :initarg :error-log :initform nil))
   (:report report-render-error))
 
+(defvar *renderer*)
+
 (define-protocol-class gl-object ()
   ((:accessor id :documentation "The OpenGL ID of an object.")
    (:accessor gl-proxy :documentation "Object for accessing the associated
@@ -61,18 +63,21 @@ OpenGL object"))
 
 (defgeneric gl-finalize (obj &optional errorp)
   (:documentation "Allocate any OpenGL resources needed for OBJ and perform any
-  tasks needed to use it (e.g. link a shader program)"))
+tasks needed to use it (e.g. link a shader program). Returns T if finalize actions were
+performed, NIL otherwise."))
 
 (defgeneric gl-finalized-p (obj))
 
-;;; Defaults: most objects won't need GL finalization.
+(defmethod gl-finalize :around ((obj t) &optional errorp)
+  (if (gl-finalized-p obj)
+      nil
+      (call-next-method)))
 
-(defmethod gl-finalize (obj &optional errorp)
-  (declare (ignore obj errorp)
-  nil))
-
-(defmethod gl-finalize :after (object target &optional errorp)
-  (push object (cons (gl-proxy object))  (gl-objects *renderer*)))
+(defmethod gl-finalize :around ((object gl-object) &optional errorp)
+  (let ((result (call-next-method)))
+    (when result
+      (push (cons (tg:make-weak-pointer object) (gl-proxy object)) (gl-objects *renderer*)))
+    result))
 
 (defmethod gl-finalized-p (obj)
   (declare (ignore obj))
@@ -114,8 +119,6 @@ This function is used in the implementation of SUBMIT-WITH-EFFECT."))
    (gl-objects :accessor gl-objects :initform nil :documentation "list of all OpenGL objects
 allocated by calls in LPSG." ))
   (:documentation "The class responsible for all rendering."))
-
-(defvar *renderer*)
 
 (defun process-finalize-queue (renderer)
   (loop
@@ -160,7 +163,8 @@ but that can impact performance."))
   (let ((id (car (gl:gen-buffers 1))))
     (setf (id buffer) id)
     (gl:bind-buffer target id)
-    (%gl:buffer-data target (size buffer) (cffi:null-pointer) (usage buffer))))
+    (%gl:buffer-data target (size buffer) (cffi:null-pointer) (usage buffer)))
+  t)
 
 (defclass drawable ()
   ((mode :accessor mode :initarg :mode
@@ -334,22 +338,20 @@ but that can impact performance."))
   (slot-boundp obj 'status))
 
 (defmethod gl-finalize ((obj shader) &optional (errorp t))
-  (if (gl-finalized-p obj)
-      (status obj)
-      (let* ((src (source obj))
-             (id (gl:create-shader (shader-type obj))))
-        (setf (id obj) id)
-        ;; XXX #defines for usets; comes from program
-        (gl:shader-source id src)
-        (gl:compile-shader id)
-        (let ((status (gl:get-shader id :compile-status)))
-          (setf (status obj) status)
-          (unless status
-            (setf (compiler-log obj) (gl:get-shader-info-log id))
-            (when errorp
-              (error 'render-error :gl-object obj :error-log (compiler-log obj)
-                     :format-control "The shader ~S has compile errors.")))
-          status))))
+  (let* ((src (source obj))
+         (id (gl:create-shader (shader-type obj))))
+    (setf (id obj) id)
+    ;; XXX #defines for usets; comes from program
+    (gl:shader-source id src)
+    (gl:compile-shader id)
+    (let ((status (gl:get-shader id :compile-status)))
+      (setf (status obj) status)
+      (unless status
+        (setf (compiler-log obj) (gl:get-shader-info-log id))
+        (when errorp
+          (error 'render-error :gl-object obj :error-log (compiler-log obj)
+                 :format-control "The shader ~S has compile errors.")))))
+  t)
 
 (define-gl-object program ()
   ((shaders :accessor shaders :initarg :shaders :initform nil)
@@ -411,13 +413,9 @@ but that can impact performance."))
           obj
         (loop
            for shader in shaders
-           when (null (gl-finalize shader))
-           do (err 'render-error
-                   :gl-object shader
-                   :format-control "The shader ~S is not finalized."))
-        (loop
-           for shader in shaders
-           do (gl:attach-shader id (id shader))))
+           do (progn
+                (gl-finalize shader errorp)
+                (gl:attach-shader id (id shader)))))
       (gl:link-program id)
       (unless (setf (status obj) (gl:get-program id :link-status))
         (setf (link-log obj) (gl:get-program-info-log id))
@@ -448,7 +446,7 @@ but that can impact performance."))
                         (list name location type size)))
          into attributes
          finally (setf (vertex-attribs obj) attributes))
-      obj)))
+      t)))
 
 (defgeneric upload-buffers (renderer obj))
 

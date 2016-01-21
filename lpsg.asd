@@ -7,7 +7,7 @@
   :version "0.0.0"
   :author "Tim Moore <timoore33@gmail.com>"
   :license "Revised BSD"
-  :depends-on (cl-opengl sb-cga mathkit alexandria)
+  :depends-on (cl-opengl sb-cga mathkit alexandria trivial-garbage)
   :components
   ((:module "lpsg"
     :components
