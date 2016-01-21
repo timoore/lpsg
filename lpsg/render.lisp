@@ -66,7 +66,11 @@ OpenGL object"))
 tasks needed to use it (e.g. link a shader program). Returns T if finalize actions were
 performed, NIL otherwise."))
 
-(defgeneric gl-finalized-p (obj))
+(defgeneric gl-finalized-p (obj)
+  (:documentation "Return T if object has already been finalized."))
+
+(defgeneric gl-destroy (obj)
+  (:documentation "Deallocate an OpenGL object."))
 
 (defmethod gl-finalize :around ((obj t) &optional errorp)
   (if (gl-finalized-p obj)
@@ -107,7 +111,6 @@ This function is used in the implementation of SUBMIT-WITH-EFFECT."))
 (defclass renderer ()
   ((buffers :accessor buffers :initform nil)
    (bundles :accessor bundles :initform nil)
-   (new-bundles :accessor new-bundles :initform nil)
    (current-state :accessor current-state :initform nil)
    (predraw-queue :accessor predraw-queue :initform nil)
    (finalize-queue :accessor finalize-queue :initform nil)
@@ -116,7 +119,7 @@ This function is used in the implementation of SUBMIT-WITH-EFFECT."))
    (render-stages :accessor render-stages :initform nil)
    ;; XXX Should be weak
    (vao-cache :accessor vao-cache :initform (make-hash-table :test 'equal))
-   (gl-objects :accessor gl-objects :initform nil :documentation "list of all OpenGL objects
+   (gl-objects :accessor gl-objects :initform nil :documentation "List of all OpenGL objects
 allocated by calls in LPSG." ))
   (:documentation "The class responsible for all rendering."))
 
@@ -153,18 +156,18 @@ but that can impact performance."))
 (defmethod gl-finalized-p ((obj gl-buffer))
   (gl-valid-p obj))
 
-;;; XXX make this gl-finalize
-(defgeneric gl-finalize-buffer (buffer target &optional errorp)
-  (:documentation "Finalize BUFFER while bound to a TARGET."))
-
-
-(defmethod gl-finalize-buffer ((buffer gl-buffer) target &optional errorp)
+(defmethod gl-finalize ((buffer gl-buffer) &optional errorp)
   (declare (ignorable errorp))          ; TODO: handle errorp
-  (let ((id (car (gl:gen-buffers 1))))
+  (let ((target (target buffer))
+        (id (car (gl:gen-buffers 1))))
     (setf (id buffer) id)
     (gl:bind-buffer target id)
     (%gl:buffer-data target (size buffer) (cffi:null-pointer) (usage buffer)))
   t)
+
+(defmethod gl-destroy ((obj %gl-buffer))
+  (gl:delete-buffers (list (%id obj)))
+  (setf (%id obj) 0))
 
 (defclass drawable ()
   ((mode :accessor mode :initarg :mode
@@ -246,6 +249,18 @@ but that can impact performance."))
 (define-gl-object vertex-array-object ()
   ())
 
+(defmethod gl-finalized-p ((obj vertex-array-object))
+  (gl-valid-p obj))
+
+(defmethod gl-finalize ((obj vertex-array-object) &optional errorp)
+  (declare (ignore errorp))
+  (setf (id obj) (gl:gen-vertex-array))
+  t)
+
+(defmethod gl-destroy ((obj %vertex-array-object))
+  (gl:delete-vertex-arrays (list (%id obj)))
+  (setf (%id obj) 0))
+
 (defun make-attribute-set-key (attr-set)
   (let ((vertex-keys (mapcar (lambda (binding)
                                (destructuring-bind (name area index)
@@ -278,9 +293,10 @@ but that can impact performance."))
       (multiple-value-bind (vao presentp)
           (gethash attr-set-key (vao-cache *renderer*))
         (unless presentp
-          (let* ((vao-id (gl:gen-vertex-array))
+          (setf vao (make-instance 'vertex-array-object))
+          (gl-finalize vao)
+          (let* ((vao-id (id vao))
                  (nullptr (cffi:null-pointer)))
-            (setq vao (make-instance 'vertex-array-object :id vao-id))
             (gl:bind-vertex-array vao-id)
             (loop
                for (nil area index) in (array-bindings attribute-set)
@@ -352,6 +368,10 @@ but that can impact performance."))
           (error 'render-error :gl-object obj :error-log (compiler-log obj)
                  :format-control "The shader ~S has compile errors.")))))
   t)
+
+(defmethod gl-destroy ((obj %shader))
+  (gl:delete-shader (%id obj))
+  (setf (%id obj) 0))
 
 (define-gl-object program ()
   ((shaders :accessor shaders :initarg :shaders :initform nil)
@@ -448,6 +468,10 @@ but that can impact performance."))
          finally (setf (vertex-attribs obj) attributes))
       t)))
 
+(defmethod gl-destroy ((obj %program))
+  (gl:delete-program (%id obj))
+  (setf (%id obj) 0))
+
 (defgeneric upload-buffers (renderer obj))
 
 (defgeneric draw (renderer)
@@ -472,8 +496,11 @@ traverse the render stages and their render queues to render all bundles."))
         ;; XXX bindings
       (setf (current-state renderer) state))))
 
+(defgeneric process-gl-objects (renderer))
+
 (defmethod draw ((renderer renderer))
   (let ((*renderer* renderer))
+    (process-gl-objects renderer)
     (loop
        for fn in (predraw-queue renderer)
        do (funcall fn renderer))
@@ -496,6 +523,22 @@ traverse the render stages and their render queues to render all bundles."))
            do (loop
                  for bundle in (bundles rq)
                  do (draw-bundle renderer bundle)))))
+
+(defmethod process-gl-objects ((renderer renderer))
+  (unless (gl-objects renderer)
+    (return-from process-gl-objects nil))
+  (let ((prev nil))
+    (loop
+       for current = (gl-objects renderer) then (cdr current)
+       while current
+       for pair = (car current)
+       do (if (tg:weak-pointer-value (car pair))
+              (setq prev current)
+              (progn
+                (gl-destroy (cdr pair))
+                (if prev
+                    (setf (cdr prev) (cdr current))
+                    (setf (gl-objects renderer) (cdr current))))))))
 
 (defgeneric close-renderer (renderer))
 

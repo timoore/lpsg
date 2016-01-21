@@ -216,6 +216,9 @@ void main()
         (:r
          (retract-cubes window)
          (draw-window window))
+        (:g
+         (tg:gc :full t)
+         (draw-window window))
         (t
          (call-next-method)))
       (call-next-method)))
