@@ -66,3 +66,11 @@ with uset parameters, to a shape."))
       (let ((rq (car (render-queues (car (render-stages renderer))))))
         (add-bundle rq bundle)))))
 
+(defmethod retract-with-effect (shape renderer (effect simple-effect))
+  (loop
+     for stage in (render-stages renderer)
+     do (loop
+           for queue in (render-queues stage)
+           do (loop
+                 for bundle in (bundles shape)
+                 do (remove-bundle queue bundle)))))

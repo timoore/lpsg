@@ -23,17 +23,65 @@
    (log :reader render-error-log :initarg :error-log :initform nil))
   (:report report-render-error))
 
+(defvar *renderer*)
+
+(define-protocol-class gl-object ()
+  ((:accessor id :documentation "The OpenGL ID of an object.")
+   (:accessor gl-proxy :documentation "Object for accessing the associated
+OpenGL object"))
+  (:documentation "Class representing any OpenGL object."))
+
+(defclass %gl-object ()
+  ((%id :accessor %id :initform 0)))
+
+(defclass gl-object-mixin ()
+  ((gl-proxy :accessor gl-proxy :initarg :gl-proxy)))
+
+(defmethod initialize-instance :after ((obj gl-object-mixin) &key (id 0 idp))
+  (when idp
+    (setf (id obj) id)))
+
+(defmethod id ((obj gl-object-mixin))
+  (%id (gl-proxy obj)))
+
+(defmethod (setf id) (val (obj gl-object-mixin))
+  (setf (%id (gl-proxy obj)) val))
+
+(defmacro define-gl-object (name super-classes slots &rest options)
+  (let* ((sym-name (symbol-name name))
+         (proxy-name (intern (concatenate 'string "%" sym-name)))
+         (init-mixin-name (intern (concatenate 'string
+                                               "%"
+                                               sym-name
+                                               (symbol-name '#:-proxy-init-mixin)))))
+    `(progn
+       (defclass ,proxy-name (%gl-object) ())
+       (defclass ,init-mixin-name () () (:default-initargs :gl-proxy (make-instance ',proxy-name)))
+       (defclass ,name (,@super-classes gl-object ,init-mixin-name gl-object-mixin)
+         ,slots
+         ,@options))))
+
 (defgeneric gl-finalize (obj &optional errorp)
   (:documentation "Allocate any OpenGL resources needed for OBJ and perform any
-  tasks needed to use it (e.g. link a shader program)"))
+tasks needed to use it (e.g. link a shader program). Returns T if finalize actions were
+performed, NIL otherwise."))
 
-(defgeneric gl-finalized-p (obj))
+(defgeneric gl-finalized-p (obj)
+  (:documentation "Return T if object has already been finalized."))
 
-;;; Defaults: most objects won't need GL finalization.
+(defgeneric gl-destroy (obj)
+  (:documentation "Deallocate an OpenGL object."))
 
-(defmethod gl-finalize (obj &optional errorp)
-  (declare (ignore obj errorp)
-  nil))
+(defmethod gl-finalize :around ((obj t) &optional errorp)
+  (if (gl-finalized-p obj)
+      nil
+      (call-next-method)))
+
+(defmethod gl-finalize :around ((object gl-object) &optional errorp)
+  (let ((result (call-next-method)))
+    (when result
+      (push (cons (tg:make-weak-pointer object) (gl-proxy object)) (gl-objects *renderer*)))
+    result))
 
 (defmethod gl-finalized-p (obj)
   (declare (ignore obj))
@@ -51,6 +99,11 @@ This function is used in the implementation of SUBMIT-WITH-EFFECT."))
 (defmethod add-bundle ((render-queue render-queue) bundle)
   (push bundle (bundles render-queue)))
 
+(defgeneric remove-bundle (render-queue bundle))
+
+(defmethod remove-bundle ((render-queue render-queue) bundle)
+  (setf (bundles render-queue) (delete bundle (bundles render-queue))))
+
 ;;; holds multiple render queues. These will be rendered in order.
 (defclass render-stage (render-queue)
   ((render-queues :accessor render-queues :initarg :render-queues :initform nil)))
@@ -58,7 +111,6 @@ This function is used in the implementation of SUBMIT-WITH-EFFECT."))
 (defclass renderer ()
   ((buffers :accessor buffers :initform nil)
    (bundles :accessor bundles :initform nil)
-   (new-bundles :accessor new-bundles :initform nil)
    (current-state :accessor current-state :initform nil)
    (predraw-queue :accessor predraw-queue :initform nil)
    (finalize-queue :accessor finalize-queue :initform nil)
@@ -66,21 +118,16 @@ This function is used in the implementation of SUBMIT-WITH-EFFECT."))
    (upload-queue :accessor upload-queue :initform nil)
    (render-stages :accessor render-stages :initform nil)
    ;; XXX Should be weak
-   (vao-cache :accessor vao-cache :initform (make-hash-table :test 'equal)))
+   (vao-cache :accessor vao-cache :initform (make-hash-table :test 'equal))
+   (gl-objects :accessor gl-objects :initform nil :documentation "List of all OpenGL objects
+allocated by calls in LPSG." ))
   (:documentation "The class responsible for all rendering."))
-
-(defvar *renderer*)
 
 (defun process-finalize-queue (renderer)
   (loop
      for obj in (finalize-queue renderer)
      if (not (gl-finalized-p obj))
      do (gl-finalize obj)))
-
-(defclass gl-object ()
-  ((id :accessor id :initarg :id :initform 0
-       :documentation "ID from OpenGL of object"))
-  (:documentation "Abstract class for objects allocated in OpenGL."))
 
 (defgeneric gl-valid-p (obj))
 
@@ -90,7 +137,7 @@ This function is used in the implementation of SUBMIT-WITH-EFFECT."))
 (defconstant +default-buffer-size+ 104856
   "The default size of a buffer object allocated with GL-BUFFER.")
 
-(defclass gl-buffer (gl-object)
+(define-gl-object gl-buffer ()
   ((size :accessor size :initarg :size
          :documentation "The size of the buffer object in OpenGL. Note: this value is mutable until
   GL-FINALIZE is called on the GL-BUFFER object.")
@@ -109,16 +156,18 @@ but that can impact performance."))
 (defmethod gl-finalized-p ((obj gl-buffer))
   (gl-valid-p obj))
 
-;;; XXX make this gl-finalize
-(defgeneric gl-finalize-buffer (buffer target &optional errorp)
-  (:documentation "Finalize BUFFER while bound to a TARGET."))
-
-(defmethod gl-finalize-buffer ((buffer gl-buffer) target &optional errorp)
+(defmethod gl-finalize ((buffer gl-buffer) &optional errorp)
   (declare (ignorable errorp))          ; TODO: handle errorp
-  (let ((id (car (gl:gen-buffers 1))))
+  (let ((target (target buffer))
+        (id (car (gl:gen-buffers 1))))
     (setf (id buffer) id)
     (gl:bind-buffer target id)
-    (%gl:buffer-data target (size buffer) (cffi:null-pointer) (usage buffer))))
+    (%gl:buffer-data target (size buffer) (cffi:null-pointer) (usage buffer)))
+  t)
+
+(defmethod gl-destroy ((obj %gl-buffer))
+  (gl:delete-buffers (list (%id obj)))
+  (setf (%id obj) 0))
 
 (defclass drawable ()
   ((mode :accessor mode :initarg :mode
@@ -197,8 +246,20 @@ but that can impact performance."))
   (:documentation "A collection of buffer mappings (buffer + offset) bound to specific attributes,
   along with an associated VAO."))
 
-(defclass vertex-array-object (gl-object)
+(define-gl-object vertex-array-object ()
   ())
+
+(defmethod gl-finalized-p ((obj vertex-array-object))
+  (gl-valid-p obj))
+
+(defmethod gl-finalize ((obj vertex-array-object) &optional errorp)
+  (declare (ignore errorp))
+  (setf (id obj) (gl:gen-vertex-array))
+  t)
+
+(defmethod gl-destroy ((obj %vertex-array-object))
+  (gl:delete-vertex-arrays (list (%id obj)))
+  (setf (%id obj) 0))
 
 (defun make-attribute-set-key (attr-set)
   (let ((vertex-keys (mapcar (lambda (binding)
@@ -232,9 +293,10 @@ but that can impact performance."))
       (multiple-value-bind (vao presentp)
           (gethash attr-set-key (vao-cache *renderer*))
         (unless presentp
-          (let* ((vao-id (gl:gen-vertex-array))
+          (setf vao (make-instance 'vertex-array-object))
+          (gl-finalize vao)
+          (let* ((vao-id (id vao))
                  (nullptr (cffi:null-pointer)))
-            (setq vao (make-instance 'vertex-array-object :id vao-id))
             (gl:bind-vertex-array vao-id)
             (loop
                for (nil area index) in (array-bindings attribute-set)
@@ -282,7 +344,7 @@ but that can impact performance."))
 ;;; strategies might be different. Should we keep a cache of objects for a set
 ;;; of uset strategies?
 
-(defclass shader (shader-source gl-object)
+(define-gl-object shader (shader-source)
   ((status :accessor status :initarg :status)
    (compiler-log :accessor compiler-log :initarg :compiler-log :initform nil))
   (:documentation "The LPSG object that holds the source code for an OpenGL shader, information
@@ -292,24 +354,26 @@ but that can impact performance."))
   (slot-boundp obj 'status))
 
 (defmethod gl-finalize ((obj shader) &optional (errorp t))
-  (if (gl-finalized-p obj)
-      (status obj)
-      (let* ((src (source obj))
-             (id (gl:create-shader (shader-type obj))))
-        (setf (id obj) id)
-        ;; XXX #defines for usets; comes from program
-        (gl:shader-source id src)
-        (gl:compile-shader id)
-        (let ((status (gl:get-shader id :compile-status)))
-          (setf (status obj) status)
-          (unless status
-            (setf (compiler-log obj) (gl:get-shader-info-log id))
-            (when errorp
-              (error 'render-error :gl-object obj :error-log (compiler-log obj)
-                     :format-control "The shader ~S has compile errors.")))
-          status))))
+  (let* ((src (source obj))
+         (id (gl:create-shader (shader-type obj))))
+    (setf (id obj) id)
+    ;; XXX #defines for usets; comes from program
+    (gl:shader-source id src)
+    (gl:compile-shader id)
+    (let ((status (gl:get-shader id :compile-status)))
+      (setf (status obj) status)
+      (unless status
+        (setf (compiler-log obj) (gl:get-shader-info-log id))
+        (when errorp
+          (error 'render-error :gl-object obj :error-log (compiler-log obj)
+                 :format-control "The shader ~S has compile errors.")))))
+  t)
 
-(defclass program (gl-object)
+(defmethod gl-destroy ((obj %shader))
+  (gl:delete-shader (%id obj))
+  (setf (%id obj) 0))
+
+(define-gl-object program ()
   ((shaders :accessor shaders :initarg :shaders :initform nil)
    (compiled-shaders :accessor compiled-shaders :initform nil)
    ;; (name location type size)
@@ -369,13 +433,9 @@ but that can impact performance."))
           obj
         (loop
            for shader in shaders
-           when (null (gl-finalize shader))
-           do (err 'render-error
-                   :gl-object shader
-                   :format-control "The shader ~S is not finalized."))
-        (loop
-           for shader in shaders
-           do (gl:attach-shader id (id shader))))
+           do (progn
+                (gl-finalize shader errorp)
+                (gl:attach-shader id (id shader)))))
       (gl:link-program id)
       (unless (setf (status obj) (gl:get-program id :link-status))
         (setf (link-log obj) (gl:get-program-info-log id))
@@ -406,7 +466,11 @@ but that can impact performance."))
                         (list name location type size)))
          into attributes
          finally (setf (vertex-attribs obj) attributes))
-      obj)))
+      t)))
+
+(defmethod gl-destroy ((obj %program))
+  (gl:delete-program (%id obj))
+  (setf (%id obj) 0))
 
 (defgeneric upload-buffers (renderer obj))
 
@@ -432,8 +496,11 @@ traverse the render stages and their render queues to render all bundles."))
         ;; XXX bindings
       (setf (current-state renderer) state))))
 
+(defgeneric process-gl-objects (renderer))
+
 (defmethod draw ((renderer renderer))
   (let ((*renderer* renderer))
+    (process-gl-objects renderer)
     (loop
        for fn in (predraw-queue renderer)
        do (funcall fn renderer))
@@ -457,12 +524,27 @@ traverse the render stages and their render queues to render all bundles."))
                  for bundle in (bundles rq)
                  do (draw-bundle renderer bundle)))))
 
+(defmethod process-gl-objects ((renderer renderer))
+  (unless (gl-objects renderer)
+    (return-from process-gl-objects nil))
+  (let ((prev nil))
+    (loop
+       for current = (gl-objects renderer) then (cdr current)
+       while current
+       for pair = (car current)
+       do (if (tg:weak-pointer-value (car pair))
+              (setq prev current)
+              (progn
+                (gl-destroy (cdr pair))
+                (if prev
+                    (setf (cdr prev) (cdr current))
+                    (setf (gl-objects renderer) (cdr current))))))))
+
 (defgeneric close-renderer (renderer))
 
 (defmethod close-renderer ((renderer renderer))
-  (loop
-     for bundle in (bundles renderer)
-       do (setf (shape bundle) nil)))
+  ;;; XXX Do what, exactly?
+  )
 
 ;;; size of data elements in VBOs.
 

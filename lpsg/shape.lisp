@@ -243,8 +243,14 @@ visiblep - true if shape is visible, false if not
     (when (typep (drawable shape) 'indexed-drawable)
       (allocate-attr (element-array (drawable shape)) :element-array-buffer))))
 
-(defmethod submit ((object shape) renderer)
-  (submit-with-effect object renderer (effect object)))
+(defmethod submit ((shape shape) renderer)
+  "Submit SHAPE to RENDERER.
+
+Calls (submit-with-effect SHAPE RENDERER (effect SHAPE))"
+  (submit-with-effect shape renderer (effect shape)))
+
+(defmethod retract ((shape shape) renderer)
+  (retract-with-effect shape renderer (effect shape)))
 
 (defmethod submit-with-effect :after ((shape shape) renderer effect)
   (declare (ignore effect))
@@ -257,6 +263,9 @@ visiblep - true if shape is visible, false if not
             (add-to-upload-queue renderer vertex-attrib))))
   (when (typep (drawable shape) 'indexed-drawable)
     (add-to-upload-queue renderer (element-array (drawable shape)))))
+
+(defmethod retract ((shape shape) renderer)
+  (retract-with-effect shape renderer (effect shape)))
 
 ;;; incremental computation stuff
 ;;; The "value" of a shape node is a list of (uset-name . uset-value).

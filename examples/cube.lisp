@@ -59,8 +59,8 @@ void main()
   ((effect :accessor effect)
    (exposed :accessor exposed :initarg :exposed)
    (projection-type :accessor projection-type :initarg :projection-type)
-   (cubes :accessor cubes :initform (make-array 2))
-   (visible-inputs :accessor visible-inputs :initform (make-array 2)))
+   (cubes :accessor cubes :initform nil)
+   (visible-inputs :accessor visible-inputs :initform nil))
   (:default-initargs :exposed nil :projection-type 'orthographic))
 
 ;;; Instances of usets
@@ -128,6 +128,32 @@ void main()
     (lpsg:compute-shape-allocation allocator cube)
     cube))
 
+(defun submit-cubes (window)
+  (when (cubes window)
+    (return-from submit-cubes nil))
+  (setf (cubes window) (make-array 2)
+        (visible-inputs window) (make-array 2))
+  (lpsg:with-allocator (allocator 'lpsg:interleaved-attribute-allocator)
+    (loop
+       for model-input in (list *model-input* *model-input2*)
+       for i from 0
+       for cube = (make-cube model-input allocator (effect window))
+       for cube-visible = (make-instance 'lpsg:input-value-node :value t)
+       do (progn
+            (setf (lpsg:input cube 'lpsg:visiblep) cube-visible)
+            (setf (aref (cubes window) i) cube)
+            (setf (aref (visible-inputs window) i) cube-visible)
+            (lpsg:submit cube window)))))
+
+(defun retract-cubes (window)
+  (unless (cubes window)
+    (return-from retract-cubes nil))
+  (loop
+     for cube across (cubes window)
+     do (lpsg:retract cube window))
+  (setf (cubes window) nil
+        (visible-inputs window) nil))
+
 (defmethod glop:on-event :after ((window cube-window) (event glop:expose-event))
   (unless (exposed window)
     ;; Create a cube with correct face normals.
@@ -156,17 +182,7 @@ void main()
       (setf (model-matrix *model-uset2*) (sb-cga:translate* -1.0 0.0 -5.0))
       (setf (light-direction *light-uset*) (compute-light-vector))
       (setf (effect window) effect)
-      (lpsg:with-allocator (allocator 'lpsg:interleaved-attribute-allocator)
-        (loop
-           for model-input in (list *model-input* *model-input2*)
-           for i from 0
-           for cube = (make-cube model-input allocator effect)
-           for cube-visible = (make-instance 'lpsg:input-value-node :value t)
-           do (progn
-                (setf (lpsg:input cube 'lpsg:visiblep) cube-visible)
-                (setf (aref (cubes window) i) cube)
-                (setf (aref (visible-inputs window) i) cube-visible)
-                (lpsg:submit cube window))))))
+      (submit-cubes window)))
   (setf (exposed window) t)
   (draw-window window))
 
@@ -193,6 +209,15 @@ void main()
                                                              0
                                                              1))))
            (setf (lpsg:value input-node) (not (lpsg:value input-node))))
+         (draw-window window))
+        (:s
+         (submit-cubes window)
+         (draw-window window))
+        (:r
+         (retract-cubes window)
+         (draw-window window))
+        (:g
+         (tg:gc :full t)
          (draw-window window))
         (t
          (call-next-method)))
