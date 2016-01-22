@@ -24,4 +24,10 @@
      (:file "effect" :depends-on ("package" "render" "environment" "bundle"))
      (:file "shape" :depends-on ("package" "render" "environment" "allocator" "incremental-comp"))
      (:file "assembly" :depends-on ("package" "shape"))
-     (:file "solids" :depends-on ("package" "render" "shape"))))))
+     (:file "solids" :depends-on ("package" "render" "shape"))))
+   (:module
+    "tinker"
+    :depends-on ("lpsg")
+    :components
+    ((:file "package")
+     (:file "camera" :depends-on ("package"))))))
