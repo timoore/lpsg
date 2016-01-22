@@ -233,7 +233,7 @@ but that can impact performance."))
   (gl-finalized-p (buffer obj)))
 
 (defmethod gl-finalize ((obj buffer-area) &optional errorp)
-  (gl-finalize-buffer (buffer obj) (target (buffer obj)) errorp))
+  (gl-finalize (buffer obj) errorp))
 
 (defclass buffer-map () ())
 
