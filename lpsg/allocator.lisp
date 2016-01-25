@@ -31,12 +31,12 @@ Allocations are made from one buffer per target, with no provision for freeing s
   nil)
 
 (defmethod allocate-target ((alloc simple-allocator) target size alignment)
-  (let ((target-alloc (assoc target (buffers alloc))))
-    (unless target-alloc
-      (setq target-alloc (cons target (make-instance 'gl-buffer :target target :size 0)))
-      (push target-alloc (buffers alloc)))
-    (let* ((buf (cdr target-alloc))
-           (current (size buf))
+  (multiple-value-bind (buf bufp)
+      (getassoc target (buffers alloc))
+    (unless bufp
+      (setq buf (make-instance 'gl-buffer :target target :size 0))
+      (setf (getassoc target (buffers alloc)) buf))
+    (let* ((current (size buf))
            (alloc-offset (round-up current alignment))
            (new-size (+ alloc-offset size)))
       (setf (size buf) new-size)

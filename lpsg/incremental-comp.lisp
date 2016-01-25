@@ -50,17 +50,10 @@ exists or not.")
 class"))
 
 (defmethod input ((node sink-node-mixin) input-name)
-  (let ((input-entry (assoc input-name (inputs node))))
-    (if input-entry
-        (values (cdr input-entry) t)
-        (values nil nil))))
+  (getassoc input-name (inputs node)))
 
 (defmethod (setf input) (new-val (node sink-node-mixin) input-name)
-  (let ((input-entry (assoc input-name (inputs node))))
-    (if input-entry
-        (setf (cdr input-entry) new-val)
-        (setf (inputs node) (acons input-name new-val (inputs node)))))
-  new-val)
+  (setf (getassoc input-name (inputs node)) new-val))
 
 (defmethod initialize-instance :after ((obj sink-node-mixin) &key inputs)
   (loop

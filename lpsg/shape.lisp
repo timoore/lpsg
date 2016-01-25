@@ -113,14 +113,10 @@ visiblep - true if shape is visible, false if not
 (defgeneric attribute (obj attribute-name))
 
 (defmethod attribute ((obj shape) attribute-name)
-  (cdr (assoc attribute-name (attributes obj) :test #'equal)))
+  (getassoc attribute-name (attributes obj) :test #'equal))
 
 (defmethod (setf attribute) (attrib (obj shape) attribute-name)
-  (let ((cell (assoc attribute-name (attributes obj) :test #'equal)))
-    (if cell
-        (setf (cdr cell) attrib)
-        (setf (attributes obj) (acons attribute-name attrib (attributes obj))))
-    attrib))
+  (setf (getassoc attribute-name (attributes obj) :test #'equal) attrib))
 
 (defmethod ensure-attribute ((obj shape) attribute-name)
   (let ((attrib (attribute obj attribute-name)))
