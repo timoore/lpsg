@@ -45,7 +45,7 @@ exists or not.")
   (:documentation "Node that consumes values via named inputs."))
 
 (defclass sink-node-mixin ()
-  ((inputs :accessor inputs :initform nil :initarg :inputs))
+  ((inputs :accessor inputs :initform nil))
   (:documentation "Mixin class that provides slots and some methods for the SINK-NODE protocol
 class"))
 
@@ -61,6 +61,11 @@ class"))
         (setf (cdr input-entry) new-val)
         (setf (inputs node) (acons input-name new-val (inputs node)))))
   new-val)
+
+(defmethod initialize-instance :after ((obj sink-node-mixin) &key inputs)
+  (loop
+     for (input-name . source) in inputs
+     do (setf (input obj input-name) source)))
 
 (defun input-value (node input-name)
   (multiple-value-bind (source sourcep)
