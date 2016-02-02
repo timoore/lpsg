@@ -66,6 +66,7 @@
    #:close-allocator
    #:with-allocator
    ;; incremental computation
+   #:if-then-node
    #:sink-node
    #:sink-node-mixin
    #:source-node

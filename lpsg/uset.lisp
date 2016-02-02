@@ -361,9 +361,8 @@
        for offset = (local-offset var)
        for writer = (get-uniform-writer var)
        for uploader = (get-uniform-uploader var)
-       for prog-uniform = (assoc (name var) (uniforms program) :test #'string=)
-       for (name location) = prog-uniform
-       if prog-uniform
+       for location = (car (getassoc (name var) (uniforms program) :test #'string=))
+       if location
        collect `(,writer (cffi:inc-pointer raw ,offset) (,(accessor var) uset))
          into local-clauses
        and collect `(,uploader ,location (cffi:inc-pointer raw ,offset))

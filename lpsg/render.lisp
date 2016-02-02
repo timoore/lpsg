@@ -213,7 +213,7 @@ but that can impact performance."))
          (entry (assoc buffer (upload-queue renderer))))
     (if entry
         (push obj (cdr entry))
-        (setf (upload-queue renderer) (acons buffer (list obj) (upload-queue renderer))))))
+        (setf (getassoc buffer (upload-queue renderer)) (list obj)))))
 
 (defun do-upload-queue (renderer)
   (loop
@@ -412,8 +412,8 @@ but that can impact performance."))
 ;;; Set the uniform values in a program, assuming  that it is currently bound.
 (defun upload-uset-to-program (uset program)
   (let* ((descriptor (descriptor uset))
-         (uset-entry (assoc descriptor (uset-alist program)))
-         (strategy (cadr uset-entry)))
+         (uset-data (getassoc descriptor (uset-alist program)))
+         (strategy (car uset-data)))
     (when strategy
       (funcall (uploader strategy) uset))
     uset))
@@ -564,7 +564,7 @@ traverse the render stages and their render queues to render all bundles."))
     (:unsigned-int-10f-11f-11f-rev . 4)))
 
 (defun get-component-size (type)
-  (let ((size (cdr (assoc type *buffer-size-alist*))))
+  (let ((size (getassoc type *buffer-size-alist*)))
     (or size
         (error 'render-error :format-control "Unknown OpenGL type %s."
                :format-arguments type))))

@@ -45,22 +45,20 @@ exists or not.")
   (:documentation "Node that consumes values via named inputs."))
 
 (defclass sink-node-mixin ()
-  ((inputs :accessor inputs :initform nil :initarg :inputs))
+  ((inputs :accessor inputs :initform nil))
   (:documentation "Mixin class that provides slots and some methods for the SINK-NODE protocol
 class"))
 
 (defmethod input ((node sink-node-mixin) input-name)
-  (let ((input-entry (assoc input-name (inputs node))))
-    (if input-entry
-        (values (cdr input-entry) t)
-        (values nil nil))))
+  (getassoc input-name (inputs node)))
 
 (defmethod (setf input) (new-val (node sink-node-mixin) input-name)
-  (let ((input-entry (assoc input-name (inputs node))))
-    (if input-entry
-        (setf (cdr input-entry) new-val)
-        (setf (inputs node) (acons input-name new-val (inputs node)))))
-  new-val)
+  (setf (getassoc input-name (inputs node)) new-val))
+
+(defmethod initialize-instance :after ((obj sink-node-mixin) &key inputs)
+  (loop
+     for (input-name . source) in inputs
+     do (setf (input obj input-name) source)))
 
 (defun input-value (node input-name)
   (multiple-value-bind (source sourcep)
@@ -150,13 +148,21 @@ class."))
     (setf (validp node) t)))
 
 (defmethod (setf value) :after (value (node input-value-node))
-  (setf (validp node) nil)
   (notify-invalid-input node node nil)
   (setf (validp node) t))
 
 (defmethod notify-invalid-input ((node input-value-node) source input-name)
   (declare (ignore source input-name))
   nil)
+
+(defclass if-then-node (computation-node computation-node-mixin source-sink-mixin)
+  ())
+
+(defmethod compute ((node if-then-node))
+  (if (input-value node 'if)
+      (input-value node 'then)
+      (input-value node 'else)))
+
 ;;; Testing
 
 #+(or)
