@@ -67,10 +67,13 @@
    #:with-allocator
    ;; incremental computation
    #:if-then-node
+   #:then
+   #:else
    #:sink-node
    #:sink-node-mixin
    #:source-node
    #:source-node-mixin
+   #:source-sink-mixin
    #:computation-node
    #:computation-node-mixin
    #:delete-sink

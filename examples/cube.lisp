@@ -55,7 +55,7 @@ void main()
 
 (lpsg:define-uset light (("lightDir" :float-vec4 light-direction :accessor light-direction)))
 
-(defclass camera-uset-node (lpsg:computation-node lpsg:computation-node-mixin lpsg::source-sink-mixin)
+(defclass camera-uset-node (lpsg:computation-node lpsg:computation-node-mixin lpsg:source-sink-mixin)
   ((uset :accessor uset :initform (make-instance 'camera))))
 
 (defmethod lpsg:compute ((node camera-uset-node))
@@ -68,13 +68,13 @@ void main()
 ;;; build the different parts from mixin classes, and then route their outputs to the
 ;;; camera-uset-node.
 
-(defclass partial-view-camera (lpsg-tinker::aimed-camera-mixin lpsg-tinker:view-node-mixin)
+(defclass partial-view-camera (lpsg-tinker:aimed-camera-mixin lpsg-tinker:view-node-mixin)
   ())
 
-(defclass partial-ortho-camera (lpsg-tinker::ortho-camera-mixin lpsg-tinker:projection-node-mixin)
+(defclass partial-ortho-camera (lpsg-tinker:ortho-camera-mixin lpsg-tinker:projection-node-mixin)
   ())
 
-(defclass partial-fov-camera (lpsg-tinker::fov-camera-mixin lpsg-tinker::projection-node-mixin)
+(defclass partial-fov-camera (lpsg-tinker:fov-camera-mixin lpsg-tinker::projection-node-mixin)
   ())
 
 (defclass cube-window (viewer-window lpsg:renderer)
@@ -96,17 +96,17 @@ void main()
   (:default-initargs :exposed nil :projection-type 'orthographic))
 
 (defmethod initialize-instance :after ((obj cube-window) &key)
-  (let ((choice (make-instance 'lpsg::if-then-node))
+  (let ((choice (make-instance 'lpsg:if-then-node))
         (selector (make-instance 'lpsg:input-value-node
                                  :value (eq (projection-type obj) 'orthographic))))
-    (setf (lpsg:input choice 'lpsg::then) (lpsg-tinker:projection-matrix-node (ortho-camera obj)))
-    (setf (lpsg:input choice 'lpsg::else) (lpsg-tinker:projection-matrix-node (fov-camera obj)))
+    (setf (lpsg:input choice 'lpsg:then) (lpsg-tinker:projection-matrix-node (ortho-camera obj)))
+    (setf (lpsg:input choice 'lpsg:else) (lpsg-tinker:projection-matrix-node (fov-camera obj)))
     (setf (lpsg:input choice 'if) selector)
     (setf (camera-choice obj) choice)
     (setf (camera-selector obj) selector)
     (setf (lpsg:input (camera-uset-node obj) 'projection-matrix) choice)
     (setf (lpsg:input (camera-uset-node obj) 'view-matrix)
-          (lpsg-tinker::view-matrix-node (view-camera obj)))))
+          (lpsg-tinker:view-matrix-node (view-camera obj)))))
 
 ;;; Instances of usets
 (defvar *model-uset* (make-instance 'model))

@@ -16,6 +16,7 @@
    #:view-matrix-inverse
    #:projection-matrix
    #:projection-matrix-inverse
+   #:aimed-camera-mixin
    #:aim-camera
    #:eye
    #:target
@@ -33,6 +34,7 @@
    #:top
    #:set-ortho-params
    #:simple-ortho-camera
+   #:ortho-camera-mixin
    #:view-node-mixin
    #:view-matrix-node
    #:view-matrix-inverse-node
