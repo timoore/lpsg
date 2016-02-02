@@ -150,7 +150,6 @@ class."))
     (setf (validp node) t)))
 
 (defmethod (setf value) :after (value (node input-value-node))
-  (setf (validp node) nil)
   (notify-invalid-input node node nil)
   (setf (validp node) t))
 
