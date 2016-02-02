@@ -4,9 +4,7 @@
 (in-package #:lpsg-examples)
 
 (defclass viewer-window (glop:window)
-  ((ortho-screen-matrix :accessor ortho-screen-matrix
-                        :initarg :ortho-screen-matrix
-                        :initform sb-cga:+identity-matrix+)
+  (
    ;; For testing if a glop resize event is really a resize
    (saved-width :accessor saved-width)
    (saved-height :accessor saved-height)))
@@ -30,13 +28,7 @@
 (defmethod update-for-window-change ((w viewer-window) event)
   (let ((width (glop:width event))
         (height (glop:height event)))
-    (gl:viewport 0 0 (glop:width event) (glop:height event))
-    ;; Ensure that projection matrix ratio always matches the window size ratio,
-    ;; so the polygon will always look square.
-    (let* ((right (max (float (/ width height)) 1.0))
-           (top (max (float (/ height width)) 1.0))
-           (ortho-mat (kit.math:ortho-matrix (- right) right (- top) top 1.0 10.0)))
-      (setf (ortho-screen-matrix w) ortho-mat))))
+    (gl:viewport 0 0 (glop:width event) (glop:height event))))
 
 (defmethod glop:on-event :around ((window viewer-window) (event glop:resize-event))
   (when (not (and (slot-boundp window 'saved-width)
