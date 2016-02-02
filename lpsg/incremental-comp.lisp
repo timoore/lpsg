@@ -157,6 +157,15 @@ class."))
 (defmethod notify-invalid-input ((node input-value-node) source input-name)
   (declare (ignore source input-name))
   nil)
+
+(defclass if-then-node (computation-node computation-node-mixin source-sink-mixin)
+  ())
+
+(defmethod compute ((node if-then-node))
+  (if (input-value node 'if)
+      (input-value node 'then)
+      (input-value node 'else)))
+
 ;;; Testing
 
 #+(or)
