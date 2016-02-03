@@ -119,14 +119,14 @@
   ((view-matrix-node :accessor view-matrix-node)
    (view-matrix-inverse-node :accessor view-matrix-inverse-node)))
 
-(defmethod initialize-instance :after ((obj view-mixin) &key)
+(defmethod initialize-instance :after ((obj view-node-mixin) &key)
   (setf (view-matrix-node obj) (make-instance 'input-value-node))
   (setf (view-matrix-inverse-node obj) (make-instance 'input-value-node)))
 
-(defmethod (setf %view-matrix) :after (new-val (obj view-mixin))
+(defmethod (setf %view-matrix) :after (new-val (obj view-node-mixin))
   (setf (value (view-matrix-node obj)) new-val))
 
-(defmethod (setf %view-matrix-inverse) :after (new-val (obj view-mixin))
+(defmethod (setf %view-matrix-inverse) :after (new-val (obj view-node-mixin))
   (setf (value (view-matrix-inverse-node obj)) new-val))
 
 (defclass projection-node-mixin (projection-mixin)

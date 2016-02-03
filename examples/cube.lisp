@@ -55,18 +55,10 @@ void main()
 
 (lpsg:define-uset light (("lightDir" :float-vec4 light-direction :accessor light-direction)))
 
-(defclass camera-uset-node (lpsg:computation-node lpsg:computation-node-mixin lpsg:source-sink-mixin)
-  ((uset :accessor uset :initform (make-instance 'camera))))
-
-(defmethod lpsg:compute ((node camera-uset-node))
-  (let ((uset (uset node)))
-    (setf (camera-matrix uset) (lpsg:input-value node 'view-matrix))
-    (setf (projection-matrix uset) (lpsg:input-value node 'projection-matrix))
-    uset))
-
-;;; We support orthographic and perspective cameras, so instead of using a complete camera, we
-;;; build the different parts from mixin classes, and then route their outputs to the
-;;; camera-uset-node.
+;;; We support both orthographic and perspective cameras, which are placed with the same
+;;; eye-target-up parameters. Therefore we build the different parts from the camera mixin classes
+;;; and incremental nodes, and then route their outputs to a camera-uset-node which produces a uset
+;;; as its value.
 
 (defclass partial-view-camera (lpsg-tinker:aimed-camera-mixin lpsg-tinker:view-node-mixin)
   ())
@@ -77,6 +69,20 @@ void main()
 (defclass partial-fov-camera (lpsg-tinker:fov-camera-mixin lpsg-tinker::projection-node-mixin)
   ())
 
+;;; This incremental node takes 'view-matrix and 'projection-matrix as input and produces a uset.
+(defclass camera-uset-node (lpsg:computation-node lpsg:computation-node-mixin lpsg:source-sink-mixin)
+  ((uset :accessor uset :initform (make-instance 'camera))))
+
+(defmethod lpsg:compute ((node camera-uset-node))
+  (let ((uset (uset node)))
+    (setf (camera-matrix uset) (lpsg:input-value node 'view-matrix))
+    (setf (projection-matrix uset) (lpsg:input-value node 'projection-matrix))
+    uset))
+
+(defparameter *default-camera-params* `(:eye ,(sb-cga:vec 1.0 1.0 0.0)
+                                        :target ,(sb-cga:vec 0.0 0.0 -5.0)
+                                        :up ,(sb-cga:vec 0.0 1.0 0.0)))
+
 (defclass cube-window (viewer-window lpsg:renderer)
   ((effect :accessor effect)
    (exposed :accessor exposed :initarg :exposed)
@@ -84,15 +90,15 @@ void main()
    (cubes :accessor cubes :initform nil)
    (visible-inputs :accessor visible-inputs :initform nil)
    (view-camera :accessor view-camera
-                :initform (make-instance 'partial-view-camera
-                                         :eye (sb-cga:vec 1.0 1.0 0.0)
-                                         :target (sb-cga:vec 0.0 0.0 -5.0)
-                                         :up (sb-cga:vec 0.0 1.0 0.0)))
+                :initform (apply #'make-instance 'partial-view-camera *default-camera-params*))
    (ortho-camera :accessor ortho-camera :initform (make-instance 'partial-ortho-camera))
    (fov-camera :accessor fov-camera :initform (make-instance 'partial-fov-camera))
+   ;; if-then node for choosing the orthographic or perspective camera's projection matrix
    (camera-choice :accessor camera-choice)
+   ;; An input-value node for holding T or NIL to select the type of camera.
    (camera-selector :accessor camera-selector)
-   (camera-uset-node :accessor camera-uset-node :initform (make-instance 'camera-uset-node)))
+   (camera-uset-node :accessor camera-uset-node :initform (make-instance 'camera-uset-node))
+   (current-dragger :initform nil))
   (:default-initargs :exposed nil :projection-type 'orthographic))
 
 (defmethod initialize-instance :after ((obj cube-window) &key)
@@ -142,10 +148,6 @@ void main()
           (lpsg-tinker:set-perspective-params
            (fov-camera window) (/ (float pi 1.0) 4.0) (/ width height) near far)))))
 
-(defun compute-view-matrix ()
-  (kit.math:look-at (sb-cga:vec 1.0 1.0 0.0)
-                    (sb-cga:vec 0.0 0.0 -5.0)
-                    (sb-cga:vec 0.0 1.0 0.0)))
 
 ;;; Compute a high light, slightly to the side and front. This is the standard Lambert shading
 ;;; model, for diffuse shading only.
@@ -258,6 +260,82 @@ void main()
         (t
          (call-next-method)))
       (call-next-method)))
+
+(defun mouse-to-viewport (window x y)
+  (values (float x 1.0) (float (- (glop:window-height window) y) 1.0)))
+
+(defclass trans-dragger (lpsg-tinker::translate-dragger)
+  ((start-eye :initarg :start-eye)
+   (start-look-at :initarg :start-look-at)))
+
+(defgeneric translate-camera (dragger mouse-coords))
+
+(defmethod translate-camera ((dragger trans-dragger) mouse-coords)
+  (let ((displacement (lpsg-tinker::current-displacement dragger mouse-coords)))
+    (with-slots (start-eye start-look-at)
+        dragger
+      (values (sb-cga:vec- start-eye displacement) (sb-cga:vec- start-look-at displacement)))))
+
+
+(defmethod glop:on-event :after ((window cube-window) (event glop:button-press-event))
+  (format t "Button ~S @ ~S, ~S~%" (glop:button event) (last-x window) (last-y window))
+  (with-slots (current-dragger)
+      window
+    (multiple-value-bind (x y)
+        (mouse-to-viewport window (last-x window) (last-y window))
+      (setq current-dragger
+            (make-instance 'trans-dragger
+                           :start-mouse-point (kit.math:vec2 x y)
+                           :start-eye (lpsg-tinker:eye (view-camera window))
+                           :start-look-at (lpsg-tinker:target (view-camera window))
+                           :viewport (kit.math:vec4 0.0
+                                                    0.0
+                                                    (float (glop:window-width window) 1.0)
+                                                    (float (glop:window-height window) 1.0))
+                           :perspective-matrix (lpsg:value (camera-choice window))
+                           :model-matrix (lpsg-tinker:view-matrix (view-camera window))))
+      (let ((mouse-world (kit.math:unproject (sb-cga:vec x y 0.0)
+                                             (lpsg-tinker:view-matrix (view-camera window))
+                                             (lpsg:value (camera-choice window))
+                                             (kit.math:vec4 0.0
+                                                    0.0
+                                                    (float (glop:window-width window) 1.0)
+                                                    (float (glop:window-height window) 1.0)))))
+        (format *terminal-io* "mouse: ~S ~S ~S~%"
+                (aref mouse-world 0) (aref mouse-world 1) (aref mouse-world 2))))))
+
+(defmethod glop:on-event :after ((window cube-window) (event glop:mouse-motion-event))
+  (with-slots (current-dragger)
+      window
+    (when current-dragger
+      (with-slots (start-eye start-look-at)
+          current-dragger
+        (multiple-value-bind (x y)
+            (mouse-to-viewport window (last-x window) (last-y window))
+          (let* ((displacement (lpsg-tinker::current-displacement current-dragger
+                                                                  (kit.math:vec2 x y)))
+                 (camera (view-camera window)))
+            (lpsg-tinker:aim-camera camera
+                                    (sb-cga:vec- start-eye displacement)
+                                    (sb-cga:vec- start-look-at displacement)
+                                    (lpsg-tinker:up camera))
+            (draw-window window)))))))
+
+(defmethod glop:on-event :after ((window cube-window) (event glop:button-release-event))
+  (with-slots (current-dragger)
+      window
+    (when current-dragger
+      (multiple-value-bind (x y)
+          (mouse-to-viewport window (last-x window) (last-y window))
+        (let* ((displacement (lpsg-tinker::current-displacement current-dragger
+                                                                (kit.math:vec2 x y))))
+          #++
+          (format *terminal-io* "displacement: ~S ~S ~S~%"
+                  (aref displacement 0)
+                  (aref displacement 1)
+                  (aref displacement 2)))))
+    (setf current-dragger nil)))
+
 
 (defun cube-example (&rest args)
   "Draw a cube in a window.

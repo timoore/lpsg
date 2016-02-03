@@ -7,7 +7,10 @@
   (
    ;; For testing if a glop resize event is really a resize
    (saved-width :accessor saved-width)
-   (saved-height :accessor saved-height)))
+   (saved-height :accessor saved-height)
+   ;; Work around for lack of coordinates in button events
+   (last-x :accessor last-x :initform 0)
+   (last-y :accessor last-y :initform 0)))
 
 (defmethod glop:on-event ((window viewer-window) (event glop:key-event))
   (when (eq (glop:keysym event) :escape)
@@ -47,11 +50,16 @@
 
 (defmethod glop:on-event ((window viewer-window) (event glop:expose-event))
   (update-for-window-change window event)
-  (format t "Expose~%"))
+  (format t "Expose ~Sx~X~%" (glop:width event) (glop:height event)))
 
 (defmethod glop:on-event ((window viewer-window) (event glop:close-event))
   (declare (ignore event))
   (format t "Close~%"))
+
+(defmethod glop:on-event ((window viewer-window) (event glop:mouse-motion-event))
+  (setf (last-x window) (glop:x event)
+        (last-y window) (glop:y event)))
+
 
 (defgeneric open-viewer (window title width height &rest key-args
                          &key major minor fullscreen
