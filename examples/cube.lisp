@@ -136,6 +136,7 @@ void main()
     ;; Initialize any OpenGL objects, upload any new data to OpenGL buffers, and draw all the
     ;; shapes.
     (lpsg:draw win)
+    (gl:finish)
     (glop:swap-buffers win)))
 
 (defun compute-projection-matrix (window proj-type near far)
@@ -264,9 +265,21 @@ void main()
 (defun mouse-to-viewport (window x y)
   (values (float x 1.0) (float (- (glop:window-height window) y) 1.0)))
 
-(defclass trans-dragger (lpsg-tinker::translate-dragger)
+(defclass viewer-dragger ()
   ((start-eye :initarg :start-eye)
    (start-look-at :initarg :start-look-at)))
+
+(defclass trans-dragger (viewer-dragger lpsg-tinker::translate-dragger)
+  ())
+
+(defclass perspective-trans-dragger (trans-dragger)
+  ((scale-factor)))
+
+(defmethod initialize-instance :after ((obj perspective-trans-dragger) &key near)
+  (with-slots (start-eye start-look-at scale-factor)
+      obj
+    (setf scale-factor (/ (sb-cga:vec-length (sb-cga:vec- start-look-at start-eye)) near))
+    (format *terminal-io* "scale factor: ~S~%" scale-factor)))
 
 (defgeneric translate-camera (dragger mouse-coords))
 
@@ -276,6 +289,36 @@ void main()
         dragger
       (values (sb-cga:vec- start-eye displacement) (sb-cga:vec- start-look-at displacement)))))
 
+(defmethod translate-camera :around ((dragger perspective-trans-dragger) mouse-coords)
+  (with-slots (scale-factor)
+      dragger
+    (let ((raw-displacement (call-next-method)))
+      (sb-cga:vec* raw-displacement scale-factor))))
+
+(defclass rotate-dragger (viewer-dragger lpsg-tinker::rotate-dragger)
+  ((start-up :initarg :start-up)))
+
+(defgeneric rotate-camera (dragger mouse-coords))
+
+;;; Multiplication around a point is MtMrMt'*v. In order to transform the camera, we want to
+;;; multiply by the inverse i.e., MtMr'Mt'.
+
+(defmethod rotate-camera ((dragger rotate-dragger) mouse-coords)
+  (let* ((dragger-transform (lpsg-tinker::current-world-transform dragger mouse-coords)))
+    (with-slots (start-eye start-up)
+        dragger
+      (values (sb-cga:transform-point start-eye dragger-transform)
+              (sb-cga:transform-direction start-up dragger-transform)))))
+
+(defun print-mouse-click (window x y)
+  (let ((mouse-world (kit.math:unproject (sb-cga:vec x y 0.0)
+                                         (lpsg-tinker:view-matrix (view-camera window))
+                                         (lpsg:value (camera-choice window))
+                                         (kit.math:vec4 0.0
+                                                        0.0
+                                                        (float (glop:window-width window) 1.0)
+                                                        (float (glop:window-height window) 1.0)))))
+    (format *terminal-io* "mouse: ~S~%" mouse-world)))
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:button-press-event))
   (format t "Button ~S @ ~S, ~S~%" (glop:button event) (last-x window) (last-y window))
@@ -283,57 +326,66 @@ void main()
       window
     (multiple-value-bind (x y)
         (mouse-to-viewport window (last-x window) (last-y window))
-      (setq current-dragger
-            (make-instance 'trans-dragger
-                           :start-mouse-point (kit.math:vec2 x y)
-                           :start-eye (lpsg-tinker:eye (view-camera window))
-                           :start-look-at (lpsg-tinker:target (view-camera window))
-                           :viewport (kit.math:vec4 0.0
-                                                    0.0
-                                                    (float (glop:window-width window) 1.0)
-                                                    (float (glop:window-height window) 1.0))
-                           :perspective-matrix (lpsg:value (camera-choice window))
-                           :model-matrix (lpsg-tinker:view-matrix (view-camera window))))
-      (let ((mouse-world (kit.math:unproject (sb-cga:vec x y 0.0)
-                                             (lpsg-tinker:view-matrix (view-camera window))
-                                             (lpsg:value (camera-choice window))
-                                             (kit.math:vec4 0.0
-                                                    0.0
-                                                    (float (glop:window-width window) 1.0)
-                                                    (float (glop:window-height window) 1.0)))))
-        (format *terminal-io* "mouse: ~S ~S ~S~%"
-                (aref mouse-world 0) (aref mouse-world 1) (aref mouse-world 2))))))
+      (let ((common-args (list :start-mouse-point (kit.math:vec2 x y)
+                               :start-eye (lpsg-tinker:eye (view-camera window))
+                               :start-look-at (lpsg-tinker:target (view-camera window))
+                               :viewport (kit.math:vec4 0.0
+                                                        0.0
+                                                        (float (glop:window-width window) 1.0)
+                                                        (float (glop:window-height window) 1.0))
+                               :perspective-matrix (lpsg:value (camera-choice window))
+                               :view-matrix (lpsg-tinker:view-matrix (view-camera window))))
+            (button (glop:button event)))
+        (cond ((and (eql button 2)
+                    (eq (projection-type window) 'orthographic))
+               (setq current-dragger (apply #'make-instance 'trans-dragger common-args)))
+              ((eql button 2)
+               (setq current-dragger (apply #'make-instance 'perspective-trans-dragger
+                                            :near (lpsg-tinker:near (fov-camera window))
+                                            common-args)))
+              ((eql button 1)
+               (setq current-dragger
+                     (apply #'make-instance 'rotate-dragger
+                            :arcball-center (lpsg-tinker:target (view-camera window))
+                            :radius .8
+                            :start-up (lpsg-tinker:up (view-camera window))
+                            common-args)))
+              (t nil)))
+      (print-mouse-click window x y))))
+
+(defgeneric transform-camera (window dragger x y))
+
+(defmethod transform-camera ((window cube-window) (dragger trans-dragger) event-x event-y)
+  (with-slots (start-eye start-look-at)
+      dragger
+    (multiple-value-bind (x y)
+        (mouse-to-viewport window event-x event-y)
+      (let* ((displacement (lpsg-tinker::current-displacement dragger (kit.math:vec2 x y)))
+             (camera (view-camera window)))
+        (lpsg-tinker:aim-camera camera
+                                (sb-cga:vec- start-eye displacement)
+                                (sb-cga:vec- start-look-at displacement)
+                                (lpsg-tinker:up camera))))))
+
+(defmethod transform-camera ((window cube-window) (dragger rotate-dragger) event-x event-y)
+  (with-slots (start-look-at)
+      dragger
+    (multiple-value-bind (x y)
+        (mouse-to-viewport window event-x event-y)
+      (multiple-value-bind (new-eye new-up)
+          (rotate-camera dragger (kit.math:vec2 x y))
+        (lpsg-tinker:aim-camera (view-camera window) new-eye start-look-at new-up)))))
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:mouse-motion-event))
   (with-slots (current-dragger)
       window
     (when current-dragger
-      (with-slots (start-eye start-look-at)
-          current-dragger
-        (multiple-value-bind (x y)
-            (mouse-to-viewport window (last-x window) (last-y window))
-          (let* ((displacement (lpsg-tinker::current-displacement current-dragger
-                                                                  (kit.math:vec2 x y)))
-                 (camera (view-camera window)))
-            (lpsg-tinker:aim-camera camera
-                                    (sb-cga:vec- start-eye displacement)
-                                    (sb-cga:vec- start-look-at displacement)
-                                    (lpsg-tinker:up camera))
-            (draw-window window)))))))
+      (transform-camera window current-dragger (last-x window) (last-y window))
+      (draw-window window))))
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:button-release-event))
   (with-slots (current-dragger)
       window
-    (when current-dragger
-      (multiple-value-bind (x y)
-          (mouse-to-viewport window (last-x window) (last-y window))
-        (let* ((displacement (lpsg-tinker::current-displacement current-dragger
-                                                                (kit.math:vec2 x y))))
-          #++
-          (format *terminal-io* "displacement: ~S ~S ~S~%"
-                  (aref displacement 0)
-                  (aref displacement 1)
-                  (aref displacement 2)))))
     (setf current-dragger nil)))
 
 

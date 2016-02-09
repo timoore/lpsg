@@ -31,7 +31,7 @@
 (defmethod update-for-window-change ((w viewer-window) event)
   (let ((width (glop:width event))
         (height (glop:height event)))
-    (gl:viewport 0 0 (glop:width event) (glop:height event))))
+    (gl:viewport 0 0 width height)))
 
 (defmethod glop:on-event :around ((window viewer-window) (event glop:resize-event))
   (when (not (and (slot-boundp window 'saved-width)
