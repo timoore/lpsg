@@ -3,6 +3,8 @@
 
 (in-package #:lpsg-examples)
 
+(defgeneric on-mouse-motion-event (window event last-event-p))
+
 (defclass viewer-window (glop:window)
   (
    ;; For testing if a glop resize event is really a resize
@@ -23,8 +25,9 @@
 (defmethod glop:on-event ((window viewer-window) (event glop:button-event))
   (declare (ignore event)))
 
-(defmethod glop:on-event ((window viewer-window) (event glop:mouse-motion-event))
-  (declare (ignore event)))
+(defmethod on-mouse-motion-event ((window viewer-window) (event glop:mouse-motion-event)
+                                  last-event-p)
+  (declare (ignore last-event-p)))
 
 (defgeneric update-for-window-change (w event))
 
@@ -56,7 +59,9 @@
   (declare (ignore event))
   (format t "Close~%"))
 
-(defmethod glop:on-event ((window viewer-window) (event glop:mouse-motion-event))
+(defmethod on-mouse-motion-event :after ((window viewer-window) (event glop:mouse-motion-event)
+                                         last-event-p)
+  (declare (ignore last-event-p))
   (setf (last-x window) (glop:x event)
         (last-y window) (glop:y event)))
 
@@ -88,3 +93,28 @@
   (glop:set-fullscreen window fullscreen)
   window)
 
+(defgeneric process-events (window &optional blocking)
+  (:documentation "Process glop events for @cl:param{window}.
+
+This calls "))
+
+(defmethod process-events ((window viewer-window) &optional (blocking t))
+  (loop
+     for event = (glop:next-event window :blocking blocking)
+     if event
+     do (let ((saved-event nil))
+          (when (typep event 'glop:mouse-motion-event)
+            (setq saved-event event)
+            (loop
+               for read-ahead-event = (glop:next-event window :blocking nil)
+               while (typep read-ahead-event 'glop:mouse-motion-event)
+               do (progn
+                    (on-mouse-motion-event window saved-event nil)
+                    (setq saved-event read-ahead-event))
+               finally (progn
+                         (on-mouse-motion-event window saved-event t)
+                         (setq event read-ahead-event))))
+          (when event
+            (glop:on-event window event)
+            (when (typep event 'glop:close-event)
+              (return-from process-events nil))))))

@@ -136,7 +136,6 @@ void main()
     ;; Initialize any OpenGL objects, upload any new data to OpenGL buffers, and draw all the
     ;; shapes.
     (lpsg:draw win)
-    (gl:finish)
     (glop:swap-buffers win)))
 
 (defun compute-projection-matrix (window proj-type near far)
@@ -376,12 +375,14 @@ void main()
           (rotate-camera dragger (kit.math:vec2 x y))
         (lpsg-tinker:aim-camera (view-camera window) new-eye start-look-at new-up)))))
 
-(defmethod glop:on-event :after ((window cube-window) (event glop:mouse-motion-event))
+(defmethod on-mouse-motion-event :after ((window cube-window) (event glop:mouse-motion-event)
+                                         last-event-p)
   (with-slots (current-dragger)
       window
     (when current-dragger
       (transform-camera window current-dragger (last-x window) (last-y window))
-      (draw-window window))))
+      (when last-event-p
+        (draw-window window)))))
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:button-release-event))
   (with-slots (current-dragger)
@@ -399,7 +400,6 @@ The `p' key switches between orthographic and perspective views."
          (progn
            (unless win
              (return-from cube-example nil))
-           (loop
-              while (glop:dispatch-events win :blocking t :on-foo nil)))
+           (process-events win))
       (and win (glop:destroy-window win)))))
 
