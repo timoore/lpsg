@@ -41,6 +41,19 @@ should be applied to the camera parameters to obtain its new orientation."))
            (new-mouse-world (unproject new-mouse-point view-matrix perspective-matrix viewport)))
       (vec- new-mouse-world start-mouse-world))))
 
+(defmethod current-world-transform ((dragger translate-dragger) new-mouse)
+  (with-slots (start-mouse-point viewport perspective-matrix view-matrix view-matrix-inverse)
+      dragger
+    (let* ((start-mouse-camera (unproject start-mouse-point
+                                          +identity-matrix+
+                                          perspective-matrix
+                                          viewport))
+           (mouse-point (vec3 new-mouse 0.0))
+           (mouse-camera (unproject mouse-point +identity-matrix+ perspective-matrix viewport)))
+      (matrix* view-matrix-inverse
+               (translate (vec- start-mouse-camera mouse-camera))
+               view-matrix))))
+
 ;;; Rotational Dragger - arcball with Holroyd variation: see
 ;;; http://www.diku.dk/~kash/papers/DSAGM2002_henriksen.pdf
 

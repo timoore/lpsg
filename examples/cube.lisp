@@ -280,34 +280,8 @@ void main()
     (setf scale-factor (/ (sb-cga:vec-length (sb-cga:vec- start-look-at start-eye)) near))
     (format *terminal-io* "scale factor: ~S~%" scale-factor)))
 
-(defgeneric translate-camera (dragger mouse-coords))
-
-(defmethod translate-camera ((dragger trans-dragger) mouse-coords)
-  (let ((displacement (lpsg-tinker::current-displacement dragger mouse-coords)))
-    (with-slots (start-eye start-look-at)
-        dragger
-      (values (sb-cga:vec- start-eye displacement) (sb-cga:vec- start-look-at displacement)))))
-
-(defmethod translate-camera :around ((dragger perspective-trans-dragger) mouse-coords)
-  (with-slots (scale-factor)
-      dragger
-    (let ((raw-displacement (call-next-method)))
-      (sb-cga:vec* raw-displacement scale-factor))))
-
 (defclass rotate-dragger (viewer-dragger lpsg-tinker::rotate-dragger)
   ((start-up :initarg :start-up)))
-
-(defgeneric rotate-camera (dragger mouse-coords))
-
-;;; Multiplication around a point is MtMrMt'*v. In order to transform the camera, we want to
-;;; multiply by the inverse i.e., MtMr'Mt'.
-
-(defmethod rotate-camera ((dragger rotate-dragger) mouse-coords)
-  (let* ((dragger-transform (lpsg-tinker::current-world-transform dragger mouse-coords)))
-    (with-slots (start-eye start-up)
-        dragger
-      (values (sb-cga:transform-point start-eye dragger-transform)
-              (sb-cga:transform-direction start-up dragger-transform)))))
 
 (defun print-mouse-click (window x y)
   (let ((mouse-world (kit.math:unproject (sb-cga:vec x y 0.0)
@@ -354,25 +328,38 @@ void main()
 
 (defgeneric transform-camera (window dragger x y))
 
+;;; Helper function to scale the translation in perspective view
+
+(defgeneric get-world-transform (window dragger event-x event-y))
+
+(defmethod get-world-transform ((window cube-window) (dragger trans-dragger) event-x event-y)
+  (multiple-value-bind (x y)
+      (mouse-to-viewport window event-x event-y)
+    (lpsg-tinker::current-world-transform dragger (kit.math:vec2 x y))))
+
+(defmethod get-world-transform :around ((window cube-window) (dragger perspective-trans-dragger)
+                                        event-x event-y)
+  (let ((transform (call-next-method))
+        (scale-factor (slot-value dragger 'scale-factor)))
+    (sb-cga:matrix* (sb-cga:scale* scale-factor scale-factor scale-factor) transform)))
+
 (defmethod transform-camera ((window cube-window) (dragger trans-dragger) event-x event-y)
   (with-slots (start-eye start-look-at)
       dragger
-    (multiple-value-bind (x y)
-        (mouse-to-viewport window event-x event-y)
-      (let* ((displacement (lpsg-tinker::current-displacement dragger (kit.math:vec2 x y)))
-             (camera (view-camera window)))
-        (lpsg-tinker:aim-camera camera
-                                (sb-cga:vec- start-eye displacement)
-                                (sb-cga:vec- start-look-at displacement)
-                                (lpsg-tinker:up camera))))))
+    (let* ((transform (get-world-transform window dragger event-x event-y))
+           (new-eye (sb-cga:transform-point start-eye transform))
+           (new-look-at (sb-cga:transform-point start-look-at transform))
+           (camera (view-camera window)))
+      (lpsg-tinker:aim-camera camera new-eye new-look-at (lpsg-tinker:up camera)))))
 
 (defmethod transform-camera ((window cube-window) (dragger rotate-dragger) event-x event-y)
-  (with-slots (start-look-at)
+  (with-slots (start-eye start-look-at start-up)
       dragger
     (multiple-value-bind (x y)
         (mouse-to-viewport window event-x event-y)
-      (multiple-value-bind (new-eye new-up)
-          (rotate-camera dragger (kit.math:vec2 x y))
+      (let* ((transform (lpsg-tinker::current-world-transform dragger (kit.math:vec2 x y)))
+             (new-eye (sb-cga:transform-point start-eye transform))
+             (new-up (sb-cga:transform-direction start-up transform)))
         (lpsg-tinker:aim-camera (view-camera window) new-eye start-look-at new-up)))))
 
 (defmethod on-mouse-motion-event :after ((window cube-window) (event glop:mouse-motion-event)
