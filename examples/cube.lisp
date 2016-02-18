@@ -45,68 +45,21 @@ void main()
 ;;; Usets are sets of uniforms that can be set in shader programs. DEFINE-USET defines a CLOS class
 ;;; to hold values in lisp, as well as functions for uploading the values into a shader
 ;;; program. Note that the names in strings refer to uniforms in the above shaders.
-(lpsg:define-uset camera (("projectionMatrix" :float-mat4
-                                              projection-matrix :accessor projection-matrix)
-                          ("cameraMatrix" :float-mat4
-                                          camera-matrix :accessor camera-matrix)))
-
-(lpsg:define-uset model (("modelMatrix" :float-mat4
-                                        model-matrix :accessor model-matrix)))
 
 (lpsg:define-uset light (("lightDir" :float-vec4 light-direction :accessor light-direction)))
 
-(defclass camera-uset-node (lpsg:computation-node lpsg:computation-node-mixin lpsg:source-sink-mixin)
-  ((uset :accessor uset :initform (make-instance 'camera))))
-
-(defmethod lpsg:compute ((node camera-uset-node))
-  (let ((uset (uset node)))
-    (setf (camera-matrix uset) (lpsg:input-value node 'view-matrix))
-    (setf (projection-matrix uset) (lpsg:input-value node 'projection-matrix))
-    uset))
-
-;;; We support orthographic and perspective cameras, so instead of using a complete camera, we
-;;; build the different parts from mixin classes, and then route their outputs to the
-;;; camera-uset-node.
-
-(defclass partial-view-camera (lpsg-tinker:aimed-camera-mixin lpsg-tinker:view-node-mixin)
-  ())
-
-(defclass partial-ortho-camera (lpsg-tinker:ortho-camera-mixin lpsg-tinker:projection-node-mixin)
-  ())
-
-(defclass partial-fov-camera (lpsg-tinker:fov-camera-mixin lpsg-tinker::projection-node-mixin)
-  ())
+(defparameter *default-camera-params* `(:eye ,(sb-cga:vec 1.0 1.0 0.0)
+                                        :target ,(sb-cga:vec 0.0 0.0 -5.0)
+                                        :up ,(sb-cga:vec 0.0 1.0 0.0)))
 
 (defclass cube-window (viewer-window lpsg:renderer)
-  ((effect :accessor effect)
+  ((view-camera :initform (apply #'make-instance 'partial-view-camera *default-camera-params*))
+   (effect :accessor effect)
    (exposed :accessor exposed :initarg :exposed)
-   (projection-type :accessor projection-type :initarg :projection-type)
    (cubes :accessor cubes :initform nil)
    (visible-inputs :accessor visible-inputs :initform nil)
-   (view-camera :accessor view-camera
-                :initform (make-instance 'partial-view-camera
-                                         :eye (sb-cga:vec 1.0 1.0 0.0)
-                                         :target (sb-cga:vec 0.0 0.0 -5.0)
-                                         :up (sb-cga:vec 0.0 1.0 0.0)))
-   (ortho-camera :accessor ortho-camera :initform (make-instance 'partial-ortho-camera))
-   (fov-camera :accessor fov-camera :initform (make-instance 'partial-fov-camera))
-   (camera-choice :accessor camera-choice)
-   (camera-selector :accessor camera-selector)
-   (camera-uset-node :accessor camera-uset-node :initform (make-instance 'camera-uset-node)))
-  (:default-initargs :exposed nil :projection-type 'orthographic))
-
-(defmethod initialize-instance :after ((obj cube-window) &key)
-  (let ((choice (make-instance 'lpsg:if-then-node))
-        (selector (make-instance 'lpsg:input-value-node
-                                 :value (eq (projection-type obj) 'orthographic))))
-    (setf (lpsg:input choice 'lpsg:then) (lpsg-tinker:projection-matrix-node (ortho-camera obj)))
-    (setf (lpsg:input choice 'lpsg:else) (lpsg-tinker:projection-matrix-node (fov-camera obj)))
-    (setf (lpsg:input choice 'if) selector)
-    (setf (camera-choice obj) choice)
-    (setf (camera-selector obj) selector)
-    (setf (lpsg:input (camera-uset-node obj) 'projection-matrix) choice)
-    (setf (lpsg:input (camera-uset-node obj) 'view-matrix)
-          (lpsg-tinker:view-matrix-node (view-camera obj)))))
+   (current-dragger :initform nil))
+  (:default-initargs :exposed nil))
 
 ;;; Instances of usets
 (defvar *model-uset* (make-instance 'model))
@@ -131,21 +84,6 @@ void main()
     ;; shapes.
     (lpsg:draw win)
     (glop:swap-buffers win)))
-
-(defun compute-projection-matrix (window proj-type near far)
-  (let ((width (glop:window-width window))
-        (height (glop:window-height window)))
-    (if (eq proj-type 'orthographic)
-        (let* ((right (max (float (/ width height)) 1.0))
-               (top (max (float (/ height width)) 1.0)))
-          (lpsg-tinker:set-ortho-params (ortho-camera window) (- right) right (- top) top near far)
-          (lpsg-tinker:set-perspective-params
-           (fov-camera window) (/ (float pi 1.0) 4.0) (/ width height) near far)))))
-
-(defun compute-view-matrix ()
-  (kit.math:look-at (sb-cga:vec 1.0 1.0 0.0)
-                    (sb-cga:vec 0.0 0.0 -5.0)
-                    (sb-cga:vec 0.0 1.0 0.0)))
 
 ;;; Compute a high light, slightly to the side and front. This is the standard Lambert shading
 ;;; model, for diffuse shading only.
@@ -227,7 +165,6 @@ void main()
   (draw-window window))
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:resize-event))
-  (compute-projection-matrix window (projection-type window) 1.0 10.0)
   (draw-window window))
 
 (defmethod glop:on-event ((window cube-window) (event glop:key-event))
@@ -259,6 +196,13 @@ void main()
          (call-next-method)))
       (call-next-method)))
 
+(defmethod on-mouse-motion-event :after ((window cube-window) (event glop:mouse-motion-event)
+                                         last-event-p)
+  (with-slots (current-dragger)
+      window
+    (when (and current-dragger last-event-p)
+      (draw-window window))))
+
 (defun cube-example (&rest args)
   "Draw a cube in a window.
 
@@ -269,7 +213,6 @@ The `p' key switches between orthographic and perspective views."
          (progn
            (unless win
              (return-from cube-example nil))
-           (loop
-              while (glop:dispatch-events win :blocking t :on-foo nil)))
+           (process-events win))
       (and win (glop:destroy-window win)))))
 

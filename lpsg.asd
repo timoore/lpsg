@@ -34,4 +34,5 @@
     :depends-on ("lpsg")
     :components
     ((:file "package")
-     (:file "camera" :depends-on ("package"))))))
+     (:file "camera" :depends-on ("package"))
+     (:file "draggers" :depends-on ("package"))))))
