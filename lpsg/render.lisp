@@ -317,18 +317,6 @@ but that can impact performance."))
         (setf (vao attribute-set) vao))))
   attribute-set)
 
-
-(defclass graphics-state ()
-  ((bindings)
-   (program :accessor program :initarg :program :initform nil))
-  (:documentation "Class that stores all OpenGL state."))
-
-(defmethod gl-finalized-p ((obj graphics-state))
-  (gl-finalized-p (program obj)))
-
-(defmethod gl-finalize ((obj graphics-state) &optional errorp)
-  (gl-finalize (program obj) errorp))
-
 (defclass shader-source ()
   ((shader-type :accessor shader-type :initarg :shader-type )
    (source :accessor source :initarg :source :initform nil)
@@ -481,20 +469,6 @@ Finalize all objects on the finalize queue(s), do any upload operations in the u
 traverse the render stages and their render queues to render all bundles."))
 
 (defgeneric draw-bundles (renderer))
-
-(defgeneric bind-state (renderer state))
-
-(defmethod bind-state ((renderer renderer) (state graphics-state))
-  (with-slots (current-state)
-      renderer
-    (when (eq current-state state)
-      (return-from bind-state nil))
-    (let* ((old-program (and current-state (program current-state)))
-           (new-program (program state)))
-      (unless (eq new-program old-program)
-        (gl:use-program (id new-program)))
-        ;; XXX bindings
-      (setf (current-state renderer) state))))
 
 (defgeneric process-gl-objects (renderer))
 
