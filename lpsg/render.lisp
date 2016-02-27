@@ -206,6 +206,20 @@ but that can impact performance."))
 (defmethod upload-fn ((obj buffer-area))
   (error "No upload function defined."))
 
+(defclass mirrored-resource-mixin ()
+  ((data :accessor data :initarg :data)
+   (data-offset :accessor data-offset :initarg :data-offset :initform 0)
+   (data-count :accessor data-count :initarg :data-count :initform 0
+               :documentation "number of elements")
+   (data-stride :accessor data-stride :initarg :data-stride :initform 0
+                :documentation "offset between start of each element")
+   (num-components :accessor num-components :initarg :num-components
+                   :documentation "number of components per element. Redundant
+  with buffer-area components?")
+   (upload-fn :accessor upload-fn :initarg :upload-fn
+              :documentation "Function to upload Lisp data to a mapped buffer.
+Will be created automatically, but must be specified for now.")))
+
 (defgeneric schedule-upload (renderer object)
   (:documentation "Register an object to be uploaded to OpenGL."))
 
@@ -234,9 +248,14 @@ but that can impact performance."))
         (push obj (cdr entry))
         (setf (getassoc buffer (bo-queue queue)) (list obj)))))
 
-(defun do-upload-queue (renderer)
+(defgeneric process-upload-queue (renderer queue))
+
+(defmethod process-upload-queue (renderer queue)
+  )
+
+(defmethod process-upload-queue :after (renderer (queue buffer-object-upload-queue))
   (loop
-     for (buffer . uploads) in (bo-queue (upload-queue renderer))
+     for (buffer . uploads) in (bo-queue queue)
      for target = (target buffer)
      do (progn
           (gl:bind-buffer target (id buffer))
@@ -246,9 +265,12 @@ but that can impact performance."))
                   uploads))
           (gl:unmap-buffer target))
      finally
-       (setf (bo-queue (upload-queue renderer)) nil))
+       (setf (bo-queue queue) nil))
   ;; Is this necessary? Should all the targets be set to 0?
   (gl:bind-buffer :array-buffer 0))
+
+(defun do-upload-queue (renderer)
+  (process-upload-queue renderer (upload-queue renderer)))
 
 (defmethod gl-finalized-p ((obj buffer-area))
   (gl-finalized-p (buffer obj)))
