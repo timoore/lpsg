@@ -206,18 +206,37 @@ but that can impact performance."))
 (defmethod upload-fn ((obj buffer-area))
   (error "No upload function defined."))
 
-(defgeneric add-to-upload-queue (renderer buffer-area))
+(defgeneric schedule-upload (renderer object)
+  (:documentation "Register an object to be uploaded to OpenGL."))
 
-(defmethod add-to-upload-queue ((renderer renderer) (obj buffer-area))
+(defclass buffer-object-upload-queue ()
+  ((bo-queue :accessor bo-queue :initform nil)))
+
+(defclass texture-upload-queue ()
+  ((tex-queue :accessor tex-queue :initform nil)))
+
+(defclass upload-queue (buffer-object-upload-queue texture-upload-queue)
+  ())
+
+(defgeneric add-to-upload-queue (queue object))
+
+(defmethod schedule-upload :before ((renderer renderer) object)
+  (unless (upload-queue renderer)
+    (setf (upload-queue renderer) (make-instance 'upload-queue))))
+
+(defmethod schedule-upload ((renderer renderer) (object buffer-area))
+  (add-to-upload-queue (upload-queue renderer) object))
+
+(defmethod add-to-upload-queue ((queue buffer-object-upload-queue) (obj buffer-area))
   (let* ((buffer (buffer obj))
-         (entry (assoc buffer (upload-queue renderer))))
+         (entry (assoc buffer (bo-queue queue))))
     (if entry
         (push obj (cdr entry))
-        (setf (getassoc buffer (upload-queue renderer)) (list obj)))))
+        (setf (getassoc buffer (bo-queue queue)) (list obj)))))
 
 (defun do-upload-queue (renderer)
   (loop
-     for (buffer . uploads) in (upload-queue renderer)
+     for (buffer . uploads) in (bo-queue (upload-queue renderer))
      for target = (target buffer)
      do (progn
           (gl:bind-buffer target (id buffer))
@@ -225,7 +244,9 @@ but that can impact performance."))
             (mapc (lambda (area)
                     (funcall (upload-fn area) area ptr))
                   uploads))
-          (gl:unmap-buffer target)))
+          (gl:unmap-buffer target))
+     finally
+       (setf (bo-queue (upload-queue renderer)) nil))
   ;; Is this necessary? Should all the targets be set to 0?
   (gl:bind-buffer :array-buffer 0))
 
@@ -482,7 +503,6 @@ traverse the render stages and their render queues to render all bundles."))
     (process-finalize-queue renderer)
     (setf (finalize-queue renderer) nil)
     (do-upload-queue renderer)
-    (setf (upload-queue renderer) nil)
     (draw-bundles renderer)))
 
 (defgeneric draw-bundle (renderer bundle))

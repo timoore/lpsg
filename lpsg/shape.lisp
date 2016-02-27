@@ -256,9 +256,9 @@ Calls (submit-with-effect SHAPE RENDERER (effect SHAPE))"
           ;; XXX Is vertex attrib mirrored? Does it actually need uploading?
           ;; Is there a better way than typep?
           (when (typep vertex-attrib 'mirrored-resource)
-            (add-to-upload-queue renderer vertex-attrib))))
+            (schedule-upload renderer vertex-attrib))))
   (when (typep (drawable shape) 'indexed-drawable)
-    (add-to-upload-queue renderer (element-array (drawable shape)))))
+    (schedule-upload renderer (element-array (drawable shape)))))
 
 (defmethod retract ((shape shape) renderer)
   (retract-with-effect shape renderer (effect shape)))
