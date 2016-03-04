@@ -108,6 +108,11 @@ This function is used in the implementation of SUBMIT-WITH-EFFECT."))
 (defclass render-stage (render-queue)
   ((render-queues :accessor render-queues :initarg :render-queues :initform nil)))
 
+(defclass glcontext-parameters ()
+  ((max-combined-texture-image-units :accessor max-combined-texture-image-units
+                                     :initarg :max-combined-texture-image-units))
+  (:default-initargs :max-combined-texture-image-units 8)) ;XXX way to small, for testing
+
 (defclass renderer ()
   ((buffers :accessor buffers :initform nil)
    (bundles :accessor bundles :initform nil)
@@ -120,8 +125,16 @@ This function is used in the implementation of SUBMIT-WITH-EFFECT."))
    ;; XXX Should be weak
    (vao-cache :accessor vao-cache :initform (make-hash-table :test 'equal))
    (gl-objects :accessor gl-objects :initform nil :documentation "List of all OpenGL objects
-allocated by calls in LPSG." ))
+allocated by calls in LPSG." )
+   (context-parameters :accessor context-parameters
+                       :documentation "Parameters of the OpenGL context."))
   (:documentation "The class responsible for all rendering."))
+
+;;; XXX Temporary until we figure out how how / when to intialize the renderer from a graphics
+;;; context.
+
+(defmethod initialize-instance :after ((obj renderer) &key)
+  (setf (context-parameters obj) (make-instance 'glcontext-parameters)))
 
 (defun process-finalize-queue (renderer)
   (loop

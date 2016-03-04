@@ -68,6 +68,7 @@
      finally (setf (tex-queue queue) nil)))
 
 (defmethod upload-texture (renderer (area raw-texture-resource) (texture texture-2d))
+  (declare (ignore renderer))
   (gl:active-texture 0)
   (let ((target (target texture)))
     (gl:bind-texture target (id texture))
@@ -115,19 +116,161 @@
     (gl:sampler-parameter id :texture-max-lod (max-lod obj))
     (gl:sampler-parameter id :texture-lod-bias (lod-bias obj))
     (gl:sampler-parameter id :texture-compare-mode (compare-mode obj))
-    (gl:sampler-parameter id :texture-compare-func (compare-func obj)))
-  )
+    (gl:sampler-parameter id :texture-compare-func (compare-func obj))))
 
-(defclass graphics-state ()
-  ((texture-bindings)
-   (program :accessor program :initarg :program :initform nil))
-  (:documentation "Class that stores all OpenGL state."))
+(define-protocol-class glstate-member ()
+  ((:generic glstate-compare (m1 m2)
+             (:documentation "Compares state members. Returns -1, 0, 1."))
+   (:generic glstate-bind (renderer m previous))
+   (:generic glstate-finalize (m))))
+
+(defgeneric glstate-finalized-p (m)
+  (:method-combination and))
+
+;;; This is called only after all the other primary methods have returned 0, so the states must be
+;;; equal.
+(defmethod glstate-compare ((m1 glstate-member) m2)
+  (declare (ignore m2))
+  0)
+
+(defclass glstate-program (glstate-member)
+  ((program :accessor program :initarg :program :initform nil)))
+
+(defun compare-num (x y)
+  (cond ((= x y)
+         0)
+        ((< x y)
+         -1)
+        (t 1)))
+
+(defun compare-gl-objects (obj1 obj2)
+  (cond ((eq obj1 obj2)
+         0)
+        ((null obj1)
+         -1)
+        ((null obj2)
+         1)
+        (t
+         (compare-num (id obj1) (id obj2)))))
+
+(defmethod glstate-compare ((m1 glstate-program) (m2 glstate-program))
+  (let ((result (compare-gl-objects (program m1) (program m2))))
+    (if (zerop result)
+        (call-next-method)
+        result)))
+
+(defmethod glstate-bind :after (renderer (m glstate-program) previous)
+  (declare (ignorable renderer))
+  (unless (and previous (eq (program m) (program previous)))
+    (gl:use-program (id (program m)))))
+
+(defmethod glstate-finalized-p and ((m glstate-program))
+  (gl-finalized-p (program m)))
+
+(defmethod glstate-finalize :after ((m glstate-program))
+  (gl-finalize (program m)))
+
+(defclass gltexture-unit ()
+  ((tex-object :accessor tex-object)
+   (sampler-object :accessor sampler-object)))
+
+(defun compare-texture-unit (unit1 unit2)
+  (cond ((and unit1 unit2)
+         (let ((tex-comp (compare-gl-objects (tex-object unit1) (tex-object unit2))))
+           (if (zerop tex-comp)
+               (compare-gl-objects (sampler-object unit1) (sampler-object unit2))
+               tex-comp)))
+        (unit1
+         -1)
+        (unit2
+         1)
+        (t 0)))
+
+(defclass glstate-texunits (glstate-member)
+  ((units :accessor units
+          :documentation "An array of bindings for OpenGL's texture units. The members of the array
+  can be NIL, representing no binding")))
+
+(defmethod initialize-instance ((obj glstate-texunits) &key units renderer)
+  (let ((max-tex-units (if renderer
+                           (max-combined-texture-image-units (context-parameters renderer))
+                           16)))
+    (if (and units (= (length units) max-tex-units))
+        (setf (units obj) units)
+        (let ((new-units (make-array max-tex-units :initial-element nil)))
+          (when units
+            (setf (subseq new-units 0) units))
+          (setf (units obj) new-units)))))
+
+(defmethod glstate-compare ((m1 glstate-texunits) m2)
+  (let* ((units1 (units m1))
+         (units2 (units m2)))
+    (loop
+       for unit1 across units1
+       for unit2 across units2
+       for comp = (compare-texture-unit unit1 unit2)
+       unless (zerop comp)
+       do (return-from glstate-compare comp))
+    (call-next-method)))
+
+(defmethod glstate-bind :after (renderer (m glstate-texunits) previous)
+  (declare (ignore renderer))
+  (flet ((unbind-texture (unit)
+           (when unit
+             (gl:bind-texture (target (tex-object unit)) 0))))
+    (let ((units (units m))
+          (prev-units (and previous (units previous))))
+      (loop
+         with len = (length units)
+         for i from 0 below len
+         do (progn
+              (gl:active-texture i)
+              (cond ((svref units i)
+                     (let* ((unit (svref units i))
+                            (tex-obj (tex-object unit))
+                            (sampler-obj (sampler-object unit)))
+                       (gl:bind-texture (target tex-obj) (id tex-obj))
+                       (gl:bind-sampler i (id sampler-obj))))
+                    ((svref prev-units i)
+                     (unbind-texture (svref prev-units i)))
+                    (t (gl:bind-texture :texture-2d 0))))))))
+
+(defmethod glstate-finalized-p and ((m glstate-texunits))
+  (let ((units (units m)))
+    (unless units
+      (return-from glstate-finalized-p t))
+    (loop
+       for unit across units
+       when unit
+       do (unless (and (gl-finalized-p (tex-object unit)) (gl-finalized-p (sampler-object unit)))
+            (return-from glstate-finalized-p nil)))
+    t))
+
+(defmethod glstate-finalize :after ((m glstate-texunits))
+  (loop
+     for unit across (units m)
+     do (when unit
+          (gl-finalize (tex-object unit))
+          (gl-finalize (sampler-object unit)))))
+
+(defclass graphics-state (glstate-program)
+  ()
+  (:documentation "Class that stores most OpenGL state."))
+
+;;; Maybe use progn method combination as an alternative to these dummy primary methods? 
+(defmethod glstate-finalize ((obj graphics-state))
+  t)
+
+(defmethod glstate-bind (renderer (obj graphics-state) previous)
+  (declare (ignorable renderer previous))
+  t)
 
 (defmethod gl-finalized-p ((obj graphics-state))
-  (gl-finalized-p (program obj)))
+  (glstate-finalized-p obj))
 
 (defmethod gl-finalize ((obj graphics-state) &optional errorp)
-  (gl-finalize (program obj) errorp))
+  (declare (ignore errorp))
+  (glstate-finalize obj))
 
 (defgeneric bind-state (renderer state))
 
@@ -136,10 +279,6 @@
       renderer
     (when (eq current-state state)
       (return-from bind-state nil))
-    (let* ((old-program (and current-state (program current-state)))
-           (new-program (program state)))
-      (unless (eq new-program old-program)
-        (gl:use-program (id new-program)))
-        ;; XXX bindings
-      (setf (current-state renderer) state))))
+    (glstate-bind renderer state current-state)
+    (setf (current-state renderer) state)))
 
