@@ -46,6 +46,7 @@
    #:program
    #:gl-buffer
    #:buffer
+   #:attribute
    #:attributes
    #:define-uset
    #:graphics-state

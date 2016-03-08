@@ -8,10 +8,8 @@
 (in-package #:lpsg)
 
 (defclass effect ()
-  ((attribute-map :accessor attribute-map :initarg :attribute-map :initform nil
-                  :documentation "Alist that maps from vertex attribute names
-  to indices or NIL for overall binding. XXX Not clear if this will be used.")
-   )
+  ((attribute-map :accessor attribute-map :initform nil :initarg :attribute-map
+                  :documentation "list of (symbol glsl-name) where glsl-name is a string"))
   (:documentation "Class that represents the rendered appearance of a shape.
 
  EFFECT is responsable for creating bundles and their environments and putting them in the
@@ -37,9 +35,7 @@ just ignore it."
   attrib-set)
 
 (defclass simple-effect (effect)
-  ((attribute-map :accessor attribute-map :initform nil :initarg :attribute-map
-                  :documentation "list of (symbol glsl-name) where glsl-name is a string")
-   (gl-state :accessor gl-state :initarg :gl-state)
+  ((gl-state :accessor gl-state :initarg :gl-state)
    (uset-names :accessor uset-names :initarg :uset-names :initform nil))
   (:documentation "This class supports effects which are simply the application of OpenGL state,
 with uset parameters, to a shape."))

@@ -12,7 +12,7 @@
    (width :accessor width :initarg :width)
    (height :accessor height :initarg :height)
    (generate-mipmap-p :accessor generate-mipmap-p :initarg :generate-mipmap-p))
-  (:default-initargs :level 0 :generate-mipmap t))
+  (:default-initargs :level 0 :x-offset 0 :y-offset 0 :generate-mipmap t))
 
 (define-gl-object texture ()
   ((target :accessor target :initarg :target)

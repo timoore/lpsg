@@ -28,7 +28,11 @@
 ;;; POSSIBILITY OF SUCH DAMAGE.
 
 (defpackage #:lpsg-examples
-  (:use #:cl)
+  (:use #:cl #:lpsg)
   (:export
    #:cube-example))
 
+(defpackage #:lpsg-examples.texture
+  (:use #:cl #:lpsg #:lpsg-examples)
+  (:export
+   #:texture-example))
