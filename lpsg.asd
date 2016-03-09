@@ -17,8 +17,8 @@
       :components
       ((:file "package")
        (:file "macros")
-       (:file "interface")
-       (:file "protocol")))
+       (:file "protocol")
+       (:file "interface")))
      (:file "incremental-comp" :depends-on (base))
      (:file "uset" :depends-on (base))
      (:file "allocator" :depends-on (base))

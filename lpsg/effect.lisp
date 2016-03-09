@@ -19,6 +19,23 @@
   class only has one environment, but other effects might have different environments for different
   passes."))
 
+(defun init-attr-set-from-shape (attrib-set shape attr-map)
+  " Initialize attribute set from shape and drawable attributes. The actual vertex
+attribute index for an attribute may not be known until the shader
+program is linked, so make it invalid for now and let gl-finalize sort
+it out. If an attribute is not supported by the environment, no problem;
+just ignore it."
+  (setf (array-bindings attrib-set)
+        (mapcan (lambda (entry)
+                  (let ((gl-name (cdr (assoc (car entry) attr-map))))
+                    (if gl-name
+                        (list (list gl-name (cdr entry) -1))
+                        nil)))
+                (attributes shape)))
+  (when (typep (drawable shape) 'indexed-drawable)
+    (setf (element-binding attrib-set) (element-array (drawable shape))))
+  attrib-set)
+
 (defclass simple-effect (effect)
   ((attribute-map :accessor attribute-map :initform nil :initarg :attribute-map
                   :documentation "list of (symbol glsl-name) where glsl-name is a string")
@@ -26,6 +43,13 @@
    (uset-names :accessor uset-names :initarg :uset-names :initform nil))
   (:documentation "This class supports effects which are simply the application of OpenGL state,
 with uset parameters, to a shape."))
+
+(defclass shape-attribute-set (attribute-set)
+  ())
+
+(defmethod initialize-instance :after ((obj shape-attribute-set) &key shape attribute-map)
+  (when (and shape attribute-map)
+    (init-attr-set-from-shape obj shape attribute-map)))
 
 (defmethod submit-with-effect (shape renderer (effect simple-effect))
   (let* ((env (make-instance 'environment
@@ -36,29 +60,15 @@ with uset parameters, to a shape."))
                              :uniform-sets (mapcar (lambda (uset-name)
                                                      (input-value shape uset-name))
                                                    (uset-names effect))))
-         (attr-map (attribute-map env))
-         (attrib-set (make-instance 'attribute-set)))
+         (attr-map (attribute-map env)))
     ;; Enqueue initial update of usets
     (notify-invalid-input env nil nil)
-    ;; Make attribute set from shape and drawable attributes The actual vertex
-    ;; attribute index for an attribute may not be known until the shader
-    ;; program is linked, so make it invalid for now and let gl-finalize sort
-    ;; it out. If an attribute is not supported by the environment, no problem;
-    ;; just ignore it.
-    (setf (array-bindings attrib-set)
-          (mapcan (lambda (entry)
-                    (let ((gl-name (cdr (assoc (car entry) attr-map))))
-                      (if gl-name
-                          (list (list gl-name (cdr entry) -1))
-                          nil)))
-                  (attributes shape)))
-    (when (typep (drawable shape) 'indexed-drawable)
-      (setf (element-binding attrib-set) (element-array (drawable shape))))
-    (let ((bundle (make-instance 'render-bundle
-                                 :attribute-set attrib-set :shape shape :environment env)))
+    (let* ((attrib-set (make-instance 'shape-attribute-set :shape shape :attribute-map attr-map))
+           (bundle (make-instance 'render-bundle
+                                  :attribute-set attrib-set :shape shape :environment env)))
       (push bundle (bundles shape))
       (push bundle (finalize-queue renderer))
-      ;; For now, just use one render-stage / render-queue
+      ;; Use only one render-stage / render-queue for now.
       (unless (render-stages renderer)
         (setf (render-stages renderer)
               (list (make-instance 'render-stage

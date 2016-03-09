@@ -86,7 +86,7 @@ The cube has VERTEX and NORMAL vertex attributes. The resulting shape has an ind
            (element-attr (make-instance 'mirrored-resource
                                         :data element-array :data-count 36
                                         :components 1 :buffer-type :short))
-           (cube-shape (make-instance 'shape
+           (cube-shape (make-instance 'standard-shape
                                       :drawable (make-instance 'indexed-drawable
                                                                :mode :triangles
                                                                :vertex-count 36

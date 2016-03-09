@@ -27,3 +27,11 @@ resources."))
   (:documentation "Compute the storage needed by the attributes of a
   shape and allocate their buffers in the BUFFER-AREA slots of each of the shape's
   attributes.."))
+
+(define-protocol-class shape ()
+  ((:accessor attributes
+              :documentation "Alist of (name . attribute). The names are later mapped to a vertex binding index.")
+   (:accessor effect)
+   ;; XXX uset computation nodes?
+   (:accessor usets)
+   (:accessor drawable)))
