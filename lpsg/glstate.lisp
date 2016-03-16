@@ -45,11 +45,11 @@
 
 (defclass raw-texture-resource (texture-area)
   ((data :accessor data :initarg :data)
-   (data-offset :accessor data-offset :initarg :data-offset :initform 0)
+   (data-offset :accessor data-offset :initarg :data-offset)
    (data-count :accessor data-count :initarg :data-count :initform 0
                :documentation "number of elements")
    (row-alignment :accessor row-alignment :initarg :row-alignment))
-  (:default-initargs :row-alignment 1)
+  (:default-initargs :data-offset 0 :row-alignment 1)
   (:documentation "Class for texture data stored in foreign memory."))
 
 ;;; Texture upload queue stuff

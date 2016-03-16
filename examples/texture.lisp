@@ -9,7 +9,7 @@
   (:default-initargs :attribute-map '((vertex . "in_Position")
                                       (normal . "in_Normal")
                                       (texcoord . "in_TexCoord"))
-    :uset-names '(camera model light tex-sampler)))
+    :uset-names '(lpsg-examples::camera lpsg-examples::model light tex-sampler)))
 
 ;;; Source for the vertex and fragment shaders. This is pretty standard OpenGL.
 (defparameter *vertex-shader-source* "
@@ -70,11 +70,11 @@ void main()
                                                        :shader-type :vertex-shader
                                                        :source *vertex-shader-source*
                                                        :usets
-                                                       '(lpsg-examples::camera model light))
+                                                       '(lpsg-examples::camera lpsg-examples::model light))
                                         (make-instance 'lpsg:shader
                                                        :shader-type :fragment-shader
                                                        :source *fragment-shader-source*
-                                                       :usets (tex-sampler)))))))
+                                                       :usets '(tex-sampler)))))))
 
 (defmethod submit-with-effect :before (shape renderer (effect texture-effect))
   (unless (gl-state effect)
@@ -101,7 +101,7 @@ void main()
   (:default-initargs :exposed nil))
 
 ;;; Instances of usets
-(defvar *model-uset* (make-instance 'model))
+(defvar *model-uset* (make-instance 'lpsg-examples::model))
 (defvar *light-uset* (make-instance 'light))
 
 (defvar *model-input* (make-instance 'lpsg:input-value-node :value *model-uset*))
@@ -164,8 +164,8 @@ void main()
 (defun make-textured-shape (model-input allocator window)
   (let ((shape (make-cube-with-attributes)))
         (setf (lpsg:effect shape) (effect window))
-    (setf (lpsg:input shape 'camera) (camera-uset-node window))
-    (setf (lpsg:input shape 'model) model-input)
+    (setf (lpsg:input shape 'lpsg-examples::camera) (camera-uset-node window))
+    (setf (lpsg:input shape 'lpsg-examples::model) model-input)
     (setf (lpsg:input shape 'light) *light-input*)
     ;; Allocate storage  in OpenGL buffer objects for the shape's geometry.
     (lpsg:compute-shape-allocation allocator shape)
@@ -173,11 +173,10 @@ void main()
 
 (defun submit-shape (window)
   (when (shapes window)
-    (return-from submit-cubes nil))
+    (return-from submit-shape nil))
   (setf (shapes window) (make-array 1)
         (visible-inputs window) (make-array 1))
   (lpsg:with-allocator (allocator 'lpsg:interleaved-attribute-allocator)
-    (let ((shape (make-textured-shape model-input allocator window))))
     (loop
        for model-input in (list *model-input*)
        for i from 0
@@ -203,7 +202,8 @@ void main()
 
 (defun make-texture-effect (window)
   ;;; create a texture test pattern
-  (let ((mem (cffi:foreign-alloc :uint8 :count (* 64 64 3) :initial-element 255)))
+  (let* ((data-size (* 64 64 3))
+         (mem (cffi:foreign-alloc :uint8 :count data-size :initial-element 255)))
     ;;; Make a cyan checkerboard
     (loop
        for j from 0 below 64
@@ -213,16 +213,21 @@ void main()
              do (if (oddp (* i j))
                     (progn
                       (setf (cffi:mem-aref mem :uint8 idx) 0)
-                      (setf (cffi:mem-aref mem :uint8 (+ idx 1) 255))
-                      (setf (cffi:mem-aref mem :uint8 (+ idx 2) 255))))))
+                      (setf (cffi:mem-aref mem :uint8 (+ idx 1)) 255)
+                      (setf (cffi:mem-aref mem :uint8 (+ idx 2)) 255)))))
     (let* ((texture (make-instance 'lpsg::texture-2d
                                    :target :texture-2d
                                    :width 64
                                    :height 64
-                                   :internal-format :rgb
+                                   :internal-format :rgb8
                                    :pixel-format :rgb
-                                   ))
-           (tex-area)))))
+                                   :data-type :unsigned-byte))
+           (tex-area (make-instance 'lpsg::raw-texture-resource
+                                    :texture texture
+                                    :data mem
+                                    :data-count data-size
+                                    :width 64
+                                    :height 64))))))
 
 
 (defmethod glop:on-event :after ((window texture-window) (event glop:expose-event))

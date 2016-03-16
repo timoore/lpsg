@@ -10,4 +10,5 @@
     :components
     ((:file "package")
      (:file "viewer" :depends-on ("package"))
-     (:file "cube" :depends-on ("package" "viewer"))))))
+     (:file "cube" :depends-on ("package" "viewer"))
+     (:file "texture" :depends-on ("package" "viewer"))))))

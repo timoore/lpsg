@@ -47,6 +47,7 @@
    #:gl-buffer
    #:buffer
    #:attribute
+   #:data
    #:attributes
    #:define-uset
    #:graphics-state
@@ -56,6 +57,8 @@
    #:simple-effect
    #:submit
    #:submit-with-effect
+   #:gl-state
+   #:units
    #:retract
    #:retract-with-effect
    ;; allocators and allocation
