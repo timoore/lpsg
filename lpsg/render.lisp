@@ -251,7 +251,7 @@ Will be created automatically, but must be specified for now.")))
   (unless (upload-queue renderer)
     (setf (upload-queue renderer) (make-instance 'upload-queue))))
 
-(defmethod schedule-upload ((renderer renderer) (object buffer-area))
+(defmethod schedule-upload ((renderer renderer) object)
   (add-to-upload-queue (upload-queue renderer) object))
 
 (defmethod add-to-upload-queue ((queue buffer-object-upload-queue) (obj buffer-area))
@@ -356,7 +356,7 @@ Will be created automatically, but must be specified for now.")))
             (gl:bind-vertex-array vao-id)
             (loop
                for (nil area index) in (array-bindings attribute-set)
-               when index
+               when (>= index 0)
                do (progn
                     (gl:bind-buffer :array-buffer (id (buffer area)))
                     (gl:enable-vertex-attrib-array index)

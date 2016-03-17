@@ -12,7 +12,7 @@
    (width :accessor width :initarg :width)
    (height :accessor height :initarg :height)
    (generate-mipmap-p :accessor generate-mipmap-p :initarg :generate-mipmap-p))
-  (:default-initargs :level 0 :x-offset 0 :y-offset 0 :generate-mipmap t))
+  (:default-initargs :level 0 :x-offset 0 :y-offset 0 :generate-mipmap-p t))
 
 (define-gl-object texture ()
   ((target :accessor target :initarg :target)
@@ -22,13 +22,17 @@
    (base-level :accessor base-level :initarg :base-level))
   (:default-initargs :base-level 0))
 
+(defmethod gl-finalized-p ((obj texture))
+  (gl-valid-p obj))
+
 (defclass texture-2d (texture)
   ((width :accessor width :initarg :width)
    (height :accessor height :initarg :height)))
 
 (defmethod gl-finalize ((obj texture-2d) &optional errorp)
+  (declare (ignorable errorp))
   (setf (id obj) (gl:gen-texture))
-  (gl:active-texture 0)
+  (gl:active-texture :texture0)
   (let ((target (target obj)))
     (gl:bind-texture (target obj) (id obj))
     (gl:tex-image-2d (target obj)
@@ -69,7 +73,7 @@
 
 (defmethod upload-texture (renderer (area raw-texture-resource) (texture texture-2d))
   (declare (ignore renderer))
-  (gl:active-texture 0)
+  (gl:active-texture :texture0)
   (let ((target (target texture)))
     (gl:bind-texture target (id texture))
     (gl:pixel-store :unpack-alignment (row-alignment area))
@@ -171,8 +175,8 @@
   (gl-finalize (program m)))
 
 (defclass gltexture-unit ()
-  ((tex-object :accessor tex-object)
-   (sampler-object :accessor sampler-object)))
+  ((tex-object :accessor tex-object :initarg :tex-object)
+   (sampler-object :accessor sampler-object :initarg :sampler-object)))
 
 (defun compare-texture-unit (unit1 unit2)
   (cond ((and unit1 unit2)
@@ -191,7 +195,7 @@
           :documentation "An array of bindings for OpenGL's texture units. The members of the array
   can be NIL, representing no binding")))
 
-(defmethod initialize-instance ((obj glstate-texunits) &key units renderer)
+(defmethod initialize-instance :after ((obj glstate-texunits) &key units renderer)
   (let ((max-tex-units (if renderer
                            (max-combined-texture-image-units (context-parameters renderer))
                            16)))
@@ -213,6 +217,17 @@
        do (return-from glstate-compare comp))
     (call-next-method)))
 
+(defparameter *tex-unit-enums* (apply #'vector
+                                      (loop
+                                         for i from 0 below 32
+                                         collect (intern (format nil "TEXTURE~d" i) :keyword))))
+
+#|
+(defun active-texture (num &optional (unit :texture0))
+  (let ((texture0 (cffi:foreign-enum-value '%gl:enum unit)))
+    (%gl:active-texture (+ texture0 num))))
+|#
+
 (defmethod glstate-bind :after (renderer (m glstate-texunits) previous)
   (declare (ignore renderer))
   (flet ((unbind-texture (unit)
@@ -224,14 +239,14 @@
          with len = (length units)
          for i from 0 below len
          do (progn
-              (gl:active-texture i)
+              (gl:active-texture (svref *tex-unit-enums* i))
               (cond ((svref units i)
                      (let* ((unit (svref units i))
                             (tex-obj (tex-object unit))
                             (sampler-obj (sampler-object unit)))
                        (gl:bind-texture (target tex-obj) (id tex-obj))
                        (gl:bind-sampler i (id sampler-obj))))
-                    ((svref prev-units i)
+                    ((and prev-units (svref prev-units i))
                      (unbind-texture (svref prev-units i)))
                     (t (gl:bind-texture :texture-2d 0))))))))
 
@@ -253,7 +268,7 @@
           (gl-finalize (tex-object unit))
           (gl-finalize (sampler-object unit)))))
 
-(defclass graphics-state (glstate-program)
+(defclass graphics-state (glstate-program glstate-texunits)
   ()
   (:documentation "Class that stores most OpenGL state."))
 

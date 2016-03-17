@@ -3,11 +3,12 @@
 (in-package #:lpsg-examples.texture)
 
 (defclass texture-effect (simple-effect)
-  ((texture :accessor texture)
-   (sampler :accessor sampler)
-   (shader-program :accessor shader-program :initform nil :allocation :class))
-  (:default-initargs :attribute-map '((vertex . "in_Position")
-                                      (normal . "in_Normal")
+  ((texture-area :accessor texture-area :initarg :texture-area)
+   (sampler :accessor sampler :initarg :sampler)
+   (shader-program :accessor shader-program :initform nil :allocation :class)
+   (tex-loaded :accessor tex-loaded :initform nil))
+  (:default-initargs :attribute-map '((gl:vertex . "in_Position")
+                                      (gl:normal . "in_Normal")
                                       (texcoord . "in_TexCoord"))
     :uset-names '(lpsg-examples::camera lpsg-examples::model light tex-sampler)))
 
@@ -23,7 +24,7 @@ in vec2 in_TexCoord;
 smooth out vec3 theColor;
 smooth out vec2 theTexCoord;
 
-vec3 in_Color = vec3(1.0, 0.0, 1.0);
+vec3 in_Color = vec3(1.0, 1.0, 1.0);
 
 uniform vec4 lightDir;
 uniform mat4 projectionMatrix;
@@ -76,15 +77,19 @@ void main()
                                                        :source *fragment-shader-source*
                                                        :usets '(tex-sampler)))))))
 
+
 (defmethod submit-with-effect :before (shape renderer (effect texture-effect))
-  (unless (gl-state effect)
+  (unless (slot-boundp effect 'gl-state)
     (setf (gl-state effect) (make-instance 'graphics-state
                                            :renderer renderer
                                            :program (shader-program effect)))
     (setf (svref (units (gl-state effect)) 0)
           (make-instance 'lpsg::gltexture-unit
-                         :tex-object (texture effect)
-                         :sampler-object (sampler effect)))))
+                         :tex-object (lpsg::texture (texture-area effect))
+                         :sampler-object (sampler effect))))
+  (unless (tex-loaded effect)
+    (lpsg::schedule-upload renderer (texture-area effect))
+    (setf (tex-loaded effect) t)))
 
 (defparameter *default-camera-params* `(:eye ,(sb-cga:vec 1.0 1.0 0.0)
                                         :target ,(sb-cga:vec 0.0 0.0 -5.0)
@@ -93,9 +98,8 @@ void main()
 (defclass texture-window (viewer-window lpsg:renderer)
   ((view-camera :initform (apply #'make-instance 'partial-view-camera *default-camera-params*))
    (effect :accessor effect)
-   (exposed :accessor exposed :initarg :exposed)
    (shapes :accessor shapes :initform nil)
-   (current-dragger :initform nil)
+   (visible-inputs :accessor visible-inputs :initform nil)
    (texture-source :accessor texture-source :initarg texture-source
                    :documentation "??? A pathname, perhaps?"))
   (:default-initargs :exposed nil))
@@ -103,9 +107,11 @@ void main()
 ;;; Instances of usets
 (defvar *model-uset* (make-instance 'lpsg-examples::model))
 (defvar *light-uset* (make-instance 'light))
+(defvar *sampler-uset* (make-instance 'tex-sampler))
 
 (defvar *model-input* (make-instance 'lpsg:input-value-node :value *model-uset*))
 (defvar *light-input* (make-instance 'lpsg:input-value-node :value *light-uset*))
+(defvar *sampler-input* (make-instance 'lpsg:input-value-node :value *sampler-uset*))
 
 ;;; Compute a high light, slightly to the side and front. This is the standard Lambert shading
 ;;; model, for diffuse shading only.
@@ -131,15 +137,13 @@ void main()
        for i from 0 below 6
        for face-base = (* i 4)
        do (loop
-             for v from 0 to 1
-             for vf = (float u 1.0)
-             do (loop
-                   for u from 0 to 1
-                   for uf = (float v 1.0)
-                   for tex-index = (+ face-base (* 2 v) u)
-                   do (progn
-                        (setf (aref texcoord-array tex-index 0) uf)
-                        (setf (aref texcoord-array tex-index 1) vf)))))
+             for in-face from 0 below 4
+             for u = (if (or (= in-face 0) (= in-face 3)) 0.0 1.0)
+             for v = (if (>= in-face 2) 1.0 0.0)
+             for tex-index = (+ face-base in-face)
+             do (progn
+                  (setf (aref texcoord-array tex-index 0) u)
+                  (setf (aref texcoord-array tex-index 1) v))))
     ;; map each vertex to a color using the coordinates of the vertex
     (let ((coord-array (data (attribute cube 'gl:vertex))))
       (loop
@@ -164,9 +168,10 @@ void main()
 (defun make-textured-shape (model-input allocator window)
   (let ((shape (make-cube-with-attributes)))
         (setf (lpsg:effect shape) (effect window))
-    (setf (lpsg:input shape 'lpsg-examples::camera) (camera-uset-node window))
+    (setf (lpsg:input shape 'lpsg-examples::camera) (lpsg-examples::camera-uset-node window))
     (setf (lpsg:input shape 'lpsg-examples::model) model-input)
     (setf (lpsg:input shape 'light) *light-input*)
+    (setf (input shape 'tex-sampler) *sampler-input*)
     ;; Allocate storage  in OpenGL buffer objects for the shape's geometry.
     (lpsg:compute-shape-allocation allocator shape)
     shape))
@@ -183,9 +188,9 @@ void main()
        for shape = (make-textured-shape model-input allocator window)
        for shape-visible = (make-instance 'lpsg:input-value-node :value t)
        do (progn
-            (setf (lpsg:input shape 'lpsg:visiblep) cube-visible)
-            (setf (aref (shapes window) i) cube)
-            (setf (aref (visible-inputs window) i) cube-visible)
+            (setf (lpsg:input shape 'lpsg:visiblep) shape-visible)
+            (setf (aref (shapes window) i) shape)
+            (setf (aref (visible-inputs window) i) shape-visible)
             (lpsg:submit shape window)))))
 
 (defun retract-shapes (window)
@@ -198,7 +203,7 @@ void main()
         (visible-inputs window) nil))
 
 (defmethod draw-window ((window texture-window))
-  (draw win))
+  (draw window))
 
 (defun make-texture-effect (window)
   ;;; create a texture test pattern
@@ -210,7 +215,10 @@ void main()
        do (loop
              for i from 0 below 64
              for idx = (* (+ (* j 64) i) 3)
-             do (if (oddp (* i j))
+             for row = (floor j 8)
+             for col = (floor i 8)
+             do (if (or (and (evenp row) (evenp col))
+                        (and (not (evenp row)) (not (evenp col))))
                     (progn
                       (setf (cffi:mem-aref mem :uint8 idx) 0)
                       (setf (cffi:mem-aref mem :uint8 (+ idx 1)) 255)
@@ -227,16 +235,80 @@ void main()
                                     :data mem
                                     :data-count data-size
                                     :width 64
-                                    :height 64))))))
+                                    :height 64)))
+      (make-instance 'texture-effect
+                     :texture-area tex-area
+                     :sampler (make-instance 'sampler)))))
 
 
 (defmethod glop:on-event :after ((window texture-window) (event glop:expose-event))
   (unless (exposed window)
     ;; Create a cube with correct face normals.
-    (let* ((effect (make-instance texture-effect
-                                  )))
-      (setf (model-matrix *model-uset*) (sb-cga:translate* 1.0 0.0 -5.0))
+    (let* ((effect (make-texture-effect window)))
+      (setf (lpsg-examples::model-matrix *model-uset*) (sb-cga:translate* 1.0 0.0 -5.0))
       (setf (light-direction *light-uset*) (compute-light-vector))
+      (setf (tex-sampler *sampler-uset*) 0)
       (setf (effect window) effect)
       (submit-shape window)))
   (draw-window window))
+
+(defmethod glop:on-event :after ((window texture-window) (event glop:resize-event))
+  (draw-window window))
+
+(defmethod glop:on-event ((window texture-window) (event glop:key-event))
+  (if (glop:pressed event)
+      (case (glop:keysym event)
+        (:p
+         (setf (projection-type window)
+               (if (eq (projection-type window) 'orthographic)
+                   'perspective
+                   'orthographic))
+         (setf (lpsg:value (camera-selector window)) (eq (projection-type window) 'orthographic))
+         (draw-window window))
+        (:1
+         (let ((input-node (aref (visible-inputs window) 0)))
+           (setf (lpsg:value input-node) (not (lpsg:value input-node))))
+         (draw-window window))
+        (:s
+         (submit-shape window)
+         (draw-window window))
+        (:r
+         (retract-shapes window)
+         (draw-window window))
+        (:g
+         (tg:gc :full t)
+         (draw-window window))
+        (t
+         (call-next-method)))
+      (call-next-method)))
+
+(defmethod on-mouse-motion-event :after ((window texture-window) (event glop:mouse-motion-event)
+                                         last-event-p)
+  (with-slots (current-dragger)
+      window
+    (when (and current-dragger last-event-p)
+      (draw-window window))))
+
+(defgeneric cleanup-window (win))
+
+(defmethod cleanup-window ((win texture-window))
+  (let* ((effect (effect win))
+         (mem (data (texture-area effect))))
+    (cffi:foreign-free mem)
+    (setf (shader-program effect) nil)
+    t))
+
+(defun texture-example (&rest args)
+  "Draw a textured cube in a window.
+
+The `p' key switches between orthographic and perspective views."
+  (let* ((win (apply #'make-instance 'texture-window args)))
+    (open-viewer win "texture demo" 800 600)
+    (unwind-protect
+         (progn
+           (unless win
+             (return-from texture-example nil))
+           (process-events win))
+      (when win
+        (cleanup-window win)
+        (glop:destroy-window win)))))

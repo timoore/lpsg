@@ -58,7 +58,8 @@
    ;; An input-value node for holding T or NIL to select the type of camera.
    (camera-selector :accessor camera-selector)
    (camera-uset-node :accessor camera-uset-node :initform (make-instance 'camera-uset-node))
-   (exposed :accessor exposed :initarg :exposed))
+   (exposed :accessor exposed :initarg :exposed)
+   (current-dragger :initform nil))
   (:default-initargs :projection-type 'orthographic :exposed nil))
 
 (defmethod initialize-instance :after ((obj viewer-window) &key)

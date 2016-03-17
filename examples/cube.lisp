@@ -56,8 +56,7 @@ void main()
   ((view-camera :initform (apply #'make-instance 'partial-view-camera *default-camera-params*))
    (effect :accessor effect)
    (cubes :accessor cubes :initform nil)
-   (visible-inputs :accessor visible-inputs :initform nil)
-   (current-dragger :initform nil))
+   (visible-inputs :accessor visible-inputs :initform nil))
   (:default-initargs :exposed nil))
 
 ;;; Instances of usets
