@@ -57,8 +57,10 @@
    (camera-choice :accessor camera-choice)
    ;; An input-value node for holding T or NIL to select the type of camera.
    (camera-selector :accessor camera-selector)
-   (camera-uset-node :accessor camera-uset-node :initform (make-instance 'camera-uset-node)))
-  (:default-initargs :projection-type 'orthographic))
+   (camera-uset-node :accessor camera-uset-node :initform (make-instance 'camera-uset-node))
+   (exposed :accessor exposed :initarg :exposed)
+   (current-dragger :initform nil))
+  (:default-initargs :projection-type 'orthographic :exposed nil))
 
 (defmethod initialize-instance :after ((obj viewer-window) &key)
   (let ((choice (make-instance 'lpsg:if-then-node))
@@ -72,6 +74,28 @@
     (setf (lpsg:input (camera-uset-node obj) 'projection-matrix) choice)
     (setf (lpsg:input (camera-uset-node obj) 'view-matrix)
           (lpsg-tinker:view-matrix-node (view-camera obj)))))
+
+(defgeneric draw-window (window)
+  (:documentation "Do one pass of the rendering loop."))
+
+(defmethod draw-window ((window viewer-window))
+  nil)
+
+(defmethod draw-window :around ((window viewer-window))
+  ;; All the OpenGL state set by theese calls will eventually be stored in a LPSG:GL-STATE
+  ;; object.
+  (%gl:clear-color .8 .8 .8 1.0)
+  (gl:cull-face :back)
+  (gl:depth-func :less)
+  (gl:enable :cull-face :depth-test)
+  (gl:disable :dither)
+  (gl:clear :color-buffer :depth-buffer)
+  (call-next-method)
+  (glop:swap-buffers window))
+
+(defmethod glop:on-event :around ((window viewer-window) (event glop:expose-event))
+  (call-next-method)
+  (setf (exposed window) t))
 
 (defmethod glop:on-event ((window viewer-window) (event glop:key-event))
   (when (eq (glop:keysym event) :escape)

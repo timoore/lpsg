@@ -28,7 +28,24 @@
 ;;; POSSIBILITY OF SUCH DAMAGE.
 
 (defpackage #:lpsg-examples
-  (:use #:cl)
+  (:use #:cl #:lpsg)
   (:export
-   #:cube-example))
+   #:cube-example
+   #:viewer-window
+   #:draw-window
+   #:on-mouse-motion-event
+   #:exposed
+   #:view-camera
+   #:open-viewer
+   #:projection-type
+   #:camera-selector
+   #:perspective
+   #:orthographic
+   #:partial-view-camera
+   #:current-dragger
+   #:process-events))
 
+(defpackage #:lpsg-examples.texture
+  (:use #:cl #:lpsg #:lpsg-examples)
+  (:export
+   #:texture-example))

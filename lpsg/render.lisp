@@ -108,6 +108,11 @@ This function is used in the implementation of SUBMIT-WITH-EFFECT."))
 (defclass render-stage (render-queue)
   ((render-queues :accessor render-queues :initarg :render-queues :initform nil)))
 
+(defclass glcontext-parameters ()
+  ((max-combined-texture-image-units :accessor max-combined-texture-image-units
+                                     :initarg :max-combined-texture-image-units))
+  (:default-initargs :max-combined-texture-image-units 8)) ;XXX way to small, for testing
+
 (defclass renderer ()
   ((buffers :accessor buffers :initform nil)
    (bundles :accessor bundles :initform nil)
@@ -120,8 +125,16 @@ This function is used in the implementation of SUBMIT-WITH-EFFECT."))
    ;; XXX Should be weak
    (vao-cache :accessor vao-cache :initform (make-hash-table :test 'equal))
    (gl-objects :accessor gl-objects :initform nil :documentation "List of all OpenGL objects
-allocated by calls in LPSG." ))
+allocated by calls in LPSG." )
+   (context-parameters :accessor context-parameters
+                       :documentation "Parameters of the OpenGL context."))
   (:documentation "The class responsible for all rendering."))
+
+;;; XXX Temporary until we figure out how how / when to intialize the renderer from a graphics
+;;; context.
+
+(defmethod initialize-instance :after ((obj renderer) &key)
+  (setf (context-parameters obj) (make-instance 'glcontext-parameters)))
 
 (defun process-finalize-queue (renderer)
   (loop
@@ -206,18 +219,56 @@ but that can impact performance."))
 (defmethod upload-fn ((obj buffer-area))
   (error "No upload function defined."))
 
-(defgeneric add-to-upload-queue (renderer buffer-area))
+(defclass mirrored-resource-mixin ()
+  ((data :accessor data :initarg :data)
+   (data-offset :accessor data-offset :initarg :data-offset :initform 0)
+   (data-count :accessor data-count :initarg :data-count :initform 0
+               :documentation "number of elements")
+   (data-stride :accessor data-stride :initarg :data-stride :initform 0
+                :documentation "offset between start of each element")
+   (num-components :accessor num-components :initarg :num-components
+                   :documentation "number of components per element. Redundant
+  with buffer-area components?")
+   (upload-fn :accessor upload-fn :initarg :upload-fn
+              :documentation "Function to upload Lisp data to a mapped buffer.
+Will be created automatically, but must be specified for now.")))
 
-(defmethod add-to-upload-queue ((renderer renderer) (obj buffer-area))
+(defgeneric schedule-upload (renderer object)
+  (:documentation "Register an object to be uploaded to OpenGL."))
+
+(defclass buffer-object-upload-queue ()
+  ((bo-queue :accessor bo-queue :initform nil)))
+
+(defclass texture-upload-queue ()
+  ((tex-queue :accessor tex-queue :initform nil)))
+
+(defclass upload-queue (buffer-object-upload-queue texture-upload-queue)
+  ())
+
+(defgeneric add-to-upload-queue (queue object))
+
+(defmethod schedule-upload :before ((renderer renderer) object)
+  (unless (upload-queue renderer)
+    (setf (upload-queue renderer) (make-instance 'upload-queue))))
+
+(defmethod schedule-upload ((renderer renderer) object)
+  (add-to-upload-queue (upload-queue renderer) object))
+
+(defmethod add-to-upload-queue ((queue buffer-object-upload-queue) (obj buffer-area))
   (let* ((buffer (buffer obj))
-         (entry (assoc buffer (upload-queue renderer))))
+         (entry (assoc buffer (bo-queue queue))))
     (if entry
         (push obj (cdr entry))
-        (setf (getassoc buffer (upload-queue renderer)) (list obj)))))
+        (setf (getassoc buffer (bo-queue queue)) (list obj)))))
 
-(defun do-upload-queue (renderer)
+(defgeneric process-upload-queue (renderer queue))
+
+(defmethod process-upload-queue (renderer queue)
+  )
+
+(defmethod process-upload-queue :after (renderer (queue buffer-object-upload-queue))
   (loop
-     for (buffer . uploads) in (upload-queue renderer)
+     for (buffer . uploads) in (bo-queue queue)
      for target = (target buffer)
      do (progn
           (gl:bind-buffer target (id buffer))
@@ -225,9 +276,14 @@ but that can impact performance."))
             (mapc (lambda (area)
                     (funcall (upload-fn area) area ptr))
                   uploads))
-          (gl:unmap-buffer target)))
+          (gl:unmap-buffer target))
+     finally
+       (setf (bo-queue queue) nil))
   ;; Is this necessary? Should all the targets be set to 0?
   (gl:bind-buffer :array-buffer 0))
+
+(defun do-upload-queue (renderer)
+  (process-upload-queue renderer (upload-queue renderer)))
 
 (defmethod gl-finalized-p ((obj buffer-area))
   (gl-finalized-p (buffer obj)))
@@ -300,7 +356,7 @@ but that can impact performance."))
             (gl:bind-vertex-array vao-id)
             (loop
                for (nil area index) in (array-bindings attribute-set)
-               when index
+               when (>= index 0)
                do (progn
                     (gl:bind-buffer :array-buffer (id (buffer area)))
                     (gl:enable-vertex-attrib-array index)
@@ -316,18 +372,6 @@ but that can impact performance."))
             (setf (gethash attr-set-key (vao-cache *renderer*)) vao)))
         (setf (vao attribute-set) vao))))
   attribute-set)
-
-
-(defclass graphics-state ()
-  ((bindings)
-   (program :accessor program :initarg :program :initform nil))
-  (:documentation "Class that stores all OpenGL state."))
-
-(defmethod gl-finalized-p ((obj graphics-state))
-  (gl-finalized-p (program obj)))
-
-(defmethod gl-finalize ((obj graphics-state) &optional errorp)
-  (gl-finalize (program obj) errorp))
 
 (defclass shader-source ()
   ((shader-type :accessor shader-type :initarg :shader-type )
@@ -482,20 +526,6 @@ traverse the render stages and their render queues to render all bundles."))
 
 (defgeneric draw-bundles (renderer))
 
-(defgeneric bind-state (renderer state))
-
-(defmethod bind-state ((renderer renderer) (state graphics-state))
-  (with-slots (current-state)
-      renderer
-    (when (eq current-state state)
-      (return-from bind-state nil))
-    (let* ((old-program (and current-state (program current-state)))
-           (new-program (program state)))
-      (unless (eq new-program old-program)
-        (gl:use-program (id new-program)))
-        ;; XXX bindings
-      (setf (current-state renderer) state))))
-
 (defgeneric process-gl-objects (renderer))
 
 (defmethod draw ((renderer renderer))
@@ -508,7 +538,6 @@ traverse the render stages and their render queues to render all bundles."))
     (process-finalize-queue renderer)
     (setf (finalize-queue renderer) nil)
     (do-upload-queue renderer)
-    (setf (upload-queue renderer) nil)
     (draw-bundles renderer)))
 
 (defgeneric draw-bundle (renderer bundle))

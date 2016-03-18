@@ -55,10 +55,8 @@ void main()
 (defclass cube-window (viewer-window lpsg:renderer)
   ((view-camera :initform (apply #'make-instance 'partial-view-camera *default-camera-params*))
    (effect :accessor effect)
-   (exposed :accessor exposed :initarg :exposed)
    (cubes :accessor cubes :initform nil)
-   (visible-inputs :accessor visible-inputs :initform nil)
-   (current-dragger :initform nil))
+   (visible-inputs :accessor visible-inputs :initform nil))
   (:default-initargs :exposed nil))
 
 ;;; Instances of usets
@@ -69,21 +67,6 @@ void main()
 (defvar *model-input* (make-instance 'lpsg:input-value-node :value *model-uset*))
 (defvar *light-input* (make-instance 'lpsg:input-value-node :value *light-uset*))
 (defvar *model-input2* (make-instance 'lpsg:input-value-node :value *model-uset2*))
-
-(defun draw-window (win)
-  (when (exposed win)
-    ;; All the OpenGL state set by theese calls will eventually be stored in a LPSG:GL-STATE
-    ;; object.
-    (%gl:clear-color .8 .8 .8 1.0)
-    (gl:cull-face :back)
-    (gl:depth-func :less)
-    (gl:enable :cull-face :depth-test)
-    (gl:disable :dither)
-    (gl:clear :color-buffer :depth-buffer)
-    ;; Initialize any OpenGL objects, upload any new data to OpenGL buffers, and draw all the
-    ;; shapes.
-    (lpsg:draw win)
-    (glop:swap-buffers win)))
 
 ;;; Compute a high light, slightly to the side and front. This is the standard Lambert shading
 ;;; model, for diffuse shading only.
@@ -136,6 +119,9 @@ void main()
   (setf (cubes window) nil
         (visible-inputs window) nil))
 
+(defmethod draw-window ((win cube-window))
+  (lpsg:draw win))
+
 (defmethod glop:on-event :after ((window cube-window) (event glop:expose-event))
   (unless (exposed window)
     ;; Create a cube with correct face normals.
@@ -161,7 +147,6 @@ void main()
       (setf (light-direction *light-uset*) (compute-light-vector))
       (setf (effect window) effect)
       (submit-cubes window)))
-  (setf (exposed window) t)
   (draw-window window))
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:resize-event))
