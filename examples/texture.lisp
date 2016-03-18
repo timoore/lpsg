@@ -238,7 +238,7 @@ void main()
                                     :height 64)))
       (make-instance 'texture-effect
                      :texture-area tex-area
-                     :sampler (make-instance 'sampler)))))
+                     :sampler (make-instance 'sampler :min-filter :linear-mipmap-linear)))))
 
 
 (defmethod glop:on-event :after ((window texture-window) (event glop:expose-event))
