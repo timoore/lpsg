@@ -1,0 +1,47 @@
+@begin(section)
+@title(Overview)
+
+LPSG is a Common Lisp library for rendering graphics using OpenGL. It
+presents a programming interface that allows it to implement
+optimizations that are important on modern graphics hardware. LPSG's
+target applications include 3D content creation programs, games, and
+geospatial viewing programs -- in short, any domain in which excellent
+interactive rendering of a complex scenes is required. Another
+important class of applications that LPSG will support is 2D
+applications such as text editors which need fast, portable rendering.
+
+Note: LPSG is a work in progress. Throughout this manual future work or
+features will be indicated @i([like this.])
+
+The main optimization goal pursued by LPSG is to reduce the memory
+traffic between the CPU and GPU. It does this by storing the user's
+data in OpenGL @i(buffer objects) which normally reside on the
+GPU. Most updates to a graphics view, such as matrices that specify
+eye or object positions, are small; these are handled through a system
+of parameters called @i(usets). On the other hand, LPSG does @([will])
+support efficient methods for uploading large updates of user data.
+
+Another important optimization is reducing CPU cache misses during
+rendering. This is often caused by traversing large tree-like
+structures or scene graphs in the user's application. LPSG uses a
+different approach: the application @i(submits) graphics objects to
+LPSG, which is from then on responsible for traversing the objects and
+displaying them. LPSG can use data structures that are more efficient
+than the application's, @i([and much of the traversal may even be
+moved to the GPU.]) Newer versions of OpenGL contain interfaces that
+can reduce the number of cache misses inside the driver itself,
+@i([LPSG will take of advantage of them.])
+
+An optimization which was historically crucial is to reduce the number
+of state changes in the graphics hardware. Changing the rendering
+destination, current shader program, or set of bound textures requires
+changing a lot of hardware state and may cause a stall on the
+GPU. @i([LPSG will sort the rendering order of graphics objects to
+minimize state changes.])
+
+A side effect of all these optimizations is to reduce the number of calls
+to the OpenGL API. This is good for OpenGL performance in general, as
+each OpenGL call requires work from the driver to at least validate it and
+check for errors. This is especially good in Common Lisp, as "foreign
+function calls" can be quite expensive.
+@end(section)
