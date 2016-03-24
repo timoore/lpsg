@@ -6,7 +6,7 @@ presents a programming interface that allows it to implement
 optimizations that are important on modern graphics hardware. LPSG's
 target applications include 3D content creation programs, games, and
 geospatial viewing programs -- in short, any domain in which excellent
-interactive rendering of a complex scenes is required. Another
+interactive rendering of complex scenes is required. Another
 important class of applications that LPSG will support is 2D
 applications such as text editors which need fast, portable rendering.
 
@@ -32,18 +32,38 @@ moved to the GPU.]) Newer versions of OpenGL contain interfaces that
 can reduce the number of cache misses inside the driver itself,
 @i([LPSG will take of advantage of them.])
 
-An optimization which was historically crucial is to reduce the number
-of state changes in the graphics hardware. Changing the rendering
-destination, current shader program, or set of bound textures requires
-changing a lot of hardware state and may cause a stall on the
-GPU. @i([LPSG will sort the rendering order of graphics objects to
-minimize state changes.]) 
+An optimization which was historically crucial and is still helpful is
+reducing the number of state changes in the graphics
+hardware. Changing the rendering destination, current shader program,
+or set of bound textures requires reinitializing a lot of hardware state and
+may cause a stall on the GPU. @i([LPSG will sort the rendering order
+of graphics objects to minimize state changes.])
 
 A side effect of all these optimizations is to reduce the number of calls
 to the OpenGL API. This is good for OpenGL performance in general, as
 each OpenGL call requires work from the driver to at least validate it and
 check for errors. This is especially good in Common Lisp, as "foreign
 function calls" can be quite expensive.
+
+@begin{section}
+@title{Conventions}
+LPSG is described in terms of protocols and protocol classes. A
+@i{protocol} is a set of generic functions that collaborate to do
+something. The functions in a protocol must restrict some of their
+arguments to classes that have certain properties. These classes are
+@i{protocol classes}, abstract classes that serve only as
+superclasses. A protocol class defines accessors, which behave like
+normal slot accessors, although they can take more than one
+argument. It also defines normal generic functions that are considered
+to be part of the class, even though classes don't implement functions
+and methods in Common Lisp.
+
+If a class inherits from a protocol class, then there must exist
+applicable methods for all the accessors and generic functions in the
+protocol class when the derived class is an argument to them. LPSG
+provides mixins that contain slots whose accessor methods implment the
+protocol classes' accessor generic functions.
+@end{section}
 
 @begin{section}
 @title{The renderer}
