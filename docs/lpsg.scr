@@ -37,11 +37,171 @@ of state changes in the graphics hardware. Changing the rendering
 destination, current shader program, or set of bound textures requires
 changing a lot of hardware state and may cause a stall on the
 GPU. @i([LPSG will sort the rendering order of graphics objects to
-minimize state changes.])
+minimize state changes.]) 
 
 A side effect of all these optimizations is to reduce the number of calls
 to the OpenGL API. This is good for OpenGL performance in general, as
 each OpenGL call requires work from the driver to at least validate it and
 check for errors. This is especially good in Common Lisp, as "foreign
 function calls" can be quite expensive.
+
+@begin{section}
+@title{The renderer}
+
+LPSG contains a @c{renderer} class that controls all rendering to the
+screen. This class implements an @c{open} method; this should be
+called once an OpenGL context is established. The @c{open} method
+verifies that the context can support the rendering done by lpsg; that
+is, the version of OpenGL supports the features needed by lpsg or has
+extensions that support them. It also records some parameters and
+capabilities of the OpenGL implementation, such as the number of
+texture units The @c{renderer} class also implements a @c{close}
+method, which should be called at the end of rendering to clean up;
+possibly it will deallocate OpenGL objects, but in any case it will
+invalidate them.
+
+Perhaps the most important method implemented by the renderer is the @c{submit}
+method, which is how "things" (shapes) are registered with lpsg so that
+they can be rendered.
+
+Then, the renderer object has a draw method, which causes all the
+graphic objects that have been registered with it to be drawn to the
+screen. The renderer does not swap OpenGL front and back buffers; that
+is done by the application outside of lpsg.
+
+The shape object / class is the principal way that the user gets
+things into lpsg to be rendered. It may be the only way. I'm thinking
+of having submit be really the only way that things are made known to
+lpsg. This is not quite true the way it's written right now, but let's
+go with that.
+
+The shape corresponds roughly to a geometry that can be
+rendered in OpenGL. And, in that sense, a shape is a collection of
+vertex attributes. The vertex attributes are represented by a class
+called "vertex-attribute," which, roughly speaking, are the per-vertex
+data of any geometry to be rendered. So, obviously that includes a
+position in space (coordinates); probably includes a normal vector, it
+can contain color, texture, or anything else in this modern world of
+shaders that could possibly be stored per-vertex in a shape. The shape
+also contains an object called a "drawable" which describes the
+specific shape i.e., whether it is a collection of points, lines, or
+triangles, how many of these objects there are, and also whether the
+shape is indexed or not. This refers to whether the vertex attributes
+are just straight arrays of one value for every vertex in the shape,
+or whether the individual parts of the shape are described by indices
+which are indexes into the arrays of vertex attributes. Indexed shapes
+are important because, not only do they offer a big size savings on
+meshes where a lot of the vertices would be repeated in the shape,
+they also enable another class of optimizations where the vertex
+attributes can be shared among different shapes. This turns out to be
+cheaper for OpenGL to deal with.
+
+The third major part of a shape is an object called an "environment,"
+which ultimately controls the appearance of the shape. The environment
+contains things such as the shader program, the textures bound when
+the shape is rendered... Some of these members are immutable, others
+are not. The general idea is that the shape itself is immutable, once
+it is created, and certainly once it has been submitted to lpsg. The
+individual parts of the shape are not necessarily immutable; the
+drawable part is mutable, and one can change the number of primitives
+drawn, which might be useful in some special effects to hide parts of
+a shape. The vertex attributes can be mutable. It is important to be
+able to upload new data for many kinds of dynamic animation
+effects. The environment is immutable; it is intended to be created
+and after is "read-only" (???)
+
+A shape is registered with the renderer using the @code{submit} method. After
+that, at that point lpsg handles everything. There only two things
+that can be directly done to the shape. It's visibility can be changed
+by a visible accessor on the shape, which controls whether it is
+actually displayed. There is also a retract method, which removes the
+shape from lpsg, causes to not be displayed anymore; at that point,
+it's over for the shape.
+
+This is all not very useful in terms of writing 3D
+applications. because if you put a shape on the screen with all these
+immutable attributes, then you can't navigate in the scene! You can't
+move the objects, no animation, can't do anything. This problem is
+resolved in lpsg by specifying parameters that end up affecting the
+environment. The parameters are grouped into sets, which we call
+"uniform sets," or "usets" as is used throughout lpsg. The idea is
+that parameters that are related to each other are grouped into sets
+and can eventually be updated in OpenGL in the same time, or at with
+the same frequency, and can be stored together. Uniform sets comes
+from the name that variables have in shader programs: "uniform
+variables." These are variables that change slowly; they do not change
+in the course of the rendering of a single shape. Their values might
+change between different shapes. And this is how an environment object
+could be used to render different shapes on the screen because one
+parameter of the environment would have to be the model matrix, which
+specifies where the object is in space. This is a parameter that is
+different for every shape, and it could change during the execution of
+the user's program. Another example of a uset are the parameters
+describing the viewpoint and camera. These are usually know as the
+view matrix and projection matrix. -- As well as other matrices
+associated with the camera, such as an inverse, transposed matrix used
+to transform normal vectors.
+
+Now, one of the things we are trying to optimize in lpsg is the amount
+of memory traffic to the GPU. So, we don't want to send copies of
+usets at every frame if we don't have to. So, there is a system of
+lazy evaluation in lpsg called "incremental nodes," which ultimately
+connect up to the environment object and feed it values. Normally an
+application would change the value of a uset; what this does
+is,through a chain of connected incremental nodes, causes the change
+to be registered for upload at a future time.
+
+The environment object is not used directly during OpenGL
+rendering. It does control how the rendering will be done. This is
+accomplished in the "submit" method, when a shape is submitted to the
+renderer. Submit immediately calls another method called
+"submit-with-effect". This method can be specialized on the effect
+object. This method has access to the internal data structures of the
+renderer at that point. This includes are queues that will be
+traversed in order to render shapes on the screen. That is, one of the
+queues contain shapes (????XXX), but when submit-with-effect is
+called, the effect actually creates another object, called an
+"environment," which does contain everything needed for OpenGL to
+render a shape e.g., : the shader program needed to render the shape,
+the texture units in effect, the collection of usets needed by the
+shader program.
+
+Submit-with-effect, then, has the freedom ---
+
+I mispoke, it's not shapes that go on the queues... will talk about
+that in a second. What submit-with-effect does is it takes from the
+shape it creates additional objects that are similar to shapes, but,
+in the backend of lpsg, that are called "bundles." The bundles are
+placed in the queues. Along with a bundle is an environment object
+which contains everything needed by OpenGL to render the shape. 
+@end{section}
+
 @end(section)
+
+@begin{section}
+@title{Renderer}
+@end{section}
+
+@begin{section}
+@title{Attributes and shapes}
+@end{section}
+
+@begin{section}
+@title{Incremental computation}
+@end{section}
+
+@begin{section}
+@title{Environments}
+@end{section}
+
+@begin{section}
+@title{Uniform sets}
+@end{section}
+
+@begin{section}
+@title{The submit protocol}
+@end{section}
+
+@begin{section}
+@title{Utilities}
+@end{section}
