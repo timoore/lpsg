@@ -39,6 +39,7 @@
   (:export
    #:render-bundle
    #:renderer
+   #:open-renderer
    #:close-renderer
    #:add-bundle
    #:draw

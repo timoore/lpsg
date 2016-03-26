@@ -28,6 +28,7 @@
 
 
 (defmacro define-protocol-class (name super-classes generic-functions &rest options)
+  "Define a protocol class."
   (let* ((sym-name (symbol-name name))
 	 (protocol-predicate
 	  (intern (concatenate 'string

@@ -13,6 +13,10 @@ applications such as text editors which need fast, portable rendering.
 Note: LPSG is a work in progress. Throughout this manual future work or
 features will be indicated @i([like this.])
 
+While LPSG does provide classes and functions for common 3D rendering
+tasks, its essential purpose is to aid the creation of fast programs
+that use OpenGL. A typical application that uses LPSG will 
+
 The main optimization goal pursued by LPSG is to reduce the memory
 traffic between the CPU and GPU. It does this by storing the user's
 data in OpenGL @i(buffer objects) which normally reside on the
@@ -59,26 +63,58 @@ to be part of the class, even though classes don't implement functions
 and methods in Common Lisp.
 
 If a class inherits from a protocol class, then there must exist
-applicable methods for all the accessors and generic functions in the
-protocol class when the derived class is an argument to them. LPSG
-provides mixins that contain slots whose accessor methods implment the
-protocol classes' accessor generic functions.
+applicable methods for all the accessors and generic functions defined
+by the protocol class when the derived class appears as an argument to
+them. LPSG provides mixins that contain slots whose accessor methods
+implement the protocol classes' accessor generic functions.
+
+Protocol classes are defined using the @{define-protocol-class} macro:
+
+@cl:with-package[name="lpsg"](
+@cl:doc(macro define-protocol-class)
+)
 @end{section}
 
+@begin{section}
+@title{High level LPSG}
+
+LPSG contains a @c{renderer} class that controls all rendering to the
+screen. The user creates @c{shapes} containing per-vertex attributes,
+such as position or color data. The shape also contains an effect
+object which controls its appearence on the screen.
+
+Once a shape has been prepared, it is submitted to the renderer. This
+invokes the @c{submit-with-effect} generic function which, dispatching
+on the renderer, shape, and effect arguments, creates the objects that
+are used in the actual OpenGL rendering and places them on various
+queues. These are used when the user calls the renderer's @c{draw}
+method: OpenGL objects are created on the GPU, any necessary
+initialization is performed, and shapes are rendered. On future calls
+to @c{draw}, these objects will be rendered again. The user
+effectively gives up ownership of a shape object until the
+@c{retract} method is called on it. This removes the objects created
+in the @c{submit} call from the renderer's queues and destroys any
+now-uneeded OpenGL objects.
+
+Scenes in 3D applications are very dynamic; if they weren't, there
+wouldn't be much point in displaying them in 3D. At the least, it is
+possible for the viewpoint to change at every redraw of the
+screen. The geometric objects in the scene may be animated as well,
+and these are often evaluated within systems of nested coordinate systems. To
+support this dynamism, LPSG implements a system of parameters that are
+connected in dependency chains. These @c{incremental-node} objects use
+lazy evaluation to supply values that affect OpenGL rendering. These
+values are most often used to set the uniform variables in OpenGL
+shader programs. LPSG aggregates such variables into sets, in order to
+choose the optimal way to upload them to OpenGL; these sets are called
+"uniform sets" or, throughout LPSG, "usets."
+
+@end{section}
 @begin{section}
 @title{The renderer}
 
 LPSG contains a @c{renderer} class that controls all rendering to the
-screen. This class implements an @c{open} method; this should be
-called once an OpenGL context is established. The @c{open} method
-verifies that the context can support the rendering done by lpsg; that
-is, the version of OpenGL supports the features needed by lpsg or has
-extensions that support them. It also records some parameters and
-capabilities of the OpenGL implementation, such as the number of
-texture units The @c{renderer} class also implements a @c{close}
-method, which should be called at the end of rendering to clean up;
-possibly it will deallocate OpenGL objects, but in any case it will
-invalidate them.
+screen.
 
 Perhaps the most important method implemented by the renderer is the @c{submit}
 method, which is how "things" (shapes) are registered with lpsg so that
@@ -200,6 +236,18 @@ which contains everything needed by OpenGL to render the shape.
 
 @begin{section}
 @title{Renderer}
+
+This class implements an @c{open} method; this should be
+called once an OpenGL context is established. The @c{open} method
+verifies that the context can support the rendering done by lpsg; that
+is, the version of OpenGL supports the features needed by lpsg or has
+extensions that support them. It also records some parameters and
+capabilities of the OpenGL implementation, such as the number of
+texture units The @c{renderer} class also implements a @c{close}
+method, which should be called at the end of rendering to clean up;
+possibly it will deallocate OpenGL objects, but in any case it will
+invalidate them.
+
 @end{section}
 
 @begin{section}
