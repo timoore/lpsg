@@ -18,7 +18,7 @@ tasks, its essential purpose is to aid the creation of fast programs
 that use OpenGL. A typical application that uses LPSG will specialize
 a few LPSG public classes and generic functions in order to inject
 some OpenGL code, such as a custom shader program, into LPSG's
-rendereing code.
+rendering code.
 
 The main optimization goal pursued by LPSG is to reduce the memory
 traffic between the CPU and GPU. It does this by storing the user's
@@ -220,7 +220,8 @@ it's over for the shape.
 @cl:doc(generic data)
 @cl:doc(generic attributes)
 @cl:doc(class vertex-attribute)
-@cl:doc(generic visiblep)
+@cl:doc(class shape)
+@cl:doc(class standard-shape)
 )
 @end{section}
 

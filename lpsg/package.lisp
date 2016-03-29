@@ -58,6 +58,9 @@
    #:data
    #:attributes
    #:vertex-attribute
+   ;; shapes
+   #:shape
+   #:standard-shape
    ;; usets
    #:define-uset
    ;; graphics state
