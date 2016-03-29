@@ -36,7 +36,7 @@ geometry of the associated SHAPE. "))
       t)))
 
 
-(defmethod draw-bundle ((renderer renderer) bundle)
+(defmethod draw-bundle ((renderer standard-renderer) bundle)
   (let* ((env (environment bundle))
          (gl-state (gl-state env)))
     (unless (input-value env 'visiblep)

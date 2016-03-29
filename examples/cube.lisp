@@ -52,7 +52,7 @@ void main()
                                         :target ,(sb-cga:vec 0.0 0.0 -5.0)
                                         :up ,(sb-cga:vec 0.0 1.0 0.0)))
 
-(defclass cube-window (viewer-window lpsg:renderer)
+(defclass cube-window (viewer-window lpsg:standard-renderer)
   ((view-camera :initform (apply #'make-instance 'partial-view-camera *default-camera-params*))
    (effect :accessor effect)
    (cubes :accessor cubes :initform nil)

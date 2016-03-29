@@ -4,22 +4,44 @@
 
 (in-package #:lpsg)
 
-(defgeneric submit (object renderer)
-  (:documentation "Submit OBJECT to RENDERER."))
+(define-protocol-class renderer ()
+  ((:generic open-renderer (renderer)
+    (:documentation "Intialize @cl:parameter{renderer} for rendering.
 
-(defgeneric submit-with-effect (shape renderer effect)
-  (:documentation "Submit SHAPE to RENDERER.
+The OpenGL context that will be used to do all rendering must be current when this is called.  This
+method verifies that the context can support the rendering done by lpsg; that is, the version of
+OpenGL supports the features needed by lpsg or has extensions that support them. It also records
+parameters and capabilities of the OpenGL implementation, such as the number of texture
+units."))
+   (:generic close-renderer (renderer &key deallocate-objects)
+    (:documentation "Close @cl:parameter{renderer} for rendering.
+
+If @cl:parameter{deallocate-objects} is @c{t}, then all OpenGL objects that are still allocated by
+LPSG will be explicitly deallocated. The default, @c{nil}, doesn't deallocate these objects; it
+assumes that the context will soon be destroyed." )) 
+   (:generic submit (object renderer)
+    (:documentation "Submit OBJECT to RENDERER."))
+   (:generic submit-with-effect (shape renderer effect)
+    (:documentation "Submit SHAPE to RENDERER.
 
 This function creates all the bundles necessary to render SHAPE with the appearance defined by
 EFFECT. Usually the effect is stored in the shape, so this method doesn't need to be called
-directly; (submit shape renderer) is equivalent.")) 
+directly; (submit shape renderer) is equivalent."))
 
-(defgeneric retract (object renderer)
-  (:documentation "Remove OBJECT from consideration by RENDERER. This may deallocate graphics API
+   (:generic retract (object renderer)
+    (:documentation "Remove OBJECT from consideration by RENDERER. This may deallocate graphics API
 resources."))
+   (:generic retract-with-effect (shape renderer effect)
+    (:documentation "Called by RETRACT with a shape argument.")))
+  (:documentation "The class responsible for all rendering."))
 
-(defgeneric retract-with-effect (shape renderer effect)
-  (:documentation "Called by RETRACT with a shape argument."))
+
+
+ 
+
+
+
+
 
 (defgeneric add-object (parent child))
 

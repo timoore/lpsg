@@ -113,7 +113,7 @@ This function is used in the implementation of SUBMIT-WITH-EFFECT."))
                                      :initarg :max-combined-texture-image-units))
   (:default-initargs :max-combined-texture-image-units 8)) ;XXX way to small, for testing
 
-(defclass renderer ()
+(defclass standard-renderer (renderer)
   ((buffers :accessor buffers :initform nil)
    (bundles :accessor bundles :initform nil)
    (current-state :accessor current-state :initform nil)
@@ -128,12 +128,12 @@ This function is used in the implementation of SUBMIT-WITH-EFFECT."))
 allocated by calls in LPSG." )
    (context-parameters :accessor context-parameters
                        :documentation "Parameters of the OpenGL context."))
-  (:documentation "The class responsible for all rendering."))
+  )
 
 ;;; XXX Temporary until we figure out how how / when to intialize the renderer from a graphics
 ;;; context.
 
-(defmethod initialize-instance :after ((obj renderer) &key)
+(defmethod initialize-instance :after ((obj standard-renderer) &key)
   (setf (context-parameters obj) (make-instance 'glcontext-parameters)))
 
 (defun process-finalize-queue (renderer)
@@ -247,11 +247,11 @@ Will be created automatically, but must be specified for now.")))
 
 (defgeneric add-to-upload-queue (queue object))
 
-(defmethod schedule-upload :before ((renderer renderer) object)
+(defmethod schedule-upload :before ((renderer standard-renderer) object)
   (unless (upload-queue renderer)
     (setf (upload-queue renderer) (make-instance 'upload-queue))))
 
-(defmethod schedule-upload ((renderer renderer) object)
+(defmethod schedule-upload ((renderer standard-renderer) object)
   (add-to-upload-queue (upload-queue renderer) object))
 
 (defmethod add-to-upload-queue ((queue buffer-object-upload-queue) (obj buffer-area))
@@ -519,16 +519,18 @@ Will be created automatically, but must be specified for now.")))
 (defgeneric upload-buffers (renderer obj))
 
 (defgeneric draw (renderer)
-  (:documentation "Perform all outstanding operations in RENDERER.
+  (:documentation "Draw all graphic objects that have been registered with @cl:parameter{renderer}.
 
-Finalize all objects on the finalize queue(s), do any upload operations in the upload queue, then
-traverse the render stages and their render queues to render all bundles."))
+Perform all outstanding operations in @cl:parameter:{renderer}: finalize all objects on the
+finalize queue(s), do any upload operations in the upload queue, then traverse the render stages
+and their render queues to render all bundles. The renderer does not swap OpenGL front and back
+buffers; that is done by the application outside of LPSG."))
 
 (defgeneric draw-bundles (renderer))
 
 (defgeneric process-gl-objects (renderer))
 
-(defmethod draw ((renderer renderer))
+(defmethod draw ((renderer standard-renderer))
   (let ((*renderer* renderer))
     (process-gl-objects renderer)
     (loop
@@ -542,7 +544,7 @@ traverse the render stages and their render queues to render all bundles."))
 
 (defgeneric draw-bundle (renderer bundle))
 
-(defmethod draw-bundles ((renderer renderer))
+(defmethod draw-bundles ((renderer standard-renderer))
   ;; XXX Should we set the state to something known here?
   (setf (current-state renderer) nil)
   (loop
@@ -553,7 +555,7 @@ traverse the render stages and their render queues to render all bundles."))
                  for bundle in (bundles rq)
                  do (draw-bundle renderer bundle)))))
 
-(defmethod process-gl-objects ((renderer renderer))
+(defmethod process-gl-objects ((renderer standard-renderer))
   (unless (gl-objects renderer)
     (return-from process-gl-objects nil))
   (let ((prev nil))
@@ -569,9 +571,8 @@ traverse the render stages and their render queues to render all bundles."))
                     (setf (cdr prev) (cdr current))
                     (setf (gl-objects renderer) (cdr current))))))))
 
-(defgeneric close-renderer (renderer))
-
-(defmethod close-renderer ((renderer renderer))
+(defmethod close-renderer ((renderer standard-renderer) &key deallocate-objects)
+  (declare (ignorable deallocate-objects))
   ;;; XXX Do what, exactly?
   )
 

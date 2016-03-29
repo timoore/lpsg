@@ -38,11 +38,17 @@
   (:use #:cl #:gl #:sb-cga #:kit.math)
   (:export
    #:render-bundle
+   ;; renderer protocol
    #:renderer
    #:open-renderer
    #:close-renderer
    #:add-bundle
    #:draw
+   #:submit
+   #:submit-with-effect
+   #:retract
+   #:retract-with-effect
+   #:standard-renderer
    #:shader
    #:program
    ;; buffers and attributes
@@ -54,21 +60,19 @@
    #:vertex-attribute
    ;; usets
    #:define-uset
+   ;; graphics state
    #:graphics-state
    #:units
    #:uniform-sets
    #:environment
    #:effect
    #:simple-effect
-   #:submit
-   #:submit-with-effect
    #:texture-area
    #:texture-2d
    #:sampler
    #:gl-state
    #:units
-   #:retract
-   #:retract-with-effect
+   ;; Utilities
    ;; allocators and allocation
    #:compute-shape-allocation
    #:simple-allocator
