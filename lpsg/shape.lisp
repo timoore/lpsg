@@ -3,20 +3,26 @@
 (in-package #:lpsg)
 
 (defclass mirrored-resource (buffer-area)
-  ((data :accessor data :initarg :data)
-   (data-offset :accessor data-offset :initarg :data-offset :initform 0)
+  ((data :accessor data :initarg :data :documentation "An array of data. Each element corresponds
+  to a component of attribute data stored in a buffer.")
+   (data-offset :accessor data-offset :initarg :data-offset :initform 0
+                :documentation "Offset of buffer data from the beginning of the data array.")
    (data-count :accessor data-count :initarg :data-count :initform 0
                :documentation "number of elements")
    (data-stride :accessor data-stride :initarg :data-stride :initform 0
-                :documentation "offset between start of each element")
+                :documentation "offset between start of each element, or 0 if elements are tightly
+packed.")
    (num-components :accessor num-components :initarg :num-components
                    :documentation "number of components per element. Redundant
   with buffer-area components?")
    (buffer-offset :accessor buffer-offset :initarg :buffer-offset :initform 0
-                  :documentation "Offset of the data in the target buffer when it is mapped.")
+                  :documentation "Offset of the data in the target buffer.")
    (upload-fn :accessor upload-fn :initarg :upload-fn
               :documentation "Function to upload Lisp data to a mapped buffer.
-Will be created automatically, but must be specified for now.")))
+Will be created automatically, but must be specified for now.")
+   (:documentation "Class holding Lisp data that will be uploaded to an OpenGL buffer object.
+
+The array storing the data can have any dimensionality; it will be accessed using ROW-MAJOR-AREF.")))
 
 ;;; An upload function that should work for floats
 

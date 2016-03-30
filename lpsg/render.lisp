@@ -200,18 +200,26 @@ but that can impact performance."))
   (:default-initargs :index-type :unsigned-short :base-vertex 0))
 
 (defclass buffer-area ()
-  ((buffer :accessor buffer :initarg :buffer)
+  ((buffer :accessor buffer :initarg :buffer
+           :documentation "The OpenGL buffer object containing attribute data.")
    (resource-size :accessor resource-size :initarg :resource-size
-                  :documentation "size in bytes of resource's data in buffer")
+                  :documentation "total size, in bytes, of attribute's data in buffer")
    (components :accessor components :initarg :components
                :documentation "number of components in each element of an attribute")
    (buffer-type :accessor buffer-type :initarg :buffer-type
                 :documentation "GL format of data in buffer")
-   (normalizedp :accessor normalizedp :initarg :normalizedp :initform nil)
-   (stride :accessor stride :initarg :stride :initform 0)
+   (normalizedp :accessor normalizedp :initarg :normalizedp :initform nil
+                :documentation "If true, OpenGL will normalize integer format values to [-1,1] for
+signed data and [0,-1] for unsigned.")
+   (stride :accessor stride :initarg :stride :initform 0
+           :documentation "Byte offset between the first bytes of consecutive attributes. 0
+  indicates that the attributes are tightly packed.")
    (offset :accessor offset :initarg :offset :initform 0
            :documentation "Offset used when binding a buffer with e.g., %gl:vertex-attrib-pointer."))
-  (:documentation "class for formatted data stored somewhere in a buffer"))
+  (:documentation "Class for formatted attribute data stored somewhere in a buffer.
+
+This class describes data in a vertex buffer object that will be bound using
+%gl:vertex-attrib-pointer."))
 
 (defgeneric upload-fn (buffer-area)
   (:documentation "function taking (BUFFER-AREA POINTER) ???"))
