@@ -163,14 +163,6 @@ render a shape e.g., : the shader program needed to render the shape,
 the texture units in effect, the collection of usets needed by the
 shader program.
 
-Submit-with-effect, then, has the freedom ---
-
-I mispoke, it's not shapes that go on the queues... will talk about
-that in a second. What submit-with-effect does is it takes from the
-shape it creates additional objects that are similar to shapes, but,
-in the backend of lpsg, that are called "bundles." The bundles are
-placed in the queues. Along with a bundle is an environment object
-which contains everything needed by OpenGL to render the shape. 
 @end{section}
 
 @end(section)
@@ -178,32 +170,36 @@ which contains everything needed by OpenGL to render the shape.
 @begin{section}
 @title{Attributes and shapes}
 
-The shape object / class is the principal way that the user gets
-things into lpsg to be rendered. It may be the only way. I'm thinking
-of having submit be really the only way that things are made known to
-lpsg. This is not quite true the way it's written right now, but let's
-go with that.
+The @c{shape} class represents geometry that is rendred by OpenGL. In
+that sense it contains a collection of vertex attributes i.e. the
+per-vertex data used in the rendering.  This might include a position in space
+(coordinates); a surface normal vector, colors, texture coordinates,
+or anything else in this modern world of shaders that could possibly
+be stored per-vertex in a shape. Each vertex attribute is stored in a
+@c{vertex-attribute} object.
 
-The shape corresponds roughly to a geometry that can be
-rendered in OpenGL. And, in that sense, a shape is a collection of
-vertex attributes. The vertex attributes are represented by a class
-called "vertex-attribute," which, roughly speaking, are the per-vertex
-data of any geometry to be rendered. So, obviously that includes a
-position in space (coordinates); probably includes a normal vector, it
-can contain color, texture, or anything else in this modern world of
-shaders that could possibly be stored per-vertex in a shape. The shape
-also contains an object called a "drawable" which describes the
-specific shape i.e., whether it is a collection of points, lines, or
-triangles, how many of these objects there are, and also whether the
-shape is indexed or not. This refers to whether the vertex attributes
-are just straight arrays of one value for every vertex in the shape,
-or whether the individual parts of the shape are described by indices
-which are indexes into the arrays of vertex attributes. Indexed shapes
-are important because, not only do they offer a big size savings on
-meshes where a lot of the vertices would be repeated in the shape,
-they also enable another class of optimizations where the vertex
-attributes can be shared among different shapes. This turns out to be
-cheaper for OpenGL to deal with.
+@begin{section}
+@title{Buffers}
+
+@cl:with-package[name="lpsg"](
+@cl:doc(class buffer-area)
+@cl:doc(class mirrored-resource
+)
+
+@end{section}
+
+The shape also contains an object called a "drawable" which describes
+the specific shape i.e., whether it is a collection of points, lines,
+or triangles, how many of these objects there are, and also whether
+the shape is indexed or not. This refers to whether the vertex
+attributes are just straight arrays of one value for every vertex in
+the shape, or whether the individual parts of the shape are described
+by indices which are indexes into the arrays of vertex
+attributes. Indexed shapes are important because not only do they
+offer a big size savings on meshes where a lot of the vertices would
+be repeated in the shape, they also enable another class of
+optimizations where the vertex attributes can be shared among
+different shapes. 
 
 A shape is registered with the renderer using the @code{submit} method. After
 that, at that point lpsg handles everything. There only two things
@@ -314,6 +310,15 @@ effects. The environment is immutable; it is intended to be created
 and after is "read-only" (???)
 
    #:gl-state
+
+Submit-with-effect, then, has the freedom ---
+
+I mispoke, it's not shapes that go on the queues... will talk about
+that in a second. What submit-with-effect does is it takes from the
+shape it creates additional objects that are similar to shapes, but,
+in the backend of lpsg, that are called "bundles." The bundles are
+placed in the queues. Along with a bundle is an environment object
+which contains everything needed by OpenGL to render the shape. 
 
 @end{section}
 
