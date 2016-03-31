@@ -181,9 +181,26 @@ be stored per-vertex in a shape. Each vertex attribute is stored in a
 @begin{section}
 @title{Buffers}
 
+Broadly speaking, the data used to render a shape is stored in a
+@i{vertex buffer object} (VBO) within OpenGL. This object often
+resides in the GPU's memory. Different vertex attributes from
+different shapes can be stored in the same buffer object. LPSG
+references them with a @c{buffer-area} object that describes the
+location and format of data within a buffer.
+
+The data in a buffer object is in the format required by the GPU and
+not easily accessible from a program running on the CPU. It is
+convenient in a Lisp program to manipulate shape attributes in Lisp
+arrays. The @c{mirrored-resource} class, which is a subclass of
+@c{buffer-area}, describes the location and layout of data in a Lisp
+array that will be uploaded by LPSG into a buffer. The source data of
+a @c{mirrored-resource} is described in terms of the elements of
+array, whereas the data location and format in the target buffer is
+defined in terms of bytes.
+
 @cl:with-package[name="lpsg"](
 @cl:doc(class buffer-area)
-@cl:doc(class mirrored-resource
+@cl:doc(class mirrored-resource)
 )
 
 @end{section}

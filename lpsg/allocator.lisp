@@ -19,10 +19,12 @@ Returns values (buffer offset-in-buffer allocated-size)"))
 
 (defclass simple-allocator (allocator)
   ((buffers :accessor buffers :initform nil
-            :documentation "alist of (target . buffer)"))
+            :documentation "alist of (target . buffer). TARGET is the name of an OpenGL binding
+  target e.g., :array-buffer. BUFFER is a gl-buffer object."))
   (:documentation "Class for managing allocations from several buffer objects.
 
-Allocations are made from one buffer per target, with no provision for freeing storage."))
+Allocations are made from one buffer per target, sequentially, with no provision for freeing
+storage."))
 
 (defun round-up (val divisor)
   (* (ceiling val divisor) divisor))

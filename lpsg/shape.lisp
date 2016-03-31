@@ -19,10 +19,10 @@ packed.")
                   :documentation "Offset of the data in the target buffer.")
    (upload-fn :accessor upload-fn :initarg :upload-fn
               :documentation "Function to upload Lisp data to a mapped buffer.
-Will be created automatically, but must be specified for now.")
-   (:documentation "Class holding Lisp data that will be uploaded to an OpenGL buffer object.
+Will be created automatically, but must be specified for now."))
+  (:documentation "Class holding Lisp data that will be uploaded to an OpenGL buffer object.
 
-The array storing the data can have any dimensionality; it will be accessed using ROW-MAJOR-AREF.")))
+The array storing the data can have any dimensionality; it will be accessed using ROW-MAJOR-AREF."))
 
 ;;; An upload function that should work for floats
 
@@ -146,6 +146,9 @@ visiblep - true if shape is visible, false if not
 
 ;;; Utilities for allocation
 
+;;; Create a kind of hash key for the layout of of a shape's attributes. NORMALIZEDP is contained
+;;; in the descriptor because different %gl:vertex-attrib-pointer calls will be needed for
+;;; normalized and unnormalized data.
 (defun attributes-descriptor (shape)
   (mapcar (lambda (attr-entry)
             (let ((attr (cdr attr-entry)))
@@ -158,9 +161,15 @@ visiblep - true if shape is visible, false if not
            :initial-value 4))
 
 (defclass interleaved-attribute-allocator ()
-  ((allocator-alist :accessor allocator-alist :initform nil)))
+  ((allocator-alist :accessor allocator-alist :initform nil
+                    :documentation "Alist of (attributes-descriptor . simple-allocator).
 
-(defgeneric compute-shape-allocation (allocator shape))
+Different layouts of attributes are allocated from separate simple allocators."))
+  (:documentation "Allocator that supports interleaving attributes and allocating them from a
+single buffer."))
+
+(defgeneric compute-shape-allocation (allocator shape)
+  (:documentation "Allocate buffer storage for all of a shape's attributes."))
 
 
 (defmethod open-allocator ((allocator interleaved-attribute-allocator))
@@ -176,7 +185,9 @@ visiblep - true if shape is visible, false if not
 
 
 (defun attribute-offsets (attr-desc)
-  "Returns list-of-strides, total padded size"
+  "Calculate offsets of interleaved attribute elements within the storage for a single vertex.
+
+Returns list-of-offsets, total padded size for all elements (which is the stride for each element)."
   (let ((total-alignment (max-attribute-alignment attr-desc)))
     (loop
        with current-size = 0
@@ -205,8 +216,10 @@ visiblep - true if shape is visible, false if not
       (multiple-value-bind (buffer offset)
           (allocate-target allocator
                            :array-buffer
-                           (* vertex-size (data-count (cdar (attributes shape)))) ;XXX
-                           4)
+                           ;; XXX for size
+                           (* vertex-size (data-count (cdar (attributes shape))))
+                           ;; XXX Should be max-attribute-alignment?
+                           4)                                                     
         ;; The arrays are allocated as if they start at the beginning of the buffer...
         (mapc (lambda (cell attr-offset)
                 (let ((attr (cdr cell)))
@@ -214,7 +227,8 @@ visiblep - true if shape is visible, false if not
                         (offset attr) attr-offset
                         (buffer-offset attr) (+ offset attr-offset)
                         (stride attr) vertex-size)))
-              (attributes shape) offsets)
+              (attributes shape)
+              offsets)
         ;; ... and the base-vertex is set to make the indices point to the actual location of the
         ;; data.
         (when (typep drawable 'indexed-drawable)
