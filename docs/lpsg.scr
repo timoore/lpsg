@@ -203,9 +203,11 @@ defined in terms of bytes.
 @cl:doc(class mirrored-resource)
 )
 
+@c{vertex-attribute} is a subclass of @c{mirrored-resource}.
+
 @end{section}
 
-The shape also contains an object called a "drawable" which describes
+@c{shape} contains an object called a "drawable" which describes
 the specific shape i.e., whether it is a collection of points, lines,
 or triangles, how many of these objects there are, and also whether
 the shape is indexed or not. This refers to whether the vertex
@@ -219,12 +221,12 @@ optimizations where the vertex attributes can be shared among
 different shapes. 
 
 A shape is registered with the renderer using the @code{submit} method. After
-that, at that point lpsg handles everything. There only two things
-that can be directly done to the shape. It's visibility can be changed
-by a visible accessor on the shape, which controls whether it is
-actually displayed. There is also a retract method, which removes the
-shape from lpsg, causes to not be displayed anymore; at that point,
-it's over for the shape.
+that, lpsg handles everything. There only thing
+that can be directly done to the shape is to remove it from the
+renderer. This is done by the @c{retract} generic function, which
+causes the shape to not be displayed anymore and removes the
+shape from LPSG.
+
 
 @cl:with-package[name="lpsg"](
 @cl:doc(generic gl-buffer)
