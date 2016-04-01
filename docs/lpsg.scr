@@ -148,21 +148,6 @@ garbage collection to notice when an object is no longer used.
 @cl:doc{generic retract}
 )
 
-The environment object is not used directly during OpenGL
-rendering. It does control how the rendering will be done. This is
-accomplished in the "submit" method, when a shape is submitted to the
-renderer. Submit immediately calls another method called
-"submit-with-effect". This method can be specialized on the effect
-object. This method has access to the internal data structures of the
-renderer at that point. This includes are queues that will be
-traversed in order to render shapes on the screen. That is, one of the
-queues contain shapes (????XXX), but when submit-with-effect is
-called, the effect actually creates another object, called an
-"environment," which does contain everything needed for OpenGL to
-render a shape e.g., : the shader program needed to render the shape,
-the texture units in effect, the collection of usets needed by the
-shader program.
-
 @end{section}
 
 @end(section)
@@ -235,6 +220,12 @@ shape from LPSG.
 @cl:doc(generic data)
 @cl:doc(generic attributes)
 @cl:doc(class vertex-attribute)
+)
+
+An object called an @c{environment} controls the appearance of a
+shape. Its role is described in the "Submit Protocol" section.
+
+@cl:with-package[name="lpsg"](
 @cl:doc(class shape)
 @cl:doc(class standard-shape)
 )
@@ -243,26 +234,35 @@ shape from LPSG.
 @begin{section}
 @title{Incremental computation}
 
-Now, one of the things we are trying to optimize in lpsg is the amount
-of memory traffic to the GPU. So, we don't want to send copies of
-usets at every frame if we don't have to. So, there is a system of
-lazy evaluation in lpsg called "incremental nodes," which ultimately
-connect up to the environment object and feed it values. Normally an
-application would change the value of a uset; what this does
-is,through a chain of connected incremental nodes, causes the change
-to be registered for upload at a future time.
+One of the goals of LPSG is to optimize the amount of memory traffic
+to the GPU.  To that end,  LPSG provides a system of lazy evaluation, called
+"incremental nodes," which ultimately connects to the classes
+representing OpenGL structures and feeds them values. An application
+may change the value of a parameter; through a chain of intermediate
+connected incremental nodes, which have inputs (called "sources") and
+an output (called a "sink"), this causes a value to be marked as
+invalid. When that value is actually needed, the chain of incremental
+nodes that calculate the value is traversed and updated. Incremental
+nodes that calculate a value based on their inputs, called
+@c{computation-nodes}, store the result, so the value is not
+recomputed if it is not invalid.
+
+LPSG calls the generic function @c{notify-invalid-input} to mark a
+node as invalid. This function can be specialized to perform other
+actions at that time e.g., putting a node on a queue to perform an
+upload to the GPU at a later time.
 
 @cl:with-package[name="lpsg"](
-@cl:doc(class if-then-node)
-@cl:doc(class then)
-@cl:doc(class else)
-@cl:doc(class sink-node)
-@cl:doc(class sink-node-mixin)
 @cl:doc(class source-node)
 @cl:doc(class source-node-mixin)
+@cl:doc(class sink-node)
+@cl:doc(class sink-node-mixin)
 @cl:doc(class source-sink-mixin)
 @cl:doc(class computation-node)
 @cl:doc(class computation-node-mixin)
+@cl:doc(class if-then-node)
+@cl:doc(class then)
+@cl:doc(class else)
 @cl:doc(generic delete-sink)
 @cl:doc(generic value)
 @cl:doc(generic compute)
@@ -272,6 +272,53 @@ to be registered for upload at a future time.
 @cl:doc(function input-value)
 )
 
+An example:
+@begin{code}
+(progn
+  (defclass plus-node (computation-node computation-node-mixin source-sink-mixin)
+    ())
+
+  (defmethod compute ((node plus-node))
+    (let ((arg1 (input-value node 'arg1))
+          (arg2 (input-value node 'arg2)))
+      (+ arg1 arg2)))
+
+  (defclass mult-node (computation-node computation-node-mixin source-sink-mixin)
+    ())
+
+  (defmethod compute ((node mult-node))
+    (let ((arg1 (input-value node 'arg1))
+          (arg2 (input-value node 'arg2)))
+      (* arg1 arg2)))
+
+  (defparameter *source1* (make-instance 'input-value-node))
+  (defparameter *source2* (make-instance 'input-value-node))
+
+  (defparameter *plus-node* (make-instance 'plus-node))
+  (defparameter *mult-node* (make-instance 'mult-node))
+
+  (setf (input *plus-node* 'arg1) *source1*)
+  (setf (input *plus-node* 'arg2) *source2*)
+
+  (setf (input *mult-node* 'arg1) *source1*)
+  (setf (input *mult-node* 'arg2) *source2*)
+
+  (setf (value *source1*) 4)
+  (setf (value *source2*) 8)
+
+  (defparameter *mult-node2* (make-instance 'mult-node))
+  (setf (input *mult-node2* 'arg1) *plus-node*)
+  (setf (input *mult-node2* 'arg2) *mult-node*)
+  ;; Value of *mult-node2* should be 384.
+  (format t "~%*mult-node2*: ~S" (value *mult-node2*))
+
+  (defparameter *mult-node3* (make-instance 'mult-node))
+  (setf (input *mult-node3* 'arg1) *mult-node2*)
+  (setf (input *mult-node3* 'arg2) 10)
+  ;; Value of *mult-node3* should be 3840.
+  (format t "~%*mult-node3*: ~S" (value *mult-node3*))
+  )
+@end{code}
 @end{section}
 
 @begin{section}
@@ -309,6 +356,22 @@ to transform normal vectors.
 
 @begin{section}
 @title{The submit protocol}
+
+The environment object is not used directly during OpenGL
+rendering. It does control how the rendering will be done. This is
+accomplished in the "submit" method, when a shape is submitted to the
+renderer. Submit immediately calls another method called
+"submit-with-effect". This method can be specialized on the effect
+object. This method has access to the internal data structures of the
+renderer at that point. This includes are queues that will be
+traversed in order to render shapes on the screen. That is, one of the
+queues contain shapes (????XXX), but when submit-with-effect is
+called, the effect actually creates another object, called an
+"environment," which does contain everything needed for OpenGL to
+render a shape e.g., : the shader program needed to render the shape,
+the texture units in effect, the collection of usets needed by the
+shader program.
+
 
 @begin{section}
 @title{Environments}
