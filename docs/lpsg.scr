@@ -222,7 +222,7 @@ shape from LPSG.
 @cl:doc(class vertex-attribute)
 )
 
-An object called an @c{environment} controls the appearance of a
+An object called an @c{effect} controls the appearance of a
 shape. Its role is described in the "Submit Protocol" section.
 
 @cl:with-package[name="lpsg"](
@@ -355,22 +355,36 @@ to transform normal vectors.
 @end{section}
 
 @begin{section}
-@title{The submit protocol}
+@title{The Submit Protocol}
 
-The environment object is not used directly during OpenGL
-rendering. It does control how the rendering will be done. This is
-accomplished in the "submit" method, when a shape is submitted to the
-renderer. Submit immediately calls another method called
-"submit-with-effect". This method can be specialized on the effect
-object. This method has access to the internal data structures of the
-renderer at that point. This includes are queues that will be
-traversed in order to render shapes on the screen. That is, one of the
-queues contain shapes (????XXX), but when submit-with-effect is
+The @c{effect} object stored in a shape is not used directly during OpenGL
+rendering. It does, however, control how the rendering will be done. This is
+accomplished in the @c{submit} generic function, when a shape is submitted to the
+renderer. @c{submit} immediately calls another generic function,
+@c{submit-with-effect}, which can be specialized on the effect object.
+
+@cl:with-package[name="lpsg"](
+@cl:doc(generic submit-with-effect)
+)
+
+The methods on @c{submit-with-effect} access the internal data
+structures of the renderer. These include several queues that are
+traversed in order to render graphics on the screen. That is, one of
+the queues contain shapes (????XXX), but when submit-with-effect is
 called, the effect actually creates another object, called an
 "environment," which does contain everything needed for OpenGL to
 render a shape e.g., : the shader program needed to render the shape,
 the texture units in effect, the collection of usets needed by the
 shader program.
+
+@cl:with-package[name="lpsg"](
+@cl:doc(class render-queue)
+@cl:doc(generic bundles)
+@cl:doc(class render-stage)
+@cl:doc(generic render-queues)
+@cl:doc(generic add-bundle)
+@cl:doc(remove-bundle)
+)
 
 
 @begin{section}
@@ -418,6 +432,11 @@ which contains everything needed by OpenGL to render the shape.
 )
 
 @end{section}
+
+@begin{section}
+@title{The Draw Protocol}
+#end{section}
+
 @begin{section}
 @title{Utilities}
 

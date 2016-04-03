@@ -46,6 +46,12 @@
    #:draw
    #:submit
    #:submit-with-effect
+   #:render-queue
+   #:bundles
+   #:render-stage
+   #:render-queues
+   #:add-bundle
+   #:remove-bundle
    #:retract
    #:retract-with-effect
    #:standard-renderer
