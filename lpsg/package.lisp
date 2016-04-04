@@ -52,6 +52,7 @@
    #:render-queues
    #:add-bundle
    #:remove-bundle
+   #:finalize-queue
    #:retract
    #:retract-with-effect
    #:standard-renderer
@@ -67,6 +68,9 @@
    ;; shapes
    #:shape
    #:standard-shape
+   #:drawable
+   #:array-drawable
+   #:indexed-drawable
    ;; usets
    #:define-uset
    ;; graphics state
@@ -81,6 +85,8 @@
    #:sampler
    #:gl-state
    #:units
+   #:gl-finalize
+   #:gl-finalized-p
    ;; Utilities
    ;; allocators and allocation
    #:compute-shape-allocation

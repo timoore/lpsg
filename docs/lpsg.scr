@@ -163,6 +163,11 @@ or anything else in this modern world of shaders that could possibly
 be stored per-vertex in a shape. Each vertex attribute is stored in a
 @c{vertex-attribute} object.
 
+@cl:with-package[name="lpsg"](
+@cl:doc(class shape)
+@cl:doc(class standard-shape)
+)
+
 @begin{section}
 @title{Buffers}
 
@@ -175,7 +180,7 @@ location and format of data within a buffer.
 
 The data in a buffer object is in the format required by the GPU and
 not easily accessible from a program running on the CPU. It is
-convenient in a Lisp program to manipulate shape attributes in Lisp
+convenient for a Lisp program to manipulate shape attributes in Lisp
 arrays. The @c{mirrored-resource} class, which is a subclass of
 @c{buffer-area}, describes the location and layout of data in a Lisp
 array that will be uploaded by LPSG into a buffer. The source data of
@@ -205,6 +210,11 @@ be repeated in the shape, they also enable another class of
 optimizations where the vertex attributes can be shared among
 different shapes. 
 
+@cl:with-package[name="lpsg"](
+@cl:doc(class drawable)
+@cl:doc(class array-drawable)
+@cl:doc(class indexed-drawable)
+)
 A shape is registered with the renderer using the @code{submit} method. After
 that, lpsg handles everything. There only thing
 that can be directly done to the shape is to remove it from the
@@ -225,10 +235,6 @@ shape from LPSG.
 An object called an @c{effect} controls the appearance of a
 shape. Its role is described in the "Submit Protocol" section.
 
-@cl:with-package[name="lpsg"](
-@cl:doc(class shape)
-@cl:doc(class standard-shape)
-)
 @end{section}
 
 @begin{section}
@@ -357,20 +363,35 @@ to transform normal vectors.
 @begin{section}
 @title{The Submit Protocol}
 
-The @c{effect} object stored in a shape is not used directly during OpenGL
+The @c{effect} object stored in a shape is not used directly to perform OpenGL
 rendering. It does, however, control how the rendering will be done. This is
 accomplished in the @c{submit} generic function, when a shape is submitted to the
 renderer. @c{submit} immediately calls another generic function,
-@c{submit-with-effect}, which can be specialized on the effect object.
+@c{submit-with-effect}, which can be specialized on its shape and  effect arguments.
 
 @cl:with-package[name="lpsg"](
 @cl:doc(generic submit-with-effect)
 )
 
-The methods on @c{submit-with-effect} access the internal data
+The methods on @c{submit-with-effect} have access to internal data
 structures of the renderer. These include several queues that are
-traversed in order to render graphics on the screen. That is, one of
-the queues contain shapes (????XXX), but when submit-with-effect is
+traversed in order to render graphics on the screen. @i([The queues
+are very ad hoc at the moment. Some queues are exposed as lists;
+others have a more abstract interface. This all needs to be abstracted
+so that queue contents can be maintained in sorted order.])
+
+The "finalize" queue contains objects that reference OpenGL
+objects. "Finalization" here does not refer to garbage collector
+finalization, but to the actions required to create and intialize
+objects via calls to OpenGL.
+
+@cl:with-package[name="lpsg"](
+@cl:doc(generic gl-finalize)
+@cl:doc(generic gl-finalized-p)
+)
+
+That is, one of
+the queues contain shapes (????XXX), but when @cPsubmit-with-effect} is
 called, the effect actually creates another object, called an
 "environment," which does contain everything needed for OpenGL to
 render a shape e.g., : the shader program needed to render the shape,
@@ -422,7 +443,7 @@ which contains everything needed by OpenGL to render the shape.
 @end{section}
 
 @begin{section}
-@title{OpenGL State}
+@title{OpenGL Objects State}
 @cl:with-package[name="lpsg"](
 @cl:doc(class graphics-state)
 @cl:doc(generic units)
