@@ -222,7 +222,6 @@ renderer. This is done by the @c{retract} generic function, which
 causes the shape to not be displayed anymore and removes the
 shape from LPSG.
 
-
 @cl:with-package[name="lpsg"](
 @cl:doc(generic gl-buffer)
 @cl:doc(generic buffer)
@@ -373,6 +372,17 @@ renderer. @c{submit} immediately calls another generic function,
 @cl:doc(generic submit-with-effect)
 )
 
+The protocol class @c{effect} is the superclass of all effect
+objects.
+
+@cl:with-package[name="lpsg"](
+@cl:doc(class effect)
+)
+
+The @c{attribute-map} is an essential link between a shape and its
+on-screen representation. It maps the names of attributes in the shape
+to  vertex attributes in an OpenGL shaper program.
+
 The methods on @c{submit-with-effect} have access to internal data
 structures of the renderer. These include several queues that are
 traversed in order to render graphics on the screen. @i([The queues
@@ -383,12 +393,10 @@ so that queue contents can be maintained in sorted order.])
 The "finalize" queue contains objects that reference OpenGL
 objects. "Finalization" here does not refer to garbage collector
 finalization, but to the actions required to create and intialize
-objects via calls to OpenGL.
+objects via calls to OpenGL. The generic function @c{gl-finalize},
+described in the section "OpenGL Objects and State."
 
-@cl:with-package[name="lpsg"](
-@cl:doc(generic gl-finalize)
-@cl:doc(generic gl-finalized-p)
-)
+
 
 That is, one of
 the queues contain shapes (????XXX), but when @cPsubmit-with-effect} is
@@ -407,6 +415,13 @@ shader program.
 @cl:doc(remove-bundle)
 )
 
+Methods defined on the @c{simple-environment} class perform the basic
+actions of creating render bundles from a shape and scheduling any
+necessary finalization and upload.
+
+@cl:with-package[name="lpsg"](
+@cl:doc(class simple-effect)
+)
 
 @begin{section}
 @title{Environments}
@@ -444,7 +459,14 @@ which contains everything needed by OpenGL to render the shape.
 
 @begin{section}
 @title{OpenGL Objects State}
+
 @cl:with-package[name="lpsg"](
+)
+
+@cl:with-package[name="lpsg"](
+@cl:doc(generic gl-finalize)
+@cl:doc(generic gl-finalized-p)
+
 @cl:doc(class graphics-state)
 @cl:doc(generic units)
 @cl:doc(class texture-area)
