@@ -89,17 +89,20 @@ performed, NIL otherwise."))
 
 ;;; This should be some kind of ordered data structure (map, skip list, ...)
 (defclass render-queue ()
-  ((bundles :accessor bundles :initarg :bundles :initform nil)))
+  ((bundles :accessor bundles :initarg :bundles :initform nil))
+  (:documentation "A queue that contains bundles to be rendered."))
 
 (defgeneric add-bundle (render-queue bundle)
-  (:documentation "Add BUNDLE to RENDER-QUEUE.
+  (:documentation "Add @cl:parameter(bundle) to @cl:parameter(render-queue).
 
-This function is used in the implementation of SUBMIT-WITH-EFFECT."))
+The order in which bundles in the queue are rendered is undefined. This function is used in the
+implementation of SUBMIT-WITH-EFFECT."))
 
 (defmethod add-bundle ((render-queue render-queue) bundle)
   (push bundle (bundles render-queue)))
 
-(defgeneric remove-bundle (render-queue bundle))
+(defgeneric remove-bundle (render-queue bundle)
+  (:documentation "Remove @cl:parameter{bundle} from @cl:parameter{render-queue}."))
 
 (defmethod remove-bundle ((render-queue render-queue) bundle)
   (setf (bundles render-queue) (delete bundle (bundles render-queue))))
@@ -121,7 +124,8 @@ This function is used in the implementation of SUBMIT-WITH-EFFECT."))
    (finalize-queue :accessor finalize-queue :initform nil)
    ;; alist of (buffer . buffer-areas)
    (upload-queue :accessor upload-queue :initform nil)
-   (render-stages :accessor render-stages :initform nil)
+   (render-stages :accessor render-stages :initform nil
+                  :documentation "list of all render stages to traverse")
    ;; XXX Should be weak
    (vao-cache :accessor vao-cache :initform (make-hash-table :test 'equal))
    (gl-objects :accessor gl-objects :initform nil :documentation "List of all OpenGL objects

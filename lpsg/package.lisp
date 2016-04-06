@@ -56,8 +56,6 @@
    #:retract
    #:retract-with-effect
    #:standard-renderer
-   #:shader
-   #:program
    ;; buffers and attributes
    #:gl-buffer
    #:buffer
@@ -80,9 +78,12 @@
    #:environment
    #:effect
    #:simple-effect
+   #:gl-object
    #:texture-area
    #:texture-2d
    #:sampler
+   #:shader
+   #:program
    #:gl-state
    #:units
    #:gl-finalize

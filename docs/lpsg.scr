@@ -90,17 +90,18 @@ screen. The user creates @c{shapes} containing per-vertex attributes,
 such as position or color data. The shape also contains an effect
 object which controls its appearence on the screen.
 
-Once a shape has been prepared, it is submitted to the renderer. This
-invokes the @c{submit-with-effect} generic function which, dispatching
-on the renderer, shape, and effect arguments, creates the objects that
-are used in the actual OpenGL rendering and places them on various
+Once a shape has been prepared, it is submitted to the renderer using
+the generic function @{submit}. This invokes the
+@c{submit-with-effect} generic function which, dispatching on its
+renderer, shape, and effect arguments, creates the objects that are
+used in the actual OpenGL rendering and places them on various
 queues. These are used when the user calls the renderer's @c{draw}
-method: OpenGL objects are created on the GPU, any necessary
+method; at that time OpenGL objects are created on the GPU, any necessary
 initialization is performed, and shapes are rendered. On future calls
 to @c{draw}, these objects will be rendered again. The user
-effectively gives up ownership of a shape object until the
-@c{retract} method is called on it. This removes the objects created
-in the @c{submit} call from the renderer's queues and destroys any
+effectively gives up ownership of a shape object until the @c{retract}
+method is called on it. This removes the objects created in the
+@c{submit} call from the renderer's queues and destroys any
 now-uneeded OpenGL objects.
 
 Scenes in 3D applications are very dynamic; if they weren't, there
@@ -234,6 +235,16 @@ shape from LPSG.
 An object called an @c{effect} controls the appearance of a
 shape. Its role is described in the "Submit Protocol" section.
 
+A shape's slots may not be changed after it has been submitted to the
+renderer. The individual parts of the shape are not necessarily
+immutable; the drawable part is mutable, and one can change the number
+of primitives drawn, which might be useful to selectively draw parts
+of a shape. The vertex attributes can be mutable. It is 
+important to be able to upload new data for many kinds of dynamic
+animation effects. The environment object is immutable, but the
+rendering it controls is influenced by uset parameters that attached
+to the shape via the incremental computation system, decribed next.
+
 @end{section}
 
 @begin{section}
@@ -324,6 +335,8 @@ An example:
   (format t "~%*mult-node3*: ~S" (value *mult-node3*))
   )
 @end{code}
+
+@c{source-node} objects can produce any type of value.
 @end{section}
 
 @begin{section}
@@ -356,7 +369,23 @@ to transform normal vectors.
 @cl:with-package[name="lpsg"](
 @cl:doc(macro define-uset)
 )
-   
+
+Because incremental computation @c{source-node} objects can produce
+any type of value, they can also produce uniform sets. The LPSG user
+assigns @c(standard-shape) nodes as sinks for incremental computation
+nodes that produce uset values, using the name of the uset as the
+input name. A shape doesn't actually have a role at render time, but
+it serves as a placeholder for objects that will need to receive the
+uset values and update rendering parameters. The appropriate
+connections are made when the shape is submitted. @i([This may change
+when the incremental computation protocol is based more on the MOP and
+is a bit less dynamic in terms of input slots. Also, it makes more
+sense to attach incremental nodes to the effect object than to the
+shape.)] The usets produced by incremental nodes should not be freshly
+allocated at each update, but should be updated in
+place. @i(Environments currently rely on this, which is kind of
+brittle and should be fixed.)
+
 @end{section}
 
 @begin{section}
@@ -383,28 +412,45 @@ The @c{attribute-map} is an essential link between a shape and its
 on-screen representation. It maps the names of attributes in the shape
 to  vertex attributes in an OpenGL shaper program.
 
-The methods on @c{submit-with-effect} have access to internal data
-structures of the renderer. These include several queues that are
-traversed in order to render graphics on the screen. @i([The queues
-are very ad hoc at the moment. Some queues are exposed as lists;
-others have a more abstract interface. This all needs to be abstracted
-so that queue contents can be maintained in sorted order.])
+@c{submit-with-effect} creates objects that are used to make calls
+to OpenGL and to do rendering. These objects are similar to the
+@c{attribute}, @c{shape} and @c{effect} objects that the user manipulates, but
+they are less flexible and more specific to their role in OpenGL
+rendering. The include:
 
-The "finalize" queue contains objects that reference OpenGL
+@begin(list)
+@item(@c(attribute-set) - an optimized representation of a shape's
+attributes;)
+@item(@c(environment) - An object created from the @c(effect),
+containing OpenGL resources and parameters. see the "Environment" section;)
+@item(@c((render-bundle) - The rough equivalent of a @c{shape}, which
+contains an @c(attribute-set) and an @c(effect).)
+@end(list)
+
+@c(submit-with-effect) can create several @c(render-bundle) objects
+from a shape, each with a different @c(environment) (and attribute
+set, if necessary). These bundles are are added to  @c(render-queue)
+objects, so they will be drawn at a later time. In this way
+@c(submit-with-effect) can arrange for a shape's geometry to be
+rendered several times with different environments.
+
+Two other queues are available to @c{submit-with-effect}. The
+"finalize" queue contains objects that reference OpenGL 
 objects. "Finalization" here does not refer to garbage collector
 finalization, but to the actions required to create and intialize
 objects via calls to OpenGL. The generic function @c{gl-finalize},
-described in the section "OpenGL Objects and State."
+described in the section "OpenGL Objects and State," is called on
+every object in the finalize queue. The "upload" queue is available for
+any object, such as a vertex attribute, that needs to upload data from
+Lisp to the GPU.
 
+All these queues are traversed by the @c(draw) generic function, which
+is described in the "Draw protocol" section.
 
-
-That is, one of
-the queues contain shapes (????XXX), but when @cPsubmit-with-effect} is
-called, the effect actually creates another object, called an
-"environment," which does contain everything needed for OpenGL to
-render a shape e.g., : the shader program needed to render the shape,
-the texture units in effect, the collection of usets needed by the
-shader program.
+ @i([The interfaces to queues are very ad hoc at the moment. Some queues are
+exposed as lists; others have a more abstract interface. This all
+needs to be abstracted so that queue contents can be maintained in
+sorted order.])
 
 @cl:with-package[name="lpsg"](
 @cl:doc(class render-queue)
@@ -415,7 +461,7 @@ shader program.
 @cl:doc(remove-bundle)
 )
 
-Methods defined on the @c{simple-environment} class perform the basic
+Methods defined on the @c{simple-effect} class perform the basic
 actions of creating render bundles from a shape and scheduling any
 necessary finalization and upload.
 
@@ -427,38 +473,35 @@ necessary finalization and upload.
 @title{Environments}
 
 
-The third major part of a shape is an object called an "environment,"
-which ultimately controls the appearance of the shape. The environment
-contains things such as the shader program, the textures bound when
-the shape is rendered... Some of these members are immutable, others
-are not. The general idea is that the shape itself is immutable, once
-it is created, and certainly once it has been submitted to lpsg. The
-individual parts of the shape are not necessarily immutable; the
-drawable part is mutable, and one can change the number of primitives
-drawn, which might be useful in some special effects to hide parts of
-a shape. The vertex attributes can be mutable. It is important to be
-able to upload new data for many kinds of dynamic animation
-effects. The environment is immutable; it is intended to be created
-and after is "read-only" (???)
+The @c(environment) object contained in a @c(render-bundle)
+ultimately controls the appearance of the bundle.
 
-   #:gl-state
+@cl:with-package[name="lpsg"](
+@cl:doc(class environment)
+)
 
-Submit-with-effect, then, has the freedom ---
+The @c(gl-state) slot contains a @c{gl-state} object that represents
+the OpenGL state in effect when the environment is used to render a
+bundle. This contains things such as the shader program, and the the
+bound textures, and is described in the @ref[id=opengl-state](OpenGL
+Objects and State) section.
 
-I mispoke, it's not shapes that go on the queues... will talk about
-that in a second. What submit-with-effect does is it takes from the
-shape it creates additional objects that are similar to shapes, but,
-in the backend of lpsg, that are called "bundles." The bundles are
-placed in the queues. Along with a bundle is an environment object
-which contains everything needed by OpenGL to render the shape. 
+The @c(usets) slot contains the uniform set parameters for the shader
+program contained in the graphics state. These are kept up-to-date by
+the incremental computation mechanism, as the environment is a sink
+object that receives incremental results. There are different possible
+strategies for making uniform values available to shader programs. At
+present, LPSG uses the classic OpenGL @c(glUniform) family of
+functions to upload values into shader programs. @i([In the future, we
+want to support using Uniform Buffer Objects.])
 
 @end{section}
 
 
 @end{section}
 
-@begin{section}
-@title{OpenGL Objects State}
+@begin[ref=opengl-state]{section}
+@title{OpenGL Objects and State}
 
 @cl:with-package[name="lpsg"](
 )
@@ -470,15 +513,27 @@ which contains everything needed by OpenGL to render the shape.
 @cl:doc(class graphics-state)
 @cl:doc(generic units)
 @cl:doc(class texture-area)
+
+@cl:doc(class gl-object)
 @cl:doc(class texture-2d)
 @cl:doc(class sampler)
+@cl:doc(class shader)
+@cl:doc(class program)
 )
 
 @end{section}
 
 @begin{section}
 @title{The Draw Protocol}
-#end{section}
+
+The generic function @c(draw) causes all submitted shapes to be
+rendered.
+
+@cl:with-package[name="lpsg"](
+@cl:doc(generic draw)
+)
+
+@end{section}
 
 @begin{section}
 @title{Utilities}
