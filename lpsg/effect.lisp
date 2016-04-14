@@ -70,7 +70,7 @@ with uset parameters, to a shape."))
               (list (make-instance 'render-stage
                                    :render-queues (list (make-instance 'render-queue))))))
       (let ((rq (car (render-queues (car (render-stages renderer))))))
-        (add-bundle rq bundle)))))
+        (add-rendered-object rq bundle)))))
 
 (defmethod retract-with-effect (shape renderer (effect simple-effect))
   (loop
@@ -79,4 +79,4 @@ with uset parameters, to a shape."))
            for queue in (render-queues stage)
            do (loop
                  for bundle in (bundles shape)
-                 do (remove-bundle queue bundle)))))
+                 do (remove-rendered-object queue bundle)))))

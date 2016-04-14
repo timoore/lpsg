@@ -457,8 +457,8 @@ sorted order.])
 @cl:doc(generic bundles)
 @cl:doc(class render-stage)
 @cl:doc(generic render-queues)
-@cl:doc(generic add-bundle)
-@cl:doc(remove-bundle)
+@cl:doc(generic add-rendered-object)
+@cl:doc(remove-rendered-object)
 )
 
 Methods defined on the @c{simple-effect} class perform the basic

@@ -92,20 +92,20 @@ performed, NIL otherwise."))
   ((bundles :accessor bundles :initarg :bundles :initform nil))
   (:documentation "A queue that contains bundles to be rendered."))
 
-(defgeneric add-bundle (render-queue bundle)
-  (:documentation "Add @cl:parameter(bundle) to @cl:parameter(render-queue).
+(defgeneric add-rendered-object (render-queue object)
+  (:documentation "Add @cl:parameter(object) to @cl:parameter(render-queue).
 
-The order in which bundles in the queue are rendered is undefined. This function is used in the
+The order in which objects in the queue are rendered is undefined. This function is used in the
 implementation of SUBMIT-WITH-EFFECT."))
 
-(defmethod add-bundle ((render-queue render-queue) bundle)
-  (push bundle (bundles render-queue)))
+(defmethod add-rendered-object ((render-queue render-queue) object)
+  (push object (bundles render-queue)))
 
-(defgeneric remove-bundle (render-queue bundle)
-  (:documentation "Remove @cl:parameter{bundle} from @cl:parameter{render-queue}."))
+(defgeneric remove-rendered-object (render-queue object)
+  (:documentation "Remove @cl:parameter{object} from @cl:parameter{render-queue}."))
 
-(defmethod remove-bundle ((render-queue render-queue) bundle)
-  (setf (bundles render-queue) (delete bundle (bundles render-queue))))
+(defmethod remove-rendered-object ((render-queue render-queue) object)
+  (setf (bundles render-queue) (delete object (bundles render-queue))))
 
 ;;; holds multiple render queues. These will be rendered in order.
 (defclass render-stage (render-queue)

@@ -50,8 +50,8 @@
    #:bundles
    #:render-stage
    #:render-queues
-   #:add-bundle
-   #:remove-bundle
+   #:add-rendered-object
+   #:remove-rendered-object
    #:finalize-queue
    #:retract
    #:retract-with-effect
