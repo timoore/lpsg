@@ -88,28 +88,52 @@ performed, NIL otherwise."))
   t)
 
 ;;; This should be some kind of ordered data structure (map, skip list, ...)
-(defclass render-queue ()
+(defclass unordered-render-queue (render-queue)
   ((bundles :accessor bundles :initarg :bundles :initform nil))
   (:documentation "A queue that contains bundles to be rendered."))
 
-(defgeneric add-rendered-object (render-queue object)
-  (:documentation "Add @cl:parameter(object) to @cl:parameter(render-queue).
-
-The order in which objects in the queue are rendered is undefined. This function is used in the
-implementation of SUBMIT-WITH-EFFECT."))
-
-(defmethod add-rendered-object ((render-queue render-queue) object)
+(defmethod add-rendered-object ((render-queue unordered-render-queue) object)
   (push object (bundles render-queue)))
 
-(defgeneric remove-rendered-object (render-queue object)
-  (:documentation "Remove @cl:parameter{object} from @cl:parameter{render-queue}."))
-
-(defmethod remove-rendered-object ((render-queue render-queue) object)
+(defmethod remove-rendered-object ((render-queue unordered-render-queue) object)
   (setf (bundles render-queue) (delete object (bundles render-queue))))
 
+(defmethod map-render-queue ((render-queue unordered-render-queue) function)
+  (mapc function (bundles render-queue)))
+
+(defmethod find-if-queue (predicate (render-queue unordered-render-queue))
+  (find-if predicate (bundles render-queue)))
+
+(defclass ordered-rendered-queue (render-queue)
+  ((queue-object)))
+
+(defmethod initialize-instance :after ((obj ordered-rendered-queue) &key)
+  (setf (slot-value obj 'queue-object) (serapeum:queue)))
+
+(defmethod add-rendered-object ((render-queue ordered-rendered-queue) object)
+  (with-slots (queue-object)
+      render-queue
+    (serapeum:enq object queue-object)
+    nil))
+
+(defmethod remove-rendered-object ((render-queue ordered-rendered-queue) object)
+  (with-slots (queue-object)
+      render-queue
+    (let ((contents (serapeum:clear-queue queue-object)))
+      (setq contents (delete object contents))
+      (serapeum:qconc queue-object contents))
+    nil))
+
+(defmethod map-render-queue ((render-queue ordered-rendered-queue) function)
+  (mapc function (serapeum:qlist (slot-value render-queue 'queue-object))))
+
+(defmethod find-if-queue (predicate (queue ordered-rendered-queue))
+  (find predicate (serapeum:qlist (slot-value queue 'queue-object))))
+
 ;;; holds multiple render queues. These will be rendered in order.
-(defclass render-stage (render-queue)
-  ((render-queues :accessor render-queues :initarg :render-queues :initform nil)))
+(defclass render-stage (ordered-rendered-queue)
+  ()
+  (:documentation "A render queue with designated read and draw buffers @i([default for now])"))
 
 (defclass glcontext-parameters ()
   ((max-combined-texture-image-units :accessor max-combined-texture-image-units
@@ -124,8 +148,8 @@ implementation of SUBMIT-WITH-EFFECT."))
    (finalize-queue :accessor finalize-queue :initform nil)
    ;; alist of (buffer . buffer-areas)
    (upload-queue :accessor upload-queue :initform nil)
-   (render-stages :accessor render-stages :initform nil
-                  :documentation "list of all render stages to traverse")
+   (render-stage :accessor render-stage
+                  :documentation "The top-level (default) render stage.")
    ;; XXX Should be weak
    (vao-cache :accessor vao-cache :initform (make-hash-table :test 'equal))
    (gl-objects :accessor gl-objects :initform nil :documentation "List of all OpenGL objects
@@ -138,7 +162,8 @@ allocated by calls in LPSG." )
 ;;; context.
 
 (defmethod initialize-instance :after ((obj standard-renderer) &key)
-  (setf (context-parameters obj) (make-instance 'glcontext-parameters)))
+  (setf (context-parameters obj) (make-instance 'glcontext-parameters))
+  (setf (render-stage obj) (make-instance 'render-stage)))
 
 (defun process-finalize-queue (renderer)
   (loop
@@ -559,13 +584,12 @@ buffers; that is done by the application outside of LPSG."))
 (defmethod draw-bundles ((renderer standard-renderer))
   ;; XXX Should we set the state to something known here?
   (setf (current-state renderer) nil)
-  (loop
-     for stage in (render-stages renderer)
-     do (loop
-           for rq in (render-queues stage)
-           do (loop
-                 for bundle in (bundles rq)
-                 do (draw-bundle renderer bundle)))))
+  (do-render-queue
+      (queue (render-stage renderer))
+    (do-render-queue
+        (bundle queue)
+      (draw-bundle renderer bundle))))
+
 
 (defmethod process-gl-objects ((renderer standard-renderer))
   (unless (gl-objects renderer)

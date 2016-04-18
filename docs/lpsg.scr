@@ -454,11 +454,14 @@ sorted order.])
 
 @cl:with-package[name="lpsg"](
 @cl:doc(class render-queue)
-@cl:doc(generic bundles)
+@cl:doc(class unordered-render-queue)
+@cl:doc(class ordered-render-queue)
 @cl:doc(class render-stage)
-@cl:doc(generic render-queues)
 @cl:doc(generic add-rendered-object)
-@cl:doc(remove-rendered-object)
+@cl:doc(generic remove-rendered-object)
+@cl:doc(generic map-render-queue)
+@cl:doc(macro do-render-queue)
+@cl:doc(generic find-if-queue)
 )
 
 Methods defined on the @c{simple-effect} class perform the basic

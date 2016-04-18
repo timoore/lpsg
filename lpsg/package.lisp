@@ -47,11 +47,15 @@
    #:submit
    #:submit-with-effect
    #:render-queue
-   #:bundles
+   #:unordered-render-queue
+   #:ordered-render-queue
    #:render-stage
    #:render-queues
    #:add-rendered-object
    #:remove-rendered-object
+   #:map-render-queue
+   #:find-if-queue
+   #:do-render-queue
    #:finalize-queue
    #:retract
    #:retract-with-effect

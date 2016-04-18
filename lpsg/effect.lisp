@@ -65,18 +65,16 @@ with uset parameters, to a shape."))
       (push bundle (bundles shape))
       (push bundle (finalize-queue renderer))
       ;; Use only one render-stage / render-queue for now.
-      (unless (render-stages renderer)
-        (setf (render-stages renderer)
-              (list (make-instance 'render-stage
-                                   :render-queues (list (make-instance 'render-queue))))))
-      (let ((rq (car (render-queues (car (render-stages renderer))))))
+      (let ((rq (find-if-queue #'render-queue-p (render-stage renderer))))
+        (unless rq
+          (setq rq (make-instance 'unordered-render-queue))
+          (add-rendered-object (render-stage renderer) rq))
         (add-rendered-object rq bundle)))))
 
 (defmethod retract-with-effect (shape renderer (effect simple-effect))
-  (loop
-     for stage in (render-stages renderer)
-     do (loop
-           for queue in (render-queues stage)
-           do (loop
-                 for bundle in (bundles shape)
-                 do (remove-rendered-object queue bundle)))))
+  (let ((rq (find-if-queue #'render-queue-p)))
+    (when rq
+      (loop
+         for bundle in (bundles shape)
+         do (remove-rendered-object rq bundle)))))
+

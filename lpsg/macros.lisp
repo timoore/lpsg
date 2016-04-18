@@ -60,3 +60,9 @@
               `(getassoc ,itemvar ,alist-read-form ,@(mapcan (lambda (v)
                                                                `(,(car v) ,(cadr v)))
                                                              key-alist))))))
+
+(defmacro do-render-queue ((var queue) &body body)
+  "Call @cl:parameter(body) with each object in the @c(render-queue) @cl:parameter(queue) bound to
+@cl:parameter(var)."
+  (serapeum:with-thunk (body var)
+    `(map-render-queue ,queue ,body)))

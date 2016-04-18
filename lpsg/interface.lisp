@@ -35,14 +35,6 @@ resources."))
     (:documentation "Called by RETRACT with a shape argument.")))
   (:documentation "The class responsible for all rendering."))
 
-
-
- 
-
-
-
-
-
 (defgeneric add-object (parent child))
 
 (defgeneric compute-buffer-allocation (shape allocator)
@@ -57,3 +49,26 @@ resources."))
    ;; XXX uset computation nodes?
    (:accessor usets)
    (:accessor drawable)))
+
+(define-protocol-class render-queue ()
+  ((:generic add-rendered-object (render-queue object)
+    (:documentation "Add @cl:parameter(object) to @cl:parameter(render-queue).
+
+The order in which objects in the queue are rendered is undefined. This function is used in the
+implementation of SUBMIT-WITH-EFFECT."))
+   (:generic remove-rendered-object (render-queue object)
+    (:documentation "Remove @cl:parameter{object} from @cl:parameter(render-queue)."))
+
+   (:generic map-render-queue (render-queue function)
+    (:documentation "Call @cl:parameter(function) on each object stored in the
+@cl:parameter(render-queue)."))
+
+   (:generic find-if-queue (predicate render-queue)
+    (:documentation "Search for an object in @cl:parameter(render-queue) that satisfies
+@cl:parameter(predicate)")))
+
+  (:documentation "A container class for objects, including @c(render-queue) objects too.
+
+This class contains the objects that are traversed to render a scene. This class does not guarantee
+a traversal order for objects in the queue. Subclasses of this class might sort the objects to
+obtain an optimal order, or in fact guarantee an order."))
