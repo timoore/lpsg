@@ -20,7 +20,7 @@ a few LPSG public classes and generic functions in order to inject
 some OpenGL code, such as a custom shader program, into LPSG's
 rendering code.
 
-The main optimization goal pursued by LPSG is to reduce the memory
+The main optimization attempted by LPSG is to reduce the memory
 traffic between the CPU and GPU. It does this by storing the user's
 data in OpenGL @i(buffer objects) which normally reside on the
 GPU. Most updates to a graphics view, such as matrices that specify
@@ -39,7 +39,7 @@ moved to the GPU.]) Newer versions of OpenGL contain interfaces that
 can reduce the number of cache misses inside the driver itself,
 @i([LPSG will take of advantage of them.])
 
-An optimization which was historically crucial and is still helpful is
+Another optimization which was historically crucial and is still helpful is
 reducing the number of state changes in the graphics
 hardware. Changing the rendering destination, current shader program,
 or set of bound textures requires reinitializing a lot of hardware state and
@@ -172,8 +172,8 @@ be stored per-vertex in a shape. Each vertex attribute is stored in a
 @begin{section}
 @title{Buffers}
 
-Broadly speaking, the data used to render a shape is stored in a
-@i{vertex buffer object} (VBO) within OpenGL. This object often
+The vertex attributes used to render a shape are stored in a
+@i{vertex buffer objects} (VBO) within OpenGL. This object often
 resides in the GPU's memory. Different vertex attributes from
 different shapes can be stored in the same buffer object. LPSG
 references them with a @c{buffer-area} object that describes the
@@ -193,6 +193,12 @@ defined in terms of bytes.
 @cl:doc(class buffer-area)
 @cl:doc(class mirrored-resource)
 )
+
+The object stored in the @c(buffer) slot of a @c(buffer-area) object
+is of class @c(gl-buffer), described in the @ref[id=opengl-state](OpenGL
+Objects and State) section. It can be shared among many
+@c(buffer-area) objects, thus storing their data in a single buffer
+object in OpenGL.
 
 @c{vertex-attribute} is a subclass of @c{mirrored-resource}.
 
@@ -389,6 +395,43 @@ brittle and should be fixed.)
 @end{section}
 
 @begin{section}
+@title{Textures}
+
+Textures are raster data which are most often used to map images onto
+polygonal faces in the rendered scene. They are treated differently
+from buffer objects by OpenGL because they are used differently.
+the individual @i(texels) of a texture are usually sampled in a 2D
+region rather than linearly, so a conventional cacheing strategy
+doesn't work well. Also, different resolutions of the
+texture are often stored in a @i(mipmap) to support
+filtering. Following the lead of OpenGL, LPSG provides classes that
+are not a @c(buffer-area) or @c(mirrored-resource) for managing textures.
+
+@cl:with-package[name="lpsg"](
+@cl:doc(class texture-area)
+@cl:doc(class raw-texture-resource)
+)
+
+There is an asymmetry in the LPSG interfaces, and their concrete
+implementations, for @c(buffer-area) and @c(texture-area)
+classes. The buffer area provides @i(offset) and @i(stride) parameters
+for accessing source data and packing them in a buffer for OpenGL. In
+contrast, @c(texture-area) and its subclasses provide @c(x-offset),
+@c(y-offset), and @c(row-alignment) parameters for accessing an
+arbitrary "rectangle" of data in a larger image. This reflects the
+functionality offered by OpenGL, as well as the different uses of
+buffer objects and textures.
+
+@i([A less excusable asymmetry currently exists in the implementation:
+the @c(mirrored-resource) only supports loading buffers from Lisp
+arrays, whereas @c(raw-texture-resource), the  only subclass of
+@c(texture-resource), only supports loading from "foreign"
+memory. This is due to pragmatism -- image loading libraries are
+likely to return image data as foreign memory -- as well as
+laziness. It will be fixed soon.])
+@end{section}
+
+@begin{section}
 @title{The Submit Protocol}
 
 The @c{effect} object stored in a shape is not used directly to perform OpenGL
@@ -444,6 +487,15 @@ every object in the finalize queue. The "upload" queue is available for
 any object, such as a vertex attribute, that needs to upload data from
 Lisp to the GPU.
 
+@begin(section)
+@title(Uploading Data)
+
+The "upload queue" is an opaque object not directly accessible to the
+user. The upload of some types of objects can be optimized by grouping
+all uploads for a certain object e.g., a buffer object, together. The
+generic function @c(schedule-upload) is used to place objects 
+@end(section)
+
 All these queues are traversed by the @c(draw) generic function, which
 is described in the "Draw protocol" section.
 
@@ -483,7 +535,7 @@ ultimately controls the appearance of the bundle.
 @cl:doc(class environment)
 )
 
-The @c(gl-state) slot contains a @c{gl-state} object that represents
+The @c(gl-state) slot contains a @c{graphics-state} object that represents
 the OpenGL state in effect when the environment is used to render a
 bundle. This contains things such as the shader program, and the the
 bound textures, and is described in the @ref[id=opengl-state](OpenGL
@@ -506,22 +558,75 @@ want to support using Uniform Buffer Objects.])
 @begin[ref=opengl-state]{section}
 @title{OpenGL Objects and State}
 
+LPSG uses the @c(cl-opengl) library to call functions in the OpenGL
+"C" ABI. Most programs that use LPSG will not need to call OpenGL
+directly, but @c(cl-opengl) is recommended if needed. It provides good
+perfomance while mapping the OpenGL interface to Lisp in a natural
+way. For example, the OpenGL function @c(glVertexAttribPointer) is
+called as @c(gl:vertex-attrib-pointer) in Lisp. In this documentation,
+we refer to OpenGL functions by their Lisp name.
+
+Any OpenGL rendering requires the creation of resources that are
+managed by the OpenGL driver. This typically follows a pattern of
+generating a name (a 32 bit integer) for the resource and then
+initializing it. When the resource is no longer needed, it is
+destroyed and the name can be reused by the driver. LPSG manages this
+process with a class called @c(gl-object). Subclasses are defined for
+specific OpenGL resources such as textures and shader programs.
+
 @cl:with-package[name="lpsg"](
+@cl:doc(class gl-object)
 )
+
+The OpenGL resource associated with a @c(gl-object) is not allocated
+or initialized when the @c(gl-object) is created via
+@c(make-instance). @i([This is common graphics programming practice, and
+also is compatible with a future implementation of LPSG where OpenGL
+calls are made in a seperate thread from the user program.]) The
+generic function @c(gl-finalize) is called by LPSG at an appropriate
+time to allocate the OpenGL resource and initialize it. This time is
+most often at the beginning of a call to @c(draw), when objects in the
+renderer's finalize queue are visited, but @c(gl-finalize) may be
+called at other times too.
 
 @cl:with-package[name="lpsg"](
 @cl:doc(generic gl-finalize)
 @cl:doc(generic gl-finalized-p)
 
-@cl:doc(class graphics-state)
-@cl:doc(generic units)
-@cl:doc(class texture-area)
+@c(gl-finalize) and @c(gl-finalized-p) are not restricted to take only
+subclasses of @c(gl-object). Methods for those functions can be
+specialized on higher-level classes that contain@c(gl-object) objects;
+such a method would make recursive calls to @c(gl-finalize) to
+initialize all its objects. An around method on @c(gl-finalize) calls
+@c(gl-finalized-p), so it is not necessary to explicitly call
+@c(gl-finalized-p) before calling @c(gl-finalize).
 
-@cl:doc(class gl-object)
+In Common Lisp implementations that support garbage collector
+finalization, LPSG will delete the OpenGL resource associated with a
+@c(gl-object) when that object is collected. For a variety of reasons
+it is not possible to perform the actual deletion in the context of a
+garbage collector finalization routine. Instead, LPSG uses weak
+pointers and auxilliary classes called @i(proxy objects) to defer the
+deletion to an appropriate time. @i([The user should be able to delete
+OpenGL objects explicitly; how / when does this happen?])
+
+@cl:with-package[name="lpsg"](
+@cl:doc(class gl-buffer)
 @cl:doc(class texture-2d)
 @cl:doc(class sampler)
 @cl:doc(class shader)
 @cl:doc(class program)
+)
+
+The @c(graphics-state) object stored in an @c(environment) contains
+OpenGL objects that should be @i(bound) in the OpenGL context, @i([as
+well as settings that are enabled,])  when rendering is done using
+that environment. 
+
+@cl:with-package[name="lpsg"](
+@cl:doc(class graphics-state)
+@cl:doc(generic units)
+@cl:doc(generic program)
 )
 
 @end{section}

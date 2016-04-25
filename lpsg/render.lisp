@@ -63,11 +63,15 @@ OpenGL object"))
 
 (defgeneric gl-finalize (obj &optional errorp)
   (:documentation "Allocate any OpenGL resources needed for OBJ and perform any
-tasks needed to use it (e.g. link a shader program). Returns T if finalize actions were
-performed, NIL otherwise."))
+tasks needed to use it (e.g. link a shader program).
+
+Returns T if finalize actions were performed, NIL otherwise.
+
+This is called when the renderer's OpenGL context is current. The renderer is accessible in
+@c(*renderer*)."))
 
 (defgeneric gl-finalized-p (obj)
-  (:documentation "Return T if object has already been finalized."))
+  (:documentation "Returns T if object has already been finalized."))
 
 (defgeneric gl-destroy (obj)
   (:documentation "Deallocate an OpenGL object."))

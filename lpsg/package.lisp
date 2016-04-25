@@ -66,6 +66,9 @@
    #:attribute
    #:data
    #:attributes
+   #:buffer-attribute
+   #:mirrored-resource
+   #:schedule-upload
    #:vertex-attribute
    ;; shapes
    #:shape
@@ -84,6 +87,7 @@
    #:simple-effect
    #:gl-object
    #:texture-area
+   #:raw-texture-resource
    #:texture-2d
    #:sampler
    #:shader
