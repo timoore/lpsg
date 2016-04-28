@@ -47,7 +47,7 @@
     (gl:tex-parameter target :texture-base-level (base-level obj))
     (gl:bind-texture (target obj) 0)))
 
-(defclass raw-texture-resource (texture-area)
+(defclass raw-mirrored-texture-resource (texture-area)
   ((data :accessor data :initarg :data)
    (data-offset :accessor data-offset :initarg :data-offset)
    (data-count :accessor data-count :initarg :data-count :initform 0
@@ -71,7 +71,7 @@
      do (upload-texture renderer area texture)
      finally (setf (tex-queue queue) nil)))
 
-(defmethod upload-texture (renderer (area raw-texture-resource) (texture texture-2d))
+(defmethod upload-texture (renderer (area raw-mirrored-texture-resource) (texture texture-2d))
   (declare (ignore renderer))
   (gl:active-texture :texture0)
   (let ((target (target texture)))

@@ -67,7 +67,7 @@
    #:data
    #:attributes
    #:buffer-attribute
-   #:mirrored-resource
+   #:mirrored-buffer-resource
    #:schedule-upload
    #:vertex-attribute
    ;; shapes
@@ -87,7 +87,7 @@
    #:simple-effect
    #:gl-object
    #:texture-area
-   #:raw-texture-resource
+   #:raw-mirrored-texture-resource
    #:texture-2d
    #:sampler
    #:shader

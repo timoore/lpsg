@@ -83,7 +83,7 @@ The cube has VERTEX and NORMAL vertex attributes. The resulting shape has an ind
            (normal-attr (make-instance 'vertex-attribute
                                        :data normal-array :data-count 24
                                        :components 3 :buffer-type :float))
-           (element-attr (make-instance 'mirrored-resource
+           (element-attr (make-instance 'mirrored-buffer-resource
                                         :data element-array :data-count 36
                                         :components 1 :buffer-type :short))
            (cube-shape (make-instance 'standard-shape

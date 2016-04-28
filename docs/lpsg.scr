@@ -182,16 +182,16 @@ location and format of data within a buffer.
 The data in a buffer object is in the format required by the GPU and
 not easily accessible from a program running on the CPU. It is
 convenient for a Lisp program to manipulate shape attributes in Lisp
-arrays. The @c{mirrored-resource} class, which is a subclass of
+arrays. The @c{mirrored-buffer-resource} class, which is a subclass of
 @c{buffer-area}, describes the location and layout of data in a Lisp
 array that will be uploaded by LPSG into a buffer. The source data of
-a @c{mirrored-resource} is described in terms of the elements of
+a @c{mirrored-buffer-resource} is described in terms of the elements of
 array, whereas the data location and format in the target buffer is
 defined in terms of bytes.
 
 @cl:with-package[name="lpsg"](
 @cl:doc(class buffer-area)
-@cl:doc(class mirrored-resource)
+@cl:doc(class mirrored-buffer-resource)
 )
 
 The object stored in the @c(buffer) slot of a @c(buffer-area) object
@@ -200,7 +200,7 @@ Objects and State) section. It can be shared among many
 @c(buffer-area) objects, thus storing their data in a single buffer
 object in OpenGL.
 
-@c{vertex-attribute} is a subclass of @c{mirrored-resource}.
+@c{vertex-attribute} is a subclass of @c{mirrored-buffer-resource}.
 
 @end{section}
 
@@ -405,11 +405,11 @@ region rather than linearly, so a conventional cacheing strategy
 doesn't work well. Also, different resolutions of the
 texture are often stored in a @i(mipmap) to support
 filtering. Following the lead of OpenGL, LPSG provides classes that
-are not a @c(buffer-area) or @c(mirrored-resource) for managing textures.
+are not a @c(buffer-area) or @c(mirrored-buffer-resource) for managing textures.
 
 @cl:with-package[name="lpsg"](
 @cl:doc(class texture-area)
-@cl:doc(class raw-texture-resource)
+@cl:doc(class raw-mirrored-texture-resource)
 )
 
 There is an asymmetry in the LPSG interfaces, and their concrete
@@ -423,8 +423,8 @@ functionality offered by OpenGL, as well as the different uses of
 buffer objects and textures.
 
 @i([A less excusable asymmetry currently exists in the implementation:
-the @c(mirrored-resource) only supports loading buffers from Lisp
-arrays, whereas @c(raw-texture-resource), the  only subclass of
+the @c(mirrored-buffer-resource) only supports loading buffers from Lisp
+arrays, whereas @c(raw-mirrored-texture-resource), the  only subclass of
 @c(texture-resource), only supports loading from "foreign"
 memory. This is due to pragmatism -- image loading libraries are
 likely to return image data as foreign memory -- as well as
@@ -477,15 +477,16 @@ objects, so they will be drawn at a later time. In this way
 @c(submit-with-effect) can arrange for a shape's geometry to be
 rendered several times with different environments.
 
-Two other queues are available to @c{submit-with-effect}. The
-"finalize" queue contains objects that reference OpenGL 
-objects. "Finalization" here does not refer to garbage collector
-finalization, but to the actions required to create and intialize
-objects via calls to OpenGL. The generic function @c{gl-finalize},
-described in the section "OpenGL Objects and State," is called on
-every object in the finalize queue. The "upload" queue is available for
-any object, such as a vertex attribute, that needs to upload data from
-Lisp to the GPU.
+@c{submit-with-effect} also performs other important functions. Any
+object that refers to OpenGL objects may need to be finalized and
+should be placed on the "finalize" queue. "Finalization" here does not
+refer to garbage collector finalization, but to the actions required
+to create and intialize objects via calls to OpenGL. The generic
+function @c{gl-finalize}, described in the section "OpenGL Objects and
+State," is called on every object in the finalize queue.
+
+All data that will be used by OpenGL must be scheduled for upload to
+the driver and GPU.
 
 @begin(section)
 @title(Uploading Data)
@@ -493,7 +494,13 @@ Lisp to the GPU.
 The "upload queue" is an opaque object not directly accessible to the
 user. The upload of some types of objects can be optimized by grouping
 all uploads for a certain object e.g., a buffer object, together. The
-generic function @c(schedule-upload) is used to place objects 
+generic function @c(schedule-upload) is used to schedule the upload;
+this will happen after the finalize queue has been traversed, but
+before any shapes are drawn.
+
+@cl:with-package[name="lpsg"](
+@cl:doc(generic schedule-upload)
+)
 @end(section)
 
 All these queues are traversed by the @c(draw) generic function, which
@@ -515,6 +522,12 @@ sorted order.])
 @cl:doc(macro do-render-queue)
 @cl:doc(generic find-if-queue)
 )
+
+The finalize and upload queues are cleared after each call to
+@c(draw), while the render queues are not. @i([Should some uploads be
+preserved i.e., have the option to be done every frame?])
+
+@i([What about download (from the GPU) operations?])
 
 Methods defined on the @c{simple-effect} class perform the basic
 actions of creating render bundles from a shape and scheduling any

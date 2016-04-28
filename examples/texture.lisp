@@ -230,7 +230,7 @@ void main()
                                    :internal-format :rgb8
                                    :pixel-format :rgb
                                    :data-type :unsigned-byte))
-           (tex-area (make-instance 'lpsg::raw-texture-resource
+           (tex-area (make-instance 'lpsg::raw-mirrored-texture-resource
                                     :texture texture
                                     :data mem
                                     :data-count data-size

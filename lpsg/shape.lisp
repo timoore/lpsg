@@ -2,7 +2,7 @@
 
 (in-package #:lpsg)
 
-(defclass mirrored-resource (buffer-area)
+(defclass mirrored-buffer-resource (buffer-area)
   ((data :accessor data :initarg :data :documentation "An array of data. Each element corresponds
   to a component of attribute data stored in a buffer.")
    (data-offset :accessor data-offset :initarg :data-offset :initform 0
@@ -62,7 +62,7 @@ The array storing the data can have any dimensionality; it will be accessed usin
              do (setf (cffi:mem-aref dest-component :short)
                       (row-major-aref data (+ src-idx j)))))))
 
-(defmethod initialize-instance :after ((obj mirrored-resource) &key)
+(defmethod initialize-instance :after ((obj mirrored-buffer-resource) &key)
   (unless (slot-boundp obj 'num-components)
     (setf (num-components obj) (components obj)))
   (when (and (not (slot-boundp obj 'upload-fn)) (slot-boundp obj 'buffer-type))
@@ -86,7 +86,7 @@ The array storing the data can have any dimensionality; it will be accessed usin
 ;;;
 ;;; stride - stride of data in buffer
 
-(defclass vertex-attribute (mirrored-resource)
+(defclass vertex-attribute (mirrored-buffer-resource)
   ())
 
 ;;; attributes - alist of (name . vertex-attribute). 
@@ -275,7 +275,7 @@ Calls (submit-with-effect SHAPE RENDERER (effect SHAPE))"
      do (progn
           ;; XXX Is vertex attrib mirrored? Does it actually need uploading?
           ;; Is there a better way than typep?
-          (when (typep vertex-attrib 'mirrored-resource)
+          (when (typep vertex-attrib 'mirrored-buffer-resource)
             (schedule-upload renderer vertex-attrib))))
   (when (typep (drawable shape) 'indexed-drawable)
     (schedule-upload renderer (element-array (drawable shape)))))
