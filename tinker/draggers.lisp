@@ -19,7 +19,7 @@
 
 (defgeneric current-world-transform (dragger new-mouse)
   (:documentation "Returns the current transform produced by dragging the mouse to
-@cl:param{new-mouse}, in the world coordinate system, when the dragger is active. This transform
+@cl:param(new-mouse), in the world coordinate system, when the dragger is active. This transform
 should be applied to the camera parameters to obtain its new orientation."))
 
 
@@ -115,7 +115,7 @@ should be applied to the camera parameters to obtain its new orientation."))
 
 (defgeneric current-rotation-quat (dragger new-mouse)
   (:documentation "Returns the quaternion of the arcball rotation specified by
-@cl:param{new-mouse}, in the coordinate system of the camera.")) 
+@cl:param(new-mouse), in the coordinate system of the camera.")) 
 
 (defmethod current-rotation-quat ((dragger rotate-dragger) new-mouse)
   (with-slots (initial-vector)

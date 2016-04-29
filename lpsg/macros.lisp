@@ -3,6 +3,8 @@
 (in-package #:lpsg)
 
 (defmacro with-allocator ((allocator &rest allocator-args) &body body)
+  "Bind @cl:param(allocator) to an allocator created with @cl:param(allocator-args) in
+@cl:param(body). The allocator is opened before and closed after executing @cl:param(body)"
   (multiple-value-bind (forms declarations)
       (alexandria:parse-body body)
     `(let ((,allocator (make-instance ,@allocator-args)))
@@ -62,7 +64,7 @@
                                                              key-alist))))))
 
 (defmacro do-render-queue ((var queue) &body body)
-  "Call @cl:parameter(body) with each object in the @c(render-queue) @cl:parameter(queue) bound to
-@cl:parameter(var)."
+  "Call @cl:param(body) with each object in the @c(render-queue) @cl:param(queue) bound to
+@cl:param(var)."
   (serapeum:with-thunk (body var)
     `(map-render-queue ,queue ,body)))

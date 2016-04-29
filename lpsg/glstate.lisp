@@ -3,16 +3,18 @@
 (in-package #:lpsg)
 
 (defclass texture-area ()
-  ((level :accessor level :initarg :level)
-   (texture :accessor texture :initarg :texture)
+  ((level :accessor level :initarg :level :documentation "Mipmap level of this data in the texture.")
+   (texture :accessor texture :initarg :texture :documentation "OpenGL texture object")
    (x-offset :accessor x-offset :initarg :x-offset
              :documentation "X offset of data in texture image.")
    (y-offset :accessor y-offset :initarg :y-offset
              :documentation "Y offset of data in texture image.")
-   (width :accessor width :initarg :width)
-   (height :accessor height :initarg :height)
-   (generate-mipmap-p :accessor generate-mipmap-p :initarg :generate-mipmap-p))
-  (:default-initargs :level 0 :x-offset 0 :y-offset 0 :generate-mipmap-p t))
+   (width :accessor width :initarg :width :documentation "Width of image in pixels")
+   (height :accessor height :initarg :height :documentation "Height of image in pixels")
+   (generate-mipmap-p :accessor generate-mipmap-p :initarg :generate-mipmap-p
+                      :documentation "If true (default), a mipmap will be generated in the texture."))
+  (:default-initargs :level 0 :x-offset 0 :y-offset 0 :generate-mipmap-p t)
+  (:documentation "Superclass for image data that will be stored in a texture."))
 
 (define-gl-object texture ()
   ((target :accessor target :initarg :target)
@@ -26,8 +28,9 @@
   (gl-valid-p obj))
 
 (defclass texture-2d (texture)
-  ((width :accessor width :initarg :width)
-   (height :accessor height :initarg :height)))
+  ((width :accessor width :initarg :width :documentation "width of texture")
+   (height :accessor height :initarg :height :documentation "height of texture"))
+  (:documentation "class representing OpenGL Texture 2D"))
 
 (defmethod gl-finalize ((obj texture-2d) &optional errorp)
   (declare (ignorable errorp))
@@ -48,11 +51,13 @@
     (gl:bind-texture (target obj) 0)))
 
 (defclass raw-mirrored-texture-resource (texture-area)
-  ((data :accessor data :initarg :data)
-   (data-offset :accessor data-offset :initarg :data-offset)
+  ((data :accessor data :initarg :data :documentation "foreign memory containing the image data")
+   (data-offset :accessor data-offset :initarg :data-offset
+                :documentation "offset of image data in foreign memory")
    (data-count :accessor data-count :initarg :data-count :initform 0
                :documentation "number of elements")
-   (row-alignment :accessor row-alignment :initarg :row-alignment))
+   (row-alignment :accessor row-alignment :initarg :row-alignment
+                  :documentation "alignment, in bytes, of each row of the image data"))
   (:default-initargs :data-offset 0 :row-alignment 1)
   (:documentation "Class for texture data stored in foreign memory."))
 
@@ -91,21 +96,32 @@
     (gl:bind-texture target 0)))
 
 (define-gl-object sampler ()
-  ((wrap-s :accessor wrap-s :initarg :wrap-s)
-   (wrap-t :accessor wrap-t :initarg :wrap-t)
-   (wrap-r :accessor wrap-r :initarg :wrap-r)
-   (border-color :accessor border-color :initarg :border-color)
-   (min-filter :accessor min-filter :initarg :min-filter)
-   (mag-filter :accessor mag-filter :initarg :mag-filter)
-   (min-lod :accessor min-lod :initarg :min-lod)
-   (max-lod :accessor max-lod :initarg :max-lod)
-   (lod-bias :accessor lod-bias :initarg :lod-bias)
-   (compare-mode :accessor compare-mode :initarg :compare-mode)
-   (compare-func :accessor compare-func :initarg :compare-func))
+  ((wrap-s :accessor wrap-s :initarg :wrap-s :documentation "wrap mode in the S dimension, a
+  @c(cl-opengl) keyword")
+   (wrap-t :accessor wrap-t :initarg :wrap-t :documentation "wrap mode in the T dimension, a
+  @c(cl-opengl) keyword")
+   (wrap-r :accessor wrap-r :initarg :wrap-r :documentation "wrap mode in the R dimension, a
+  @c(cl-opengl) keyword")
+   (border-color :accessor border-color :initarg :border-color
+                 :documentation "the texture border color, an array of 4 floats.")
+   (min-filter :accessor min-filter :initarg :min-filter
+               :documentation "minification filter - a @c(cl-opengl) keyword")
+   (mag-filter :accessor mag-filter :initarg :mag-filter
+               :documentation "magniffication filter - a @c(cl-opengl) keyword")
+   (min-lod :accessor min-lod :initarg :min-lod
+            :documentation "minimum texture LOD level")
+   (max-lod :accessor max-lod :initarg :max-lod
+            :documentation "minimum texture LOD level")
+   (lod-bias :accessor lod-bias :initarg :lod-bias :documentation "texture LOD bias")
+   (compare-mode :accessor compare-mode :initarg :compare-mode
+                 :documentation "comparison mode, for depth textures")
+   (compare-func :accessor compare-func :initarg :compare-func
+                 :documentation "comparison function, for depth textures"))
   (:default-initargs :wrap-s :repeat :wrap-t :repeat :wrap-r :repeat
-                     :texture-border-color #(0.0 0.0 0.0 0.0) :min-filter :nearest-mipmap-linear
+                     :border-color #(0.0 0.0 0.0 0.0) :min-filter :nearest-mipmap-linear
                      :mag-filter :linear :min-lod -1000.0 :max-lod 1000.0 :lod-bias 0.0
-                     :compare-mode :none :compare-func :lequal))
+                     :compare-mode :none :compare-func :lequal)
+  (:documentation "class representing OpenGL sampler object, which controls texture filtering"))
 
 (defmethod gl-finalize ((obj sampler) &optional errorp)
   (let ((id (gl:gen-sampler)))

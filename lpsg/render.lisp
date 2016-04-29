@@ -93,7 +93,8 @@ This is called when the renderer's OpenGL context is current. The renderer is ac
 
 ;;; This should be some kind of ordered data structure (map, skip list, ...)
 (defclass unordered-render-queue (render-queue)
-  ((bundles :accessor bundles :initarg :bundles :initform nil))
+  ((bundles :accessor bundles :initarg :bundles :initform nil
+            :documentation "private"))
   (:documentation "A queue that contains bundles to be rendered."))
 
 (defmethod add-rendered-object ((render-queue unordered-render-queue) object)
@@ -145,21 +146,22 @@ This is called when the renderer's OpenGL context is current. The renderer is ac
   (:default-initargs :max-combined-texture-image-units 8)) ;XXX way to small, for testing
 
 (defclass standard-renderer (renderer)
-  ((buffers :accessor buffers :initform nil)
-   (bundles :accessor bundles :initform nil)
-   (current-state :accessor current-state :initform nil)
-   (predraw-queue :accessor predraw-queue :initform nil)
-   (finalize-queue :accessor finalize-queue :initform nil)
+  ((buffers :accessor buffers :initform nil :documentation "private")
+   (bundles :accessor bundles :initform nil :documentation "private")
+   (current-state :accessor current-state :initform nil :documentation "private")
+   (predraw-queue :accessor predraw-queue :initform nil :documentation "private")
+   (finalize-queue :accessor finalize-queue :initform nil :documentation "private")
    ;; alist of (buffer . buffer-areas)
-   (upload-queue :accessor upload-queue :initform nil)
+   (upload-queue :accessor upload-queue :initform nil :documentation "private")
    (render-stage :accessor render-stage
                   :documentation "The top-level (default) render stage.")
    ;; XXX Should be weak
-   (vao-cache :accessor vao-cache :initform (make-hash-table :test 'equal))
+   (vao-cache :accessor vao-cache :initform (make-hash-table :test 'equal) :documentation "private")
    (gl-objects :accessor gl-objects :initform nil :documentation "List of all OpenGL objects
 allocated by calls in LPSG." )
    (context-parameters :accessor context-parameters
                        :documentation "Parameters of the OpenGL context."))
+  (:documentation "The standard instantiable class of @c(renderer).")
   )
 
 ;;; XXX Temporary until we figure out how how / when to intialize the renderer from a graphics
@@ -220,17 +222,25 @@ but that can impact performance."))
          :documentation "A mode for an OpenGL draw-elements or draw-array call,
   e.g. :triangles")
    (vertex-count :accessor vertex-count :initarg :vertex-count
-                    :documentation "The total number of vertices in this geometry.")))
+                 :documentation "The total number of vertices in this geometry."))
+  (:documentation "Superclass for classes that describe the format, number, and layout of vertex
+data.")) 
 
 (defclass array-drawable (drawable)
   ((first-vertex :accessor first-vertex :initarg :first-vertex
-                 :documentation "The starting index in the enabled arrays.")))
+                 :documentation "The starting index in the enabled arrays."))
+  (:documentation "Drawable class for a shape that stores its attribute values in linear arrays."))
 
 (defclass indexed-drawable (drawable)
-  ((index-type :accessor index-type :initarg :index-type)
-   (base-vertex :accessor base-vertex :initarg :base-vertex)
-   (element-array :accessor element-array :initarg :element-array))
-  (:default-initargs :index-type :unsigned-short :base-vertex 0))
+  ((index-type :accessor index-type :initarg :index-type
+               :documentation "OpenGL type of the index values")
+   (base-vertex :accessor base-vertex :initarg :base-vertex
+                :documentation "index offset to the shape's data in the attribute arrays, as
+used in the gl:draw-elements-base-vertex function")
+   (element-array :accessor element-array :initarg :element-array
+                  :documentation "Lisp array of element indices"))
+  (:default-initargs :index-type :unsigned-short :base-vertex 0)
+  (:documentation "Drawable class for a shape that "))
 
 (defclass buffer-area ()
   ((buffer :accessor buffer :initarg :buffer
@@ -430,8 +440,9 @@ Will be created automatically, but must be specified for now.")))
 ;;; of uset strategies?
 
 (define-gl-object shader (shader-source)
-  ((status :accessor status :initarg :status)
-   (compiler-log :accessor compiler-log :initarg :compiler-log :initform nil))
+  ((status :accessor status :initarg :status :documentation "status of shader compilation")
+   (compiler-log :accessor compiler-log :initarg :compiler-log :initform nil
+                 :documentation "log of shader compilation errors and warnings"))
   (:documentation "The LPSG object that holds the source code for an OpenGL shader, information
   about its usets, ID in OpenGL, and any errors that result from its compilation."))
 
@@ -459,17 +470,21 @@ Will be created automatically, but must be specified for now.")))
   (setf (%id obj) 0))
 
 (define-gl-object program ()
-  ((shaders :accessor shaders :initarg :shaders :initform nil)
-   (compiled-shaders :accessor compiled-shaders :initform nil)
+  ((shaders :accessor shaders :initarg :shaders :initform nil
+            :documentation "shader objects that compose this program")
    ;; (name location type size)
    (uniforms :accessor uniforms :initform nil
              :documentation "Information on uniforms declared within
   the program shader source.") 
-   (status :accessor status :initarg :status)
-   (link-log :accessor link-log :initarg :link-log :initform nil)
+   (status :accessor status :initarg :status
+           :documentation "status of shader program link")
+   (link-log :accessor link-log :initarg :link-log :initform nil
+             :documentation "log of errors and warnings from linking shader program")
    ;; elements are (desc strategy (most-recent-uset counter))
-   (uset-alist :accessor uset-alist :initform nil)
-   (vertex-attribs :accessor vertex-attribs :initform nil)))
+   (uset-alist :accessor uset-alist :initform nil
+               :documentation "private")
+   (vertex-attribs :accessor vertex-attribs :initform nil :documentation "private"))
+  (:documentation "The representation of an OpenGL shader program."))
 
 ;;; Compute all the usets used in a program's shaders, then choose strategies
 ;;; for them.
@@ -560,9 +575,9 @@ Will be created automatically, but must be specified for now.")))
 (defgeneric upload-buffers (renderer obj))
 
 (defgeneric draw (renderer)
-  (:documentation "Draw all graphic objects that have been registered with @cl:parameter{renderer}.
+  (:documentation "Draw all graphic objects that have been registered with @cl:param(renderer).
 
-Perform all outstanding operations in @cl:parameter:{renderer}: finalize all objects on the
+Perform all outstanding operations in @cl:param(renderer): finalize all objects on the
 finalize queue(s), do any upload operations in the upload queue, then traverse the render stages
 and their render queues to render all bundles. The renderer does not swap OpenGL front and back
 buffers; that is done by the application outside of LPSG."))

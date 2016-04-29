@@ -73,31 +73,20 @@ The array storing the data can have any dimensionality; it will be accessed usin
        (setf (upload-fn obj) #'upload-resource-short)))))
 
 ;;; Definition of an individual vertex attribute
-;;;
-;;; data - a Lisp array. Data will be taken from consecutive elements of
-;;; the array, as by row-major-aref, according to format.
-;;;
-;;; format - OpenGL format
-;;;
-;;; buffer - The OpenGL buffer that is the target for the attribute. A gl-buffer
-;;;
-;;; offset - offset from beginning of buffer to the beginning of data. For a 2d
-;;; array, the offset is used on each row of data.
-;;;
-;;; stride - stride of data in buffer
 
 (defclass vertex-attribute (mirrored-buffer-resource)
-  ())
+  ()
+  (:documentation "class for vertex attributes of shapes"))
 
 ;;; attributes - alist of (name . vertex-attribute). 
 
 (defclass standard-shape (sink-node sink-node-mixin shape)
   ((attributes :accessor attributes :initarg :attributes :initform nil
                :documentation "Alist of (name . attribute). The names are later mapped to a vertex binding index.")
-   (effect :accessor effect :initarg :effect)
+   (effect :accessor effect :initarg :effect :documentation "private")
    ;; XXX uset computation nodes?
-   (usets :accessor usets :initarg :usets :initform nil)
-   (drawable :accessor drawable :initarg :drawable)
+   (usets :accessor usets :initarg :usets :initform nil :documentation "private")
+   (drawable :accessor drawable :initarg :drawable :documentation "private")
    (bundles :accessor bundles :initform nil
             :documentation "The bundles that are created by EFFECT for this shape."))
   (:documentation "Class for geometry coupled with an effect.
@@ -115,8 +104,6 @@ visiblep - true if shape is visible, false if not
   (unless (slot-boundp obj 'drawable)
     (setf (drawable obj) (make-instance 'drawable)))
   (setf (input obj 'visiblep) visiblep))
-
-(defgeneric attribute (obj attribute-name))
 
 (defmethod attribute ((obj shape) attribute-name)
   (getassoc attribute-name (attributes obj) :test #'equal))

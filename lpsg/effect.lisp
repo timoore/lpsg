@@ -35,8 +35,10 @@ just ignore it."
   attrib-set)
 
 (defclass simple-effect (effect)
-  ((gl-state :accessor gl-state :initarg :gl-state)
-   (uset-names :accessor uset-names :initarg :uset-names :initform nil))
+  ((gl-state :accessor gl-state :initarg :gl-state :documentation "@c(graphics-state) object used
+  to render shapes that use this effect")
+   (uset-names :accessor uset-names :initarg :uset-names :initform nil
+               :documentation "names (symbols) of usets used by the effect"))
   (:documentation "This class supports effects which are simply the application of OpenGL state,
 with uset parameters, to a shape."))
 

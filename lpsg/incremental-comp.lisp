@@ -41,11 +41,12 @@
               :documentation "Returns a NODE's input named NAME. Second value indicates if input
 exists or not.")
    (:generic delete-input (node input-name))
-   (:generic notify-invalid-input (node invalid-source input-name)))
+   (:generic notify-invalid-input (node invalid-source input-name)
+    (:documentation "Called when a source of @cl:param(node) is invalidated.")))
   (:documentation "Node that consumes values via named inputs."))
 
 (defclass sink-node-mixin ()
-  ((inputs :accessor inputs :initform nil))
+  ((inputs :accessor inputs :initform nil :documentation "slot for @c(inputs) accessor"))
   (:documentation "Mixin class that provides slots and some methods for the SINK-NODE protocol
 class"))
 
@@ -61,6 +62,7 @@ class"))
      do (setf (input obj input-name) source)))
 
 (defun input-value (node input-name)
+  "Get the value of the input @cl:param(input-name) in @cl:param(node)."
   (multiple-value-bind (source sourcep)
       (input node input-name)
     (if sourcep
@@ -72,9 +74,10 @@ class"))
   nil)
 
 (define-protocol-class source-node ()
-  ((:accessor validp)
+  ((:accessor validp :documentation "T if computed value is valid.")
    (:accessor sinks :documentation "list of (node . input-names)")
-   (:generic delete-sink (node sink input-name)))
+   (:generic delete-sink (node sink input-name)
+    (:documentation "Remove a sink node that depends on this source.")))
   
   (:documentation "Note: the input names belong to the sink nodes of this node."))
 
@@ -84,8 +87,8 @@ class"))
   nil)
 
 (defclass source-node-mixin ()
-  ((validp :accessor validp :initform nil)
-   (sinks :accessor sinks :initform nil))
+  ((validp :accessor validp :initform nil :documentation "slot for @c(validp) accessor")
+   (sinks :accessor sinks :initform nil :documentation "slot for @c(sinks) accessor"))
   (:documentation "Mixin class that provides slots and some methods for the SOURCE-NODE protocol
 class."))
 
@@ -124,8 +127,11 @@ class."))
   (:documentation "Convenience mixin class the slots necessary to implement sources and sinks."))
 
 (define-protocol-class computation-node (source-node sink-node)
-  (( :accessor cached-value)
-   (:generic compute (node))))
+  ((:accessor cached-value :documentation "the cached value of this node's @c(compute) function")
+   (:generic compute (node)
+    (:documentation "computes the value of this node ")))
+  (:documentation "an incremental computation node that has inputs (sources) and clients that use
+its value (sinks)."))
 
 (defmethod value ((node computation-node))
   (if (validp node)
@@ -136,10 +142,11 @@ class."))
         new-value)))
 
 (defclass computation-node-mixin ()
-  ((cached-value :accessor cached-value)))
+  ((cached-value :accessor cached-value :documentation "slot for @c(cached-value) accessor"))
+  (:documentation "convenience mixin class for implementing @c(computation-node) protocol classes."))
 
 (defclass input-value-node (source-node source-node-mixin)
-  ((value :accessor value))
+  ((value :accessor value :documentation "value of the node, which is set instead of computed"))
   (:documentation "A node whose value can be set. Useful as the source to multiple nodes."))
 
 (defmethod initialize-instance :after ((node input-value-node) &key (value nil valuep))
@@ -156,7 +163,8 @@ class."))
   nil)
 
 (defclass if-then-node (computation-node computation-node-mixin source-sink-mixin)
-  ())
+  ()
+  (:documentation " "))
 
 (defmethod compute ((node if-then-node))
   (if (input-value node 'if)

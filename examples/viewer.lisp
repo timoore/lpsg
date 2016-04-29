@@ -181,7 +181,7 @@
   window)
 
 (defgeneric process-events (window &optional blocking)
-  (:documentation "Process glop events for @cl:param{window}.
+  (:documentation "Process glop events for @cl:param(window).
 
 This calls "))
 

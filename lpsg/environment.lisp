@@ -9,9 +9,12 @@
   ((attribute-map :accessor attribute-map :initform nil :initarg :attribute-map
                   :documentation "list of (symbol glsl-name) where glsl-name is a string")
    (effect :accessor effect :initarg :effect :documentation "back pointer to effect object")
-   (gl-state :accessor gl-state :initarg :gl-state)
-   (uniform-sets :accessor uniform-sets :initarg :uniform-sets :initform nil)
-   (renderer :accessor renderer :initarg :renderer)))
+   (gl-state :accessor gl-state :initarg :gl-state :documentation "the state to apply when rendering")
+   (uniform-sets :accessor uniform-sets :initarg :uniform-sets :initform nil
+                 :documentation "uset values (from inputs) used to update the environment's shader
+uniforms")
+   (renderer :accessor renderer :initarg :renderer :documentation "the renderer"))
+  (:documentation "class that controls rendering of shapes."))
 
 (defmethod gl-finalized-p ((obj environment))
   (gl-finalized-p (gl-state obj)))

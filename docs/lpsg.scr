@@ -1,4 +1,6 @@
 @begin(section)
+@title(LPSG)
+@begin(section)
 @title(Overview)
 
 LPSG is a Common Lisp library for rendering graphics using OpenGL. It
@@ -25,7 +27,7 @@ traffic between the CPU and GPU. It does this by storing the user's
 data in OpenGL @i(buffer objects) which normally reside on the
 GPU. Most updates to a graphics view, such as matrices that specify
 eye or object positions, are small; these are handled through a system
-of parameters called @i(usets). On the other hand, LPSG does @([will])
+of parameters called @i(usets). On the other hand, LPSG does @i([will])
 support efficient methods for uploading large updates of user data.
 
 Another important optimization is reducing CPU cache misses during
@@ -52,13 +54,13 @@ each OpenGL call requires work from the driver to at least validate it and
 check for errors. This is especially good in Common Lisp, as "foreign
 function calls" can be quite expensive.
 
-@begin{section}
-@title{Conventions}
+@begin(section)
+@title(Conventions)
 LPSG is described in terms of protocols and protocol classes. A
-@i{protocol} is a set of generic functions that collaborate to do
+@i(protocol) is a set of generic functions that collaborate to do
 something. The functions in a protocol must restrict some of their
 arguments to classes that have certain properties. These classes are
-@i{protocol classes}, abstract classes that serve only as
+@i(protocol classes), abstract classes that serve only as
 superclasses. A protocol class defines accessors, which behave like
 normal slot accessors, although they can take more than one
 argument. It also defines normal generic functions that are considered
@@ -71,7 +73,7 @@ by the protocol class when the derived class appears as an argument to
 them. LPSG provides mixins that contain slots whose accessor methods
 implement the protocol classes' accessor generic functions.
 
-Protocol classes are defined using the @{define-protocol-class} macro:
+Protocol classes are defined using the @c(define-protocol-class) macro:
 
 @cl:with-package[name="lpsg"](
 @cl:doc(macro define-protocol-class)
@@ -80,28 +82,28 @@ Protocol classes are defined using the @{define-protocol-class} macro:
 LPSG provides instantiable classes that are subclasses of its protocol
 classes. These have names beginning with "standard-" or "simple-" and
 are documented along with the protocol classes.
-@end{section}
+@end(section)
 
-@begin{section}
-@title{High level LPSG}
+@begin(section)
+@title(High level LPSG)
 
-LPSG contains a @c{renderer} class that controls all rendering to the
-screen. The user creates @c{shapes} containing per-vertex attributes,
+LPSG contains a @c(renderer) class that controls all rendering to the
+screen. The user creates @c(shapes) containing per-vertex attributes,
 such as position or color data. The shape also contains an effect
 object which controls its appearence on the screen.
 
 Once a shape has been prepared, it is submitted to the renderer using
-the generic function @{submit}. This invokes the
-@c{submit-with-effect} generic function which, dispatching on its
+the generic function @c(submit). This invokes the
+@c(submit-with-effect) generic function which, dispatching on its
 renderer, shape, and effect arguments, creates the objects that are
 used in the actual OpenGL rendering and places them on various
-queues. These are used when the user calls the renderer's @c{draw}
+queues. These are used when the user calls the renderer's @c(draw)
 method; at that time OpenGL objects are created on the GPU, any necessary
 initialization is performed, and shapes are rendered. On future calls
-to @c{draw}, these objects will be rendered again. The user
-effectively gives up ownership of a shape object until the @c{retract}
+to @c(draw), these objects will be rendered again. The user
+effectively gives up ownership of a shape object until the @c(retract)
 method is called on it. This removes the objects created in the
-@c{submit} call from the renderer's queues and destroys any
+@c(submit) call from the renderer's queues and destroys any
 now-uneeded OpenGL objects.
 
 Scenes in 3D applications are very dynamic; if they weren't, there
@@ -110,30 +112,30 @@ possible for the viewpoint to change at every redraw of the
 screen. The geometric objects in the scene may be animated as well,
 and these are often evaluated within systems of nested coordinate systems. To
 support this dynamism, LPSG implements a system of parameters that are
-connected in dependency chains. These @c{incremental-node} objects use
+connected in dependency chains. These @c(incremental-node) objects use
 lazy evaluation to supply values that affect OpenGL rendering. These
 values are most often used to set the uniform variables in OpenGL
 shader programs. LPSG aggregates such variables into sets, in order to
 choose the optimal way to upload them to OpenGL; these sets are called
 "uniform sets" or, throughout LPSG, "usets."
 
-@end{section}
-@begin{section}
-@title{The renderer}
+@end(section)
+@begin(section)
+@title(The renderer)
 
-The @c{renderer} class that controls all rendering to the
-screen. Generic functions that dispatch on @c{renderer} ultimately
-perform all OpenGL calls. @c{open-renderer} performs any OpenGL
-initialization needed; @c{close-renderer} cleans up when the
+The @c(renderer) class that controls all rendering to the
+screen. Generic functions that dispatch on @c(renderer) ultimately
+perform all OpenGL calls. @c(open-renderer) performs any OpenGL
+initialization needed; @c(close-renderer) cleans up when the
 application is finished rendering.
 
-The user calls the @c{submit} method to register objects with a
+The user calls the @c(submit) method to register objects with a
 renderer. Geometric objects, called "shapes," that have been submitted
-will then be rendered when the @c{draw} generic function is
-called. Submitted objects persist between calls to @{draw}.
+will then be rendered when the @c(draw) generic function is
+called. Submitted objects persist between calls to @c(draw).
 
-The @c{retract} generic function removes an object from a
-@c{renderer}. It will not be rendered anymore, and any OpenGL objects
+The @c(retract) generic function removes an object from a
+@c(renderer). It will not be rendered anymore, and any OpenGL objects
 used by it will be deallocated if not used by any other LPSG
 objects. This deallocation is not immediate because it relies on
 garbage collection to notice when an object is no longer used.
@@ -146,46 +148,46 @@ garbage collection to notice when an object is no longer used.
 @cl:doc(generic draw)
 @cl:doc(class standard-renderer)
 @cl:doc(generic submit)
-@cl:doc{generic retract}
+@cl:doc(generic retract)
 )
-
-@end{section}
 
 @end(section)
 
-@begin{section}
-@title{Attributes and shapes}
+@end(section)
 
-The @c{shape} class represents geometry that is rendred by OpenGL. In
+@begin(section)
+@title(Attributes and shapes)
+
+The @c(shape) class represents geometry that is rendred by OpenGL. In
 that sense it contains a collection of vertex attributes i.e. the
 per-vertex data used in the rendering.  This might include a position in space
 (coordinates); a surface normal vector, colors, texture coordinates,
 or anything else in this modern world of shaders that could possibly
 be stored per-vertex in a shape. Each vertex attribute is stored in a
-@c{vertex-attribute} object.
+@c(vertex-attribute) object.
 
 @cl:with-package[name="lpsg"](
 @cl:doc(class shape)
 @cl:doc(class standard-shape)
 )
 
-@begin{section}
-@title{Buffers}
+@begin(section)
+@title(Buffers)
 
 The vertex attributes used to render a shape are stored in a
-@i{vertex buffer objects} (VBO) within OpenGL. This object often
+@i(vertex buffer objects) (VBO) within OpenGL. This object often
 resides in the GPU's memory. Different vertex attributes from
 different shapes can be stored in the same buffer object. LPSG
-references them with a @c{buffer-area} object that describes the
+references them with a @c(buffer-area) object that describes the
 location and format of data within a buffer.
 
 The data in a buffer object is in the format required by the GPU and
 not easily accessible from a program running on the CPU. It is
 convenient for a Lisp program to manipulate shape attributes in Lisp
-arrays. The @c{mirrored-buffer-resource} class, which is a subclass of
-@c{buffer-area}, describes the location and layout of data in a Lisp
+arrays. The @c(mirrored-buffer-resource) class, which is a subclass of
+@c(buffer-area), describes the location and layout of data in a Lisp
 array that will be uploaded by LPSG into a buffer. The source data of
-a @c{mirrored-buffer-resource} is described in terms of the elements of
+a @c(mirrored-buffer-resource) is described in terms of the elements of
 array, whereas the data location and format in the target buffer is
 defined in terms of bytes.
 
@@ -200,11 +202,11 @@ Objects and State) section. It can be shared among many
 @c(buffer-area) objects, thus storing their data in a single buffer
 object in OpenGL.
 
-@c{vertex-attribute} is a subclass of @c{mirrored-buffer-resource}.
+@c(vertex-attribute) is a subclass of @c(mirrored-buffer-resource).
 
-@end{section}
+@end(section)
 
-@c{shape} contains an object called a "drawable" which describes
+@c(shape) contains an object called a "drawable" which describes
 the specific shape i.e., whether it is a collection of points, lines,
 or triangles, how many of these objects there are, and also whether
 the shape is indexed or not. This refers to whether the vertex
@@ -222,23 +224,20 @@ different shapes.
 @cl:doc(class array-drawable)
 @cl:doc(class indexed-drawable)
 )
-A shape is registered with the renderer using the @code{submit} method. After
+A shape is registered with the renderer using the @c(submit) method. After
 that, lpsg handles everything. There only thing
 that can be directly done to the shape is to remove it from the
-renderer. This is done by the @c{retract} generic function, which
+renderer. This is done by the @c(retract) generic function, which
 causes the shape to not be displayed anymore and removes the
 shape from LPSG.
 
 @cl:with-package[name="lpsg"](
-@cl:doc(generic gl-buffer)
-@cl:doc(generic buffer)
-@cl:doc(generic attribute)
-@cl:doc(generic data)
+@cl:doc(class gl-buffer)
 @cl:doc(generic attributes)
 @cl:doc(class vertex-attribute)
 )
 
-An object called an @c{effect} controls the appearance of a
+An object called an @c(effect) controls the appearance of a
 shape. Its role is described in the "Submit Protocol" section.
 
 A shape's slots may not be changed after it has been submitted to the
@@ -251,10 +250,10 @@ animation effects. The environment object is immutable, but the
 rendering it controls is influenced by uset parameters that attached
 to the shape via the incremental computation system, decribed next.
 
-@end{section}
+@end(section)
 
-@begin{section}
-@title{Incremental computation}
+@begin(section)
+@title(Incremental computation)
 
 One of the goals of LPSG is to optimize the amount of memory traffic
 to the GPU.  To that end,  LPSG provides a system of lazy evaluation, called
@@ -266,10 +265,10 @@ an output (called a "sink"), this causes a value to be marked as
 invalid. When that value is actually needed, the chain of incremental
 nodes that calculate the value is traversed and updated. Incremental
 nodes that calculate a value based on their inputs, called
-@c{computation-nodes}, store the result, so the value is not
+@c(computation-nodes), store the result, so the value is not
 recomputed if it is not invalid.
 
-LPSG calls the generic function @c{notify-invalid-input} to mark a
+LPSG calls the generic function @c(notify-invalid-input) to mark a
 node as invalid. This function can be specialized to perform other
 actions at that time e.g., putting a node on a queue to perform an
 upload to the GPU at a later time.
@@ -295,7 +294,7 @@ upload to the GPU at a later time.
 )
 
 An example:
-@begin{code}
+@begin(code)
 (progn
   (defclass plus-node (computation-node computation-node-mixin source-sink-mixin)
     ())
@@ -340,13 +339,13 @@ An example:
   ;; Value of *mult-node3* should be 3840.
   (format t "~%*mult-node3*: ~S" (value *mult-node3*))
   )
-@end{code}
+@end(code)
 
-@c{source-node} objects can produce any type of value.
-@end{section}
+@c(source-node) objects can produce any type of value.
+@end(section)
 
-@begin{section}
-@title{Uniform sets}
+@begin(section)
+@title(Uniform sets)
 
 This is all not very useful in terms of writing 3D
 applications. because if you put a shape on the screen with all these
@@ -376,7 +375,7 @@ to transform normal vectors.
 @cl:doc(macro define-uset)
 )
 
-Because incremental computation @c{source-node} objects can produce
+Because incremental computation @c(source-node) objects can produce
 any type of value, they can also produce uniform sets. The LPSG user
 assigns @c(standard-shape) nodes as sinks for incremental computation
 nodes that produce uset values, using the name of the uset as the
@@ -392,10 +391,10 @@ allocated at each update, but should be updated in
 place. @i(Environments currently rely on this, which is kind of
 brittle and should be fixed.)
 
-@end{section}
+@end(section)
 
-@begin{section}
-@title{Textures}
+@begin(section)
+@title(Textures)
 
 Textures are raster data which are most often used to map images onto
 polygonal faces in the rendered scene. They are treated differently
@@ -429,35 +428,35 @@ arrays, whereas @c(raw-mirrored-texture-resource), the  only subclass of
 memory. This is due to pragmatism -- image loading libraries are
 likely to return image data as foreign memory -- as well as
 laziness. It will be fixed soon.])
-@end{section}
+@end(section)
 
-@begin{section}
-@title{The Submit Protocol}
+@begin(section)
+@title(The Submit Protocol)
 
-The @c{effect} object stored in a shape is not used directly to perform OpenGL
+The @c(effect) object stored in a shape is not used directly to perform OpenGL
 rendering. It does, however, control how the rendering will be done. This is
-accomplished in the @c{submit} generic function, when a shape is submitted to the
-renderer. @c{submit} immediately calls another generic function,
-@c{submit-with-effect}, which can be specialized on its shape and  effect arguments.
+accomplished in the @c(submit) generic function, when a shape is submitted to the
+renderer. @c(submit) immediately calls another generic function,
+@c(submit-with-effect), which can be specialized on its shape and  effect arguments.
 
 @cl:with-package[name="lpsg"](
 @cl:doc(generic submit-with-effect)
 )
 
-The protocol class @c{effect} is the superclass of all effect
+The protocol class @c(effect) is the superclass of all effect
 objects.
 
 @cl:with-package[name="lpsg"](
 @cl:doc(class effect)
 )
 
-The @c{attribute-map} is an essential link between a shape and its
+The @c(attribute-map) is an essential link between a shape and its
 on-screen representation. It maps the names of attributes in the shape
 to  vertex attributes in an OpenGL shaper program.
 
-@c{submit-with-effect} creates objects that are used to make calls
+@c(submit-with-effect) creates objects that are used to make calls
 to OpenGL and to do rendering. These objects are similar to the
-@c{attribute}, @c{shape} and @c{effect} objects that the user manipulates, but
+@c(attribute), @c(shape) and @c(effect) objects that the user manipulates, but
 they are less flexible and more specific to their role in OpenGL
 rendering. The include:
 
@@ -466,7 +465,7 @@ rendering. The include:
 attributes;)
 @item(@c(environment) - An object created from the @c(effect),
 containing OpenGL resources and parameters. see the "Environment" section;)
-@item(@c((render-bundle) - The rough equivalent of a @c{shape}, which
+@item(@c(render-bundle) - The rough equivalent of a @c(shape), which
 contains an @c(attribute-set) and an @c(effect).)
 @end(list)
 
@@ -477,12 +476,12 @@ objects, so they will be drawn at a later time. In this way
 @c(submit-with-effect) can arrange for a shape's geometry to be
 rendered several times with different environments.
 
-@c{submit-with-effect} also performs other important functions. Any
+@c(submit-with-effect) also performs other important functions. Any
 object that refers to OpenGL objects may need to be finalized and
 should be placed on the "finalize" queue. "Finalization" here does not
 refer to garbage collector finalization, but to the actions required
 to create and intialize objects via calls to OpenGL. The generic
-function @c{gl-finalize}, described in the section "OpenGL Objects and
+function @c(gl-finalize), described in the section "OpenGL Objects and
 State," is called on every object in the finalize queue.
 
 All data that will be used by OpenGL must be scheduled for upload to
@@ -529,7 +528,7 @@ preserved i.e., have the option to be done every frame?])
 
 @i([What about download (from the GPU) operations?])
 
-Methods defined on the @c{simple-effect} class perform the basic
+Methods defined on the @c(simple-effect) class perform the basic
 actions of creating render bundles from a shape and scheduling any
 necessary finalization and upload.
 
@@ -537,8 +536,8 @@ necessary finalization and upload.
 @cl:doc(class simple-effect)
 )
 
-@begin{section}
-@title{Environments}
+@begin(section)
+@title(Environments)
 
 
 The @c(environment) object contained in a @c(render-bundle)
@@ -548,7 +547,7 @@ ultimately controls the appearance of the bundle.
 @cl:doc(class environment)
 )
 
-The @c(gl-state) slot contains a @c{graphics-state} object that represents
+The @c(gl-state) slot contains a @c(graphics-state) object that represents
 the OpenGL state in effect when the environment is used to render a
 bundle. This contains things such as the shader program, and the the
 bound textures, and is described in the @ref[id=opengl-state](OpenGL
@@ -563,13 +562,13 @@ present, LPSG uses the classic OpenGL @c(glUniform) family of
 functions to upload values into shader programs. @i([In the future, we
 want to support using Uniform Buffer Objects.])
 
-@end{section}
+@end(section)
 
 
-@end{section}
+@end(section)
 
-@begin[ref=opengl-state]{section}
-@title{OpenGL Objects and State}
+@begin[ref=opengl-state](section)
+@title(OpenGL Objects and State)
 
 LPSG uses the @c(cl-opengl) library to call functions in the OpenGL
 "C" ABI. Most programs that use LPSG will not need to call OpenGL
@@ -605,6 +604,7 @@ called at other times too.
 @cl:with-package[name="lpsg"](
 @cl:doc(generic gl-finalize)
 @cl:doc(generic gl-finalized-p)
+)
 
 @c(gl-finalize) and @c(gl-finalized-p) are not restricted to take only
 subclasses of @c(gl-object). Methods for those functions can be
@@ -642,10 +642,10 @@ that environment.
 @cl:doc(generic program)
 )
 
-@end{section}
+@end(section)
 
-@begin{section}
-@title{The Draw Protocol}
+@begin(section)
+@title(The Draw Protocol)
 
 The generic function @c(draw) causes all submitted shapes to be
 rendered.
@@ -654,10 +654,20 @@ rendered.
 @cl:doc(generic draw)
 )
 
-@end{section}
+@c(draw) performs these actions:
+@begin(list)
+@item(Process the finalize queue, calling @c(gl-finalize) on all
+objects contained in it;)
+@item(Upload data that has been registered with @c(schedule-upload);)
+@item(Process the render stages, which results in OpenGL rendering.)
+@end(list)
 
-@begin{section}
-@title{Utilities}
+Any rendering is done in OpenGL's default framebuffer.
+
+@end(section)
+
+@begin(section)
+@title(Utilities)
 
 @cl:with-package[name="lpsg"](
 @cl:doc(generic compute-shape-allocation)
@@ -669,4 +679,5 @@ rendered.
 @cl:doc(macro with-allocator)
 @cl:doc(generic make-cube-shape)
    )
-@end{section}
+@end(section)
+@end(section)

@@ -6,7 +6,7 @@
 
 (define-protocol-class renderer ()
   ((:generic open-renderer (renderer)
-    (:documentation "Intialize @cl:parameter{renderer} for rendering.
+    (:documentation "Intialize @cl:param(renderer) for rendering.
 
 The OpenGL context that will be used to do all rendering must be current when this is called.  This
 method verifies that the context can support the rendering done by lpsg; that is, the version of
@@ -14,10 +14,10 @@ OpenGL supports the features needed by lpsg or has extensions that support them.
 parameters and capabilities of the OpenGL implementation, such as the number of texture
 units."))
    (:generic close-renderer (renderer &key deallocate-objects)
-    (:documentation "Close @cl:parameter{renderer} for rendering.
+    (:documentation "Close @cl:param(renderer) for rendering.
 
-If @cl:parameter{deallocate-objects} is @c{t}, then all OpenGL objects that are still allocated by
-LPSG will be explicitly deallocated. The default, @c{nil}, doesn't deallocate these objects; it
+If @cl:param(deallocate-objects) is @c(t), then all OpenGL objects that are still allocated by
+LPSG will be explicitly deallocated. The default, @c(nil), doesn't deallocate these objects; it
 assumes that the context will soon be destroyed." )) 
    (:generic submit (object renderer)
     (:documentation "Submit OBJECT to RENDERER."))
@@ -48,24 +48,25 @@ resources."))
    (:accessor effect)
    ;; XXX uset computation nodes?
    (:accessor usets)
-   (:accessor drawable)))
+   (:accessor drawable))
+  (:documentation "Protocol class for rendered objects."))
 
 (define-protocol-class render-queue ()
   ((:generic add-rendered-object (render-queue object)
-    (:documentation "Add @cl:parameter(object) to @cl:parameter(render-queue).
+    (:documentation "Add @cl:param(object) to @cl:param(render-queue).
 
 The order in which objects in the queue are rendered is undefined. This function is used in the
 implementation of SUBMIT-WITH-EFFECT."))
    (:generic remove-rendered-object (render-queue object)
-    (:documentation "Remove @cl:parameter{object} from @cl:parameter(render-queue)."))
+    (:documentation "Remove @cl:param(object) from @cl:param(render-queue)."))
 
    (:generic map-render-queue (render-queue function)
-    (:documentation "Call @cl:parameter(function) on each object stored in the
-@cl:parameter(render-queue)."))
+    (:documentation "Call @cl:param(function) on each object stored in the
+@cl:param(render-queue)."))
 
    (:generic find-if-queue (predicate render-queue)
-    (:documentation "Search for an object in @cl:parameter(render-queue) that satisfies
-@cl:parameter(predicate)")))
+    (:documentation "Search for an object in @cl:param(render-queue) that satisfies
+@cl:param(predicate)")))
 
   (:documentation "A container class for objects, including @c(render-queue) objects too.
 
