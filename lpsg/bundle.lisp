@@ -8,10 +8,10 @@
    (environment :accessor environment :initarg :environment))
   (:documentation "Class that ties together attributes and a graphics environment.
 
-A RENDER-BUNDLE is the lowest level object processed by a RENDERER that produces graphics output
-via OpenGL. It groups the ATTRIBUTES from a SHAPE into an ATTRIBUTE-SET that can be bound quickly
-in OpenGL. It also stores an ENVIRONMENT that holds all the graphics state needed to render the
-geometry of the associated SHAPE. "))
+A @c(render-bundle) is the lowest level object processed by a @c(renderer) that produces graphics output
+via OpenGL. It groups the @c(attribute) objects from a @c(shape) into an @c(attribute-set) that can be bound quickly
+in OpenGL. It also stores an @c(environment) that holds all the graphics state needed to render the
+geometry of the associated @c(shape). "))
 
 (defmethod gl-finalized-p ((obj render-bundle))
   (and (gl-finalized-p (attribute-set obj))
