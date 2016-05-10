@@ -59,10 +59,13 @@
    (camera-selector :accessor camera-selector)
    (camera-uset-node :accessor camera-uset-node :initform (make-instance 'camera-uset-node))
    (exposed :accessor exposed :initarg :exposed)
-   (current-dragger :initform nil))
+   (current-dragger :initform nil)
+   (last-draw-time :initform 0)
+   (last-input-time :initform 0)
+   (max-motion-time))
   (:default-initargs :projection-type 'orthographic :exposed nil))
 
-(defmethod initialize-instance :after ((obj viewer-window) &key)
+(defmethod initialize-instance :after ((obj viewer-window) &key (max-motion-seconds .0167))
   (let ((choice (make-instance 'lpsg:if-then-node))
         (selector (make-instance 'lpsg:input-value-node
                                  :value (eq (projection-type obj) 'orthographic))))
@@ -73,7 +76,8 @@
     (setf (camera-selector obj) selector)
     (setf (lpsg:input (camera-uset-node obj) 'projection-matrix) choice)
     (setf (lpsg:input (camera-uset-node obj) 'view-matrix)
-          (lpsg-tinker:view-matrix-node (view-camera obj)))))
+          (lpsg-tinker:view-matrix-node (view-camera obj)))
+    (setf (slot-value obj 'max-motion-time) (* max-motion-seconds internal-time-units-per-second))))
 
 (defgeneric draw-window (window)
   (:documentation "Do one pass of the rendering loop."))
@@ -82,6 +86,7 @@
   nil)
 
 (defmethod draw-window :around ((window viewer-window))
+  (setf (slot-value window 'last-draw-time) (get-internal-real-time))
   ;; All the OpenGL state set by theese calls will eventually be stored in a LPSG:GL-STATE
   ;; object.
   (%gl:clear-color .8 .8 .8 1.0)
@@ -185,26 +190,47 @@
 
 This calls "))
 
+(defparameter *max-motion-time* (* .0167 internal-time-units-per-second))
+
 (defmethod process-events ((window viewer-window) &optional (blocking t))
-  (loop
-     for event = (glop:next-event window :blocking blocking)
-     if event
-     do (let ((saved-event nil))
-          (when (typep event 'glop:mouse-motion-event)
-            (setq saved-event event)
-            (loop
-               for read-ahead-event = (glop:next-event window :blocking nil)
-               while (typep read-ahead-event 'glop:mouse-motion-event)
-               do (progn
-                    (on-mouse-motion-event window saved-event nil)
-                    (setq saved-event read-ahead-event))
-               finally (progn
-                         (on-mouse-motion-event window saved-event t)
-                         (setq event read-ahead-event))))
-          (when event
-            (glop:on-event window event)
-            (when (typep event 'glop:close-event)
-              (return-from process-events nil))))))
+  (let ((dropped 0)
+        (max-motion-time (slot-value window 'max-motion-time)))
+    (flet ((compress-motion (motion-event)
+             (let ((saved-event motion-event))
+               (loop
+                  for read-ahead-event = (glop:next-event window :blocking nil)
+                  while (typep read-ahead-event 'glop:mouse-motion-event)
+                  do 
+                    (let ((curr-time (get-internal-real-time))
+                          (last-input-time (slot-value window 'last-input-time)))
+                      (if (and (> last-input-time 0)
+                               (< (- curr-time last-input-time) max-motion-time))
+                          (progn
+                            (when saved-event
+                              (on-mouse-motion-event window saved-event nil))
+                            (incf dropped)
+                            (setf saved-event read-ahead-event))
+                          (progn
+                            (on-mouse-motion-event window read-ahead-event t)
+                            (setf (slot-value window 'last-input-time) curr-time
+                                  saved-event nil))))
+                  finally
+                    (when saved-event
+                      (on-mouse-motion-event window saved-event t))
+                    (return read-ahead-event)))))
+      (loop
+         for event = (glop:next-event window :blocking blocking)
+         if (typep event 'glop:mouse-motion-event)
+         do
+           (setq event (compress-motion event))
+         end
+         if event
+         do
+           (glop:on-event window event)
+           (when (typep event 'glop:close-event)
+             (format t "Dropped ~D motion events~%" dropped)
+             (return-from process-events nil))
+         end))))
 
 (defun mouse-to-viewport (window x y)
   (values (float x 1.0) (float (- (glop:window-height window) y) 1.0)))
