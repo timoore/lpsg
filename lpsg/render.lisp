@@ -62,16 +62,16 @@ OpenGL object"))
          ,@options))))
 
 (defgeneric gl-finalize (obj &optional errorp)
-  (:documentation "Allocate any OpenGL resources needed for OBJ and perform any
+  (:documentation "Allocate any OpenGL resources needed for @cl:param(obj) and perform any
 tasks needed to use it (e.g. link a shader program).
 
-Returns T if finalize actions were performed, NIL otherwise.
+Returns @c(t) if finalize actions were performed, @c(nil) otherwise.
 
 This is called when the renderer's OpenGL context is current. The renderer is accessible in
 @c(*renderer*)."))
 
 (defgeneric gl-finalized-p (obj)
-  (:documentation "Returns T if object has already been finalized."))
+  (:documentation "Returns @c(t) if object has already been finalized."))
 
 (defgeneric gl-destroy (obj)
   (:documentation "Deallocate an OpenGL object."))
@@ -109,19 +109,22 @@ This is called when the renderer's OpenGL context is current. The renderer is ac
 (defmethod find-if-queue (predicate (render-queue unordered-render-queue))
   (find-if predicate (bundles render-queue)))
 
-(defclass ordered-rendered-queue (render-queue)
-  ((queue-object)))
+(defclass ordered-render-queue (render-queue)
+  ((queue-object :documentation "private"))
+  (:documentation "Class for a queue of objects that are rendered in order.
 
-(defmethod initialize-instance :after ((obj ordered-rendered-queue) &key)
+@c(add-rendered-object) will add an object to the end of the queue."))
+
+(defmethod initialize-instance :after ((obj ordered-render-queue) &key)
   (setf (slot-value obj 'queue-object) (serapeum:queue)))
 
-(defmethod add-rendered-object ((render-queue ordered-rendered-queue) object)
+(defmethod add-rendered-object ((render-queue ordered-render-queue) object)
   (with-slots (queue-object)
       render-queue
     (serapeum:enq object queue-object)
     nil))
 
-(defmethod remove-rendered-object ((render-queue ordered-rendered-queue) object)
+(defmethod remove-rendered-object ((render-queue ordered-render-queue) object)
   (with-slots (queue-object)
       render-queue
     (let ((contents (serapeum:clear-queue queue-object)))
@@ -129,14 +132,14 @@ This is called when the renderer's OpenGL context is current. The renderer is ac
       (serapeum:qconc queue-object contents))
     nil))
 
-(defmethod map-render-queue ((render-queue ordered-rendered-queue) function)
+(defmethod map-render-queue ((render-queue ordered-render-queue) function)
   (mapc function (serapeum:qlist (slot-value render-queue 'queue-object))))
 
-(defmethod find-if-queue (predicate (queue ordered-rendered-queue))
+(defmethod find-if-queue (predicate (queue ordered-render-queue))
   (find predicate (serapeum:qlist (slot-value queue 'queue-object))))
 
 ;;; holds multiple render queues. These will be rendered in order.
-(defclass render-stage (ordered-rendered-queue)
+(defclass render-stage (ordered-render-queue)
   ()
   (:documentation "A render queue with designated read and draw buffers @i([default for now])"))
 
@@ -188,17 +191,17 @@ allocated by calls in LPSG." )
 (define-gl-object gl-buffer ()
   ((size :accessor size :initarg :size
          :documentation "The size of the buffer object in OpenGL. Note: this value is mutable until
-  GL-FINALIZE is called on the GL-BUFFER object.")
+  @c(gl-finalize) is called on the @c(gl-buffer) object.")
    (usage :accessor usage :initarg :usage
-          :documentation "Usage hint for the buffer object. Value is a CL-OPENGL keyword e.g.,
+          :documentation "Usage hint for the buffer object. Value is a @c(cl-opengl) keyword e.g.,
   :STATIC-DRAW.")
    (target :accessor target :initarg :target
-           :documentation "OpenGL targert for the buffer object. Value is a CL-OPENGL keyword e.g.,
+           :documentation "OpenGL targert for the buffer object. Value is a @c(cl-opengl) keyword e.g.,
   :ARRAY-BUFFER."))
   (:default-initargs :target :array-buffer :usage :static-draw :size +default-buffer-size+)
   (:documentation "A buffer object allocated in OpenGL.
 
-In OpenGL, the USAGE and TARGET parameters are hints and it is legal to use a buffer differently,
+In OpenGL, the @c(usage) and @c(target) parameters are hints and it is legal to use a buffer differently,
 but that can impact performance."))
 
 (defmethod gl-finalized-p ((obj gl-buffer))
@@ -346,8 +349,8 @@ Will be created automatically, but must be specified for now.")))
 
 (defclass attribute-set ()
   ((array-bindings :accessor array-bindings :initarg :array-bindings :initform nil
-                   :documentation "list of (name vertex-attribute index). NAME is the string name
-  in the shader program. INDEX is -1 if not valid.")
+                   :documentation "list of @c((name vertex-attribute index)). @c(name) is the string name
+  in the shader program. @c(index) is -1 if not valid.")
    (element-binding :accessor element-binding :initarg element-binding :initform nil)
    (vao :accessor vao))
   (:documentation "A collection of buffer mappings (buffer + offset) bound to specific attributes,

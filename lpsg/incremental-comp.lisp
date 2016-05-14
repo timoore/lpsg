@@ -23,14 +23,14 @@
 ;;; other than subclasses of COMPUTATION-GRAPH-NODE.
 
 (defgeneric value (node)
-  (:documentation "Return NODE's value."))
+  (:documentation "Return @cl:param(node)'s value."))
 
 ;;; Any list object has a value -- itself.
 (defmethod value ((node t))
   node)
 
 (defgeneric validp (node)
-  (:documentation "Returns T if a node's value is valid. "))
+  (:documentation "Returns @c(t) if a node's value is valid."))
 
 (defmethod validp ((node t))
   t)
@@ -38,8 +38,8 @@
 (define-protocol-class sink-node ()
   ((:accessor inputs :documentation "alist of (input-name . source-node).")
    (:accessor input :lambda-list (node name)
-              :documentation "Returns a NODE's input named NAME. Second value indicates if input
-exists or not.")
+              :documentation "Returns the input of a @cl:param(node) named @cl:param(name). Second
+value indicates if input exists or not.")
    (:generic delete-input (node input-name))
    (:generic notify-invalid-input (node invalid-source input-name)
     (:documentation "Called when a source of @cl:param(node) is invalidated.")))
@@ -47,7 +47,7 @@ exists or not.")
 
 (defclass sink-node-mixin ()
   ((inputs :accessor inputs :initform nil :documentation "slot for @c(inputs) accessor"))
-  (:documentation "Mixin class that provides slots and some methods for the SINK-NODE protocol
+  (:documentation "Mixin class that provides slots and some methods for the @c(sink-node) protocol
 class"))
 
 (defmethod input ((node sink-node-mixin) input-name)
@@ -74,7 +74,7 @@ class"))
   nil)
 
 (define-protocol-class source-node ()
-  ((:accessor validp :documentation "T if computed value is valid.")
+  ((:accessor validp :documentation "@c(t) if computed value is valid.")
    (:accessor sinks :documentation "list of (node . input-names)")
    (:generic delete-sink (node sink input-name)
     (:documentation "Remove a sink node that depends on this source.")))
@@ -89,7 +89,7 @@ class"))
 (defclass source-node-mixin ()
   ((validp :accessor validp :initform nil :documentation "slot for @c(validp) accessor")
    (sinks :accessor sinks :initform nil :documentation "slot for @c(sinks) accessor"))
-  (:documentation "Mixin class that provides slots and some methods for the SOURCE-NODE protocol
+  (:documentation "Mixin class that provides slots and some methods for the @c(source-node) protocol
 class."))
 
 (defmethod (setf input) :after ((new-val source-node-mixin) sink input-name)
@@ -164,7 +164,8 @@ its value (sinks)."))
 
 (defclass if-then-node (computation-node computation-node-mixin source-sink-mixin)
   ()
-  (:documentation " "))
+  (:documentation "Choose the value of the @c(then) or @c(else) input, based on the value of the
+  @c(if) input."))
 
 (defmethod compute ((node if-then-node))
   (if (input-value node 'if)

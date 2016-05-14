@@ -41,9 +41,9 @@ moved to the GPU.]) Newer versions of OpenGL contain interfaces that
 can reduce the number of cache misses inside the driver itself,
 @i([LPSG will take of advantage of them.])
 
-Another optimization which was historically crucial and is still helpful is
+Another optimization which was historically crucial, and is still helpful, is
 reducing the number of state changes in the graphics
-hardware. Changing the rendering destination, current shader program,
+hardware. Changing the rendering target, current shader program,
 or set of bound textures requires reinitializing a lot of hardware state and
 may cause a stall on the GPU. @i([LPSG will sort the rendering order
 of graphics objects to minimize state changes.])
@@ -118,10 +118,52 @@ values are most often used to set the uniform variables in OpenGL
 shader programs. LPSG aggregates such variables into sets, in order to
 choose the optimal way to upload them to OpenGL; these sets are called
 "uniform sets" or, throughout LPSG, "usets."
-
 @end(section)
+
 @begin(section)
-@title(The renderer)
+@title(Getting Started with LPSG)
+
+@begin(section)
+@title(1. Prerequisites)
+
+LPSG and its example programs require OpenGL drivers that support
+version 3.3 at a minimum. It might work in older versions of OpenGL
+with some hacking. It has been developed using SBCL on x86_64 Linux
+and Clozure Common Lisp on ARM Linux and Windows.
+@end(section)
+
+@begin(section)
+@title(2. Dependencies and Quicklisp)
+
+LPSG depends on several Common Lisp packages, including
+@link[uri="https://common-lisp.net/project/cl-opengl/"](@c(cl-opengl))
+for interfacing with OpenGL. The easiest way to install these
+dependencies is to use
+@link[uri="https://www.quicklisp.org/beta/"'(Qucklisp). LPSG itself is
+not @i([yet]) in Quicklisp, so the easiest way to use Quicklisp is to
+put the LPSG source in your @c(quicklisp/local-projects) directory and
+type
+@begin[lang=lisp](code)
+(ql:quickload :lpsg)
+@end(code)
+
+to load LPSG and its Common Lisp dependencies.
+@end(section)
+
+@begin(section)
+@title(3. Examples)
+
+LPSG comes with some simple example programs in the @c(examples) subdirectory:
+
+@begin(list)
+@item(@c(cube.lisp) - draw cubes)
+@item(@c(texture.lisp) - draw a textured cube)
+@end(list)
+@end(section)
+@end(section)
+
+@begin(section)
+@title(The Renderer)
 
 The @c(renderer) class that controls all rendering to the
 screen. Generic functions that dispatch on @c(renderer) ultimately
@@ -282,8 +324,6 @@ upload to the GPU at a later time.
 @cl:doc(class computation-node)
 @cl:doc(class computation-node-mixin)
 @cl:doc(class if-then-node)
-@cl:doc(class then)
-@cl:doc(class else)
 @cl:doc(generic delete-sink)
 @cl:doc(generic value)
 @cl:doc(generic compute)
@@ -677,7 +717,7 @@ Any rendering is done in OpenGL's default framebuffer.
 @cl:doc(generic allocate-target)
 @cl:doc(generic close-allocator)
 @cl:doc(macro with-allocator)
-@cl:doc(generic make-cube-shape)
+@cl:doc(function make-cube-shape)
    )
 @end(section)
 @end(section)
