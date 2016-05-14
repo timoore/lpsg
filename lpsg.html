@@ -46,7 +46,7 @@
   <h1 class="doc-title">LPSG » LPSG</h1>
   <article id="article" data-section="lpsg">
     <aside>
-      <ol class="toc"><li><a href="lpsg.html" data-node="lpsg">LPSG</a></li><li><ol><li><a href="lpsg.html#overview" data-node="overview">Overview</a><ol><li><a href="lpsg.html#conventions" data-node="conventions">Conventions</a></li><li><a href="lpsg.html#high-level-lpsg" data-node="high-level-lpsg">High level LPSG</a></li><li><a href="lpsg.html#the-renderer" data-node="the-renderer">The renderer</a></li></ol></li><li><a href="lpsg.html#attributes-and-shapes" data-node="attributes-and-shapes">Attributes and shapes</a><ol><li><a href="lpsg.html#buffers" data-node="buffers">Buffers</a></li></ol></li><li><a href="lpsg.html#incremental-computation" data-node="incremental-computation">Incremental computation</a></li><li><a href="lpsg.html#uniform-sets" data-node="uniform-sets">Uniform sets</a></li><li><a href="lpsg.html#textures" data-node="textures">Textures</a></li><li><a href="lpsg.html#the-submit-protocol" data-node="the-submit-protocol">The Submit Protocol</a><ol><li><a href="lpsg.html#uploading-data" data-node="uploading-data">Uploading Data</a></li><li><a href="lpsg.html#environments" data-node="environments">Environments</a></li></ol></li><li><a href="lpsg.html#opengl-state" data-node="opengl-state">OpenGL Objects and State</a></li><li><a href="lpsg.html#the-draw-protocol" data-node="the-draw-protocol">The Draw Protocol</a></li><li><a href="lpsg.html#utilities" data-node="utilities">Utilities</a></li></ol></li></ol>
+      <ol class="toc"><li><a href="lpsg.html" data-node="lpsg">LPSG</a></li><li><ol><li><a href="lpsg.html#overview" data-node="overview">Overview</a><ol><li><a href="lpsg.html#conventions" data-node="conventions">Conventions</a></li><li><a href="lpsg.html#high-level-lpsg" data-node="high-level-lpsg">High level LPSG</a></li><li><a href="lpsg.html#getting-started-with-lpsg" data-node="getting-started-with-lpsg">Getting Started with LPSG</a><ol><li><a href="lpsg.html#1.-prerequisites" data-node="1.-prerequisites">1. Prerequisites</a></li><li><a href="lpsg.html#2.-dependencies-and-quicklisp" data-node="2.-dependencies-and-quicklisp">2. Dependencies and Quicklisp</a></li><li><a href="lpsg.html#3.-examples" data-node="3.-examples">3. Examples</a></li></ol></li><li><a href="lpsg.html#the-renderer" data-node="the-renderer">The Renderer</a></li></ol></li><li><a href="lpsg.html#attributes-and-shapes" data-node="attributes-and-shapes">Attributes and shapes</a><ol><li><a href="lpsg.html#buffers" data-node="buffers">Buffers</a></li></ol></li><li><a href="lpsg.html#incremental-computation" data-node="incremental-computation">Incremental computation</a></li><li><a href="lpsg.html#uniform-sets" data-node="uniform-sets">Uniform sets</a></li><li><a href="lpsg.html#textures" data-node="textures">Textures</a></li><li><a href="lpsg.html#the-submit-protocol" data-node="the-submit-protocol">The Submit Protocol</a><ol><li><a href="lpsg.html#uploading-data" data-node="uploading-data">Uploading Data</a></li><li><a href="lpsg.html#environments" data-node="environments">Environments</a></li></ol></li><li><a href="lpsg.html#opengl-state" data-node="opengl-state">OpenGL Objects and State</a></li><li><a href="lpsg.html#the-draw-protocol" data-node="the-draw-protocol">The Draw Protocol</a></li><li><a href="lpsg.html#utilities" data-node="utilities">Utilities</a></li></ol></li></ol>
     </aside>
     <main class="codex-section">
       <p>
@@ -78,9 +78,9 @@ displaying them. LPSG can use data structures that are more efficient
 than the application's, <i>[and much of the traversal may even be
 moved to the GPU.]</i> Newer versions of OpenGL contain interfaces that
 can reduce the number of cache misses inside the driver itself,
-<i>[LPSG will take of advantage of them.]</i></p><p>Another optimization which was historically crucial and is still helpful is
+<i>[LPSG will take of advantage of them.]</i></p><p>Another optimization which was historically crucial, and is still helpful, is
 reducing the number of state changes in the graphics
-hardware. Changing the rendering destination, current shader program,
+hardware. Changing the rendering target, current shader program,
 or set of bound textures requires reinitializing a lot of hardware state and
 may cause a stall on the GPU. <i>[LPSG will sort the rendering order
 of graphics objects to minimize state changes.]</i></p><p>A side effect of all these optimizations is to reduce the number of calls
@@ -132,8 +132,24 @@ lazy evaluation to supply values that affect OpenGL rendering. These
 values are most often used to set the uniform variables in OpenGL
 shader programs. LPSG aggregates such variables into sets, in order to
 choose the optimal way to upload them to OpenGL; these sets are called
-&quot;uniform sets&quot; or, throughout LPSG, &quot;usets.&quot;</p><p>
-</p><h2 id="the-renderer">The renderer</h2><p>The <code>renderer</code> class that controls all rendering to the
+&quot;uniform sets&quot; or, throughout LPSG, &quot;usets.&quot;
+</p><h2 id="getting-started-with-lpsg">Getting Started with LPSG</h2><h3 id="1.-prerequisites">1. Prerequisites</h3><p>LPSG and its example programs require OpenGL drivers that support
+version 3.3 at a minimum. It might work in older versions of OpenGL
+with some hacking. It has been developed using SBCL on x86_64 Linux
+and Clozure Common Lisp on ARM Linux and Windows.
+</p><h3 id="2.-dependencies-and-quicklisp">2. Dependencies and Quicklisp</h3><p>LPSG depends on several Common Lisp packages, including
+<a href="https://common-lisp.net/project/cl-opengl/"><code>cl-opengl</code></a>
+for interfacing with OpenGL. The easiest way to install these
+dependencies is to use
+@link[uri=&quot;https://www.quicklisp.org/beta/&quot;'(Qucklisp). LPSG itself is
+not <i>[yet]</i> in Quicklisp, so the easiest way to use Quicklisp is to
+put the LPSG source in your <code>quicklisp/local-projects</code> directory and
+type
+</p><pre><code html:class="lisp">(ql:quickload :lpsg)
+</code></pre><p>to load LPSG and its Common Lisp dependencies.
+</p><h3 id="3.-examples">3. Examples</h3><p>LPSG comes with some simple example programs in the <code>examples</code> subdirectory:</p><ul><li><code>cube.lisp</code> - draw cubes</li><li><code>texture.lisp</code> - draw a textured cube</li></ul><p>
+</p><p>
+</p><h2 id="the-renderer">The Renderer</h2><p>The <code>renderer</code> class that controls all rendering to the
 screen. Generic functions that dispatch on <code>renderer</code> ultimately
 perform all OpenGL calls. <code>open-renderer</code> performs any OpenGL
 initialization needed; <code>close-renderer</code> cleans up when the
@@ -155,7 +171,7 @@ units.</p></div></div>
 <div class="codex-doc-node codex-operator codex-generic-function"><code class="codex-name">close-renderer</code><code class="codex-lambda-list">(renderer &amp;key deallocate-objects)</code><div class="codex-docstring"><p>Close <code class="codex-param">renderer</code> for rendering.</p><p>If <code class="codex-param">deallocate-objects</code> is <code>t</code>, then all OpenGL objects that are still allocated by
 LPSG will be explicitly deallocated. The default, <code>nil</code>, doesn't deallocate these objects; it
 assumes that the context will soon be destroyed.</p></div></div>
-<div class="codex-doc-node codex-operator codex-generic-function"><code class="codex-name">draw</code><code class="codex-lambda-list">(renderer)</code><div class="codex-docstring"><p>Draw all graphic objects that have been registered with <code class="codex-param">renderer</code>.</p><p>Perform all outstanding operations in @cl:param:{renderer}: finalize all objects on the
+<div class="codex-doc-node codex-operator codex-generic-function"><code class="codex-name">draw</code><code class="codex-lambda-list">(renderer)</code><div class="codex-docstring"><p>Draw all graphic objects that have been registered with <code class="codex-param">renderer</code>.</p><p>Perform all outstanding operations in <code class="codex-param">renderer</code>: finalize all objects on the
 finalize queue(s), do any upload operations in the upload queue, then traverse the render stages
 and their render queues to render all bundles. The renderer does not swap OpenGL front and back
 buffers; that is done by the application outside of LPSG.</p></div></div>
@@ -228,10 +244,10 @@ that can be directly done to the shape is to remove it from the
 renderer. This is done by the <code>retract</code> generic function, which
 causes the shape to not be displayed anymore and removes the
 shape from LPSG.
-<div class="codex-doc-node codex-record codex-class"><code class="codex-name">gl-buffer</code><div class="codex-docstring"><p>A buffer object allocated in OpenGL.</p><p>In OpenGL, the USAGE and TARGET parameters are hints and it is legal to use a buffer differently,
+<div class="codex-doc-node codex-record codex-class"><code class="codex-name">gl-buffer</code><div class="codex-docstring"><p>A buffer object allocated in OpenGL.</p><p>In OpenGL, the <code>usage</code> and <code>target</code> parameters are hints and it is legal to use a buffer differently,
 but that can impact performance.</p></div><ul class="codex-slot-list"><li class="codex-slot codex-class-slot"><code class="codex-name">size</code><div class="codex-docstring">The size of the buffer object in OpenGL. Note: this value is mutable until
-  GL-FINALIZE is called on the GL-BUFFER object.</div></li><li class="codex-slot codex-class-slot"><code class="codex-name">usage</code><div class="codex-docstring">Usage hint for the buffer object. Value is a CL-OPENGL keyword e.g.,
-  :STATIC-DRAW.</div></li><li class="codex-slot codex-class-slot"><code class="codex-name">target</code><div class="codex-docstring">OpenGL targert for the buffer object. Value is a CL-OPENGL keyword e.g.,
+  <code>gl-finalize</code> is called on the <code>gl-buffer</code> object.</div></li><li class="codex-slot codex-class-slot"><code class="codex-name">usage</code><div class="codex-docstring">Usage hint for the buffer object. Value is a <code>cl-opengl</code> keyword e.g.,
+  :STATIC-DRAW.</div></li><li class="codex-slot codex-class-slot"><code class="codex-name">target</code><div class="codex-docstring">OpenGL targert for the buffer object. Value is a <code>cl-opengl</code> keyword e.g.,
   :ARRAY-BUFFER.</div></li></ul></div>
 <div class="codex-doc-node codex-operator codex-generic-function"><code class="codex-name">attributes</code><code class="codex-lambda-list">(shape)</code><div class="codex-docstring">Alist of (name . attribute). The names are later mapped to a vertex binding index.</div></div>
 <div class="codex-doc-node codex-record codex-class"><code class="codex-name">vertex-attribute</code><div class="codex-docstring">class for vertex attributes of shapes</div><ul class="codex-slot-list"></ul></div>
@@ -260,25 +276,24 @@ node as invalid. This function can be specialized to perform other
 actions at that time e.g., putting a node on a queue to perform an
 upload to the GPU at a later time.
 <div class="codex-doc-node codex-record codex-class"><code class="codex-name">source-node</code><div class="codex-docstring">Note: the input names belong to the sink nodes of this node.</div><ul class="codex-slot-list"></ul></div>
-<div class="codex-doc-node codex-record codex-class"><code class="codex-name">source-node-mixin</code><div class="codex-docstring">Mixin class that provides slots and some methods for the SOURCE-NODE protocol
+<div class="codex-doc-node codex-record codex-class"><code class="codex-name">source-node-mixin</code><div class="codex-docstring">Mixin class that provides slots and some methods for the <code>source-node</code> protocol
 class.</div><ul class="codex-slot-list"><li class="codex-slot codex-class-slot"><code class="codex-name">validp</code><div class="codex-docstring">slot for <code>validp</code> accessor</div></li><li class="codex-slot codex-class-slot"><code class="codex-name">sinks</code><div class="codex-docstring">slot for <code>sinks</code> accessor</div></li></ul></div>
 <div class="codex-doc-node codex-record codex-class"><code class="codex-name">sink-node</code><div class="codex-docstring">Node that consumes values via named inputs.</div><ul class="codex-slot-list"></ul></div>
-<div class="codex-doc-node codex-record codex-class"><code class="codex-name">sink-node-mixin</code><div class="codex-docstring">Mixin class that provides slots and some methods for the SINK-NODE protocol
+<div class="codex-doc-node codex-record codex-class"><code class="codex-name">sink-node-mixin</code><div class="codex-docstring">Mixin class that provides slots and some methods for the <code>sink-node</code> protocol
 class</div><ul class="codex-slot-list"><li class="codex-slot codex-class-slot"><code class="codex-name">inputs</code><div class="codex-docstring">slot for <code>inputs</code> accessor</div></li></ul></div>
 <div class="codex-doc-node codex-record codex-class"><code class="codex-name">source-sink-mixin</code><div class="codex-docstring">Convenience mixin class the slots necessary to implement sources and sinks.</div><ul class="codex-slot-list"></ul></div>
 <div class="codex-doc-node codex-record codex-class"><code class="codex-name">computation-node</code><div class="codex-docstring">an incremental computation node that has inputs (sources) and clients that use
 its value (sinks).</div><ul class="codex-slot-list"></ul></div>
 <div class="codex-doc-node codex-record codex-class"><code class="codex-name">computation-node-mixin</code><div class="codex-docstring">convenience mixin class for implementing <code>computation-node</code> protocol classes.</div><ul class="codex-slot-list"><li class="codex-slot codex-class-slot"><code class="codex-name">cached-value</code><div class="codex-docstring">slot for <code>cached-value</code> accessor</div></li></ul></div>
-<div class="codex-doc-node codex-record codex-class"><code class="codex-name">if-then-node</code><div class="codex-docstring"></div><ul class="codex-slot-list"></ul></div>
-<div class="codex-error codex-no-node">No node with name <code>then</code>.</div>
-<div class="codex-error codex-no-node">No node with name <code>else</code>.</div>
+<div class="codex-doc-node codex-record codex-class"><code class="codex-name">if-then-node</code><div class="codex-docstring">Choose the value of the <code>then</code> or <code>else</code> input, based on the value of the
+  <code>if</code> input.</div><ul class="codex-slot-list"></ul></div>
 <div class="codex-doc-node codex-operator codex-generic-function"><code class="codex-name">delete-sink</code><code class="codex-lambda-list">(node sink input-name)</code><div class="codex-docstring">Remove a sink node that depends on this source.</div></div>
-<div class="codex-doc-node codex-operator codex-generic-function"><code class="codex-name">value</code><code class="codex-lambda-list">(node)</code><div class="codex-docstring">Return NODE's value.</div></div>
+<div class="codex-doc-node codex-operator codex-generic-function"><code class="codex-name">value</code><code class="codex-lambda-list">(node)</code><div class="codex-docstring">Return <code class="codex-param">node</code>'s value.</div></div>
 <div class="codex-doc-node codex-operator codex-generic-function"><code class="codex-name">compute</code><code class="codex-lambda-list">(node)</code><div class="codex-docstring">computes the value of this node </div></div>
 <div class="codex-doc-node codex-operator codex-generic-function"><code class="codex-name">notify-invalid-input</code><code class="codex-lambda-list">(node invalid-source input-name)</code><div class="codex-docstring">Called when a source of <code class="codex-param">node</code> is invalidated.</div></div>
 <div class="codex-doc-node codex-record codex-class"><code class="codex-name">input-value-node</code><div class="codex-docstring">A node whose value can be set. Useful as the source to multiple nodes.</div><ul class="codex-slot-list"><li class="codex-slot codex-class-slot"><code class="codex-name">value</code><div class="codex-docstring">value of the node, which is set instead of computed</div></li></ul></div>
-<div class="codex-doc-node codex-operator codex-generic-function"><code class="codex-name">input</code><code class="codex-lambda-list">(node name)</code><div class="codex-docstring">Returns a NODE's input named NAME. Second value indicates if input
-exists or not.</div></div>
+<div class="codex-doc-node codex-operator codex-generic-function"><code class="codex-name">input</code><code class="codex-lambda-list">(node name)</code><div class="codex-docstring">Returns the input of a <code class="codex-param">node</code> named <code class="codex-param">name</code>. Second
+value indicates if input exists or not.</div></div>
 <div class="codex-doc-node codex-operator codex-function"><code class="codex-name">input-value</code><code class="codex-lambda-list">(node input-name)</code><div class="codex-docstring">Get the value of the input <code class="codex-param">input-name</code> in <code class="codex-param">node</code>.</div></div>
 </p><p>An example:
 </p><pre><code html:class=NIL>(progn
@@ -448,7 +463,7 @@ sorted order.]</i></p><p>
 a traversal order for objects in the queue. Subclasses of this class might sort the objects to
 obtain an optimal order, or in fact guarantee an order.</p></div><ul class="codex-slot-list"></ul></div>
 <div class="codex-doc-node codex-record codex-class"><code class="codex-name">unordered-render-queue</code><div class="codex-docstring">A queue that contains bundles to be rendered.</div><ul class="codex-slot-list"><li class="codex-slot codex-class-slot"><code class="codex-name">bundles</code><div class="codex-docstring">private</div></li></ul></div>
-<div class="codex-error codex-no-node">No node with name <code>ordered-render-queue</code>.</div>
+<div class="codex-doc-node codex-record codex-class"><code class="codex-name">ordered-render-queue</code><div class="codex-docstring">Class for a queue of objects that are rendered in order.<code>add-rendered-object</code> will add an object to the end of the queue.</div><ul class="codex-slot-list"><li class="codex-slot codex-class-slot"><code class="codex-name">queue-object</code><div class="codex-docstring">private</div></li></ul></div>
 <div class="codex-doc-node codex-record codex-class"><code class="codex-name">render-stage</code><div class="codex-docstring">A render queue with designated read and draw buffers <i>[default for now]</i></div><ul class="codex-slot-list"></ul></div>
 <div class="codex-doc-node codex-operator codex-generic-function"><code class="codex-name">add-rendered-object</code><code class="codex-lambda-list">(render-queue object)</code><div class="codex-docstring"><p>Add <code class="codex-param">object</code> to <code class="codex-param">render-queue</code>.</p><p>The order in which objects in the queue are rendered is undefined. This function is used in the
 implementation of SUBMIT-WITH-EFFECT.</p></div></div>
@@ -508,10 +523,10 @@ time to allocate the OpenGL resource and initialize it. This time is
 most often at the beginning of a call to <code>draw</code>, when objects in the
 renderer's finalize queue are visited, but <code>gl-finalize</code> may be
 called at other times too.
-<div class="codex-doc-node codex-operator codex-generic-function"><code class="codex-name">gl-finalize</code><code class="codex-lambda-list">(obj &amp;optional errorp)</code><div class="codex-docstring"><p>Allocate any OpenGL resources needed for OBJ and perform any
-tasks needed to use it (e.g. link a shader program).</p><p>Returns T if finalize actions were performed, NIL otherwise.</p><p>This is called when the renderer's OpenGL context is current. The renderer is accessible in
+<div class="codex-doc-node codex-operator codex-generic-function"><code class="codex-name">gl-finalize</code><code class="codex-lambda-list">(obj &amp;optional errorp)</code><div class="codex-docstring"><p>Allocate any OpenGL resources needed for <code class="codex-param">obj</code> and perform any
+tasks needed to use it (e.g. link a shader program).</p><p>Returns <code>t</code> if finalize actions were performed, <code>nil</code> otherwise.</p><p>This is called when the renderer's OpenGL context is current. The renderer is accessible in
 <code>*renderer*</code>.</p></div></div>
-<div class="codex-doc-node codex-operator codex-generic-function"><code class="codex-name">gl-finalized-p</code><code class="codex-lambda-list">(obj)</code><div class="codex-docstring">Returns T if object has already been finalized.</div></div>
+<div class="codex-doc-node codex-operator codex-generic-function"><code class="codex-name">gl-finalized-p</code><code class="codex-lambda-list">(obj)</code><div class="codex-docstring">Returns <code>t</code> if object has already been finalized.</div></div>
 </p><p><code>gl-finalize</code> and <code>gl-finalized-p</code> are not restricted to take only
 subclasses of <code>gl-object</code>. Methods for those functions can be
 specialized on higher-level classes that contain<code>gl-object</code> objects;
@@ -526,10 +541,10 @@ garbage collector finalization routine. Instead, LPSG uses weak
 pointers and auxilliary classes called <i>proxy objects</i> to defer the
 deletion to an appropriate time. <i>[The user should be able to delete
 OpenGL objects explicitly; how / when does this happen?]</i></p><p>
-<div class="codex-doc-node codex-record codex-class"><code class="codex-name">gl-buffer</code><div class="codex-docstring"><p>A buffer object allocated in OpenGL.</p><p>In OpenGL, the USAGE and TARGET parameters are hints and it is legal to use a buffer differently,
+<div class="codex-doc-node codex-record codex-class"><code class="codex-name">gl-buffer</code><div class="codex-docstring"><p>A buffer object allocated in OpenGL.</p><p>In OpenGL, the <code>usage</code> and <code>target</code> parameters are hints and it is legal to use a buffer differently,
 but that can impact performance.</p></div><ul class="codex-slot-list"><li class="codex-slot codex-class-slot"><code class="codex-name">size</code><div class="codex-docstring">The size of the buffer object in OpenGL. Note: this value is mutable until
-  GL-FINALIZE is called on the GL-BUFFER object.</div></li><li class="codex-slot codex-class-slot"><code class="codex-name">usage</code><div class="codex-docstring">Usage hint for the buffer object. Value is a CL-OPENGL keyword e.g.,
-  :STATIC-DRAW.</div></li><li class="codex-slot codex-class-slot"><code class="codex-name">target</code><div class="codex-docstring">OpenGL targert for the buffer object. Value is a CL-OPENGL keyword e.g.,
+  <code>gl-finalize</code> is called on the <code>gl-buffer</code> object.</div></li><li class="codex-slot codex-class-slot"><code class="codex-name">usage</code><div class="codex-docstring">Usage hint for the buffer object. Value is a <code>cl-opengl</code> keyword e.g.,
+  :STATIC-DRAW.</div></li><li class="codex-slot codex-class-slot"><code class="codex-name">target</code><div class="codex-docstring">OpenGL targert for the buffer object. Value is a <code>cl-opengl</code> keyword e.g.,
   :ARRAY-BUFFER.</div></li></ul></div>
 <div class="codex-doc-node codex-record codex-class"><code class="codex-name">texture-2d</code><div class="codex-docstring">class representing OpenGL Texture 2D</div><ul class="codex-slot-list"><li class="codex-slot codex-class-slot"><code class="codex-name">width</code><div class="codex-docstring">width of texture</div></li><li class="codex-slot codex-class-slot"><code class="codex-name">height</code><div class="codex-docstring">height of texture</div></li></ul></div>
 <div class="codex-doc-node codex-record codex-class"><code class="codex-name">sampler</code><div class="codex-docstring">class representing OpenGL sampler object, which controls texture filtering</div><ul class="codex-slot-list"><li class="codex-slot codex-class-slot"><code class="codex-name">wrap-s</code><div class="codex-docstring">wrap mode in the S dimension, a
@@ -549,7 +564,7 @@ that environment.
 <div class="codex-error codex-no-node">No node with name <code>program</code>.</div>
 </p><h1 id="the-draw-protocol">The Draw Protocol</h1><p>The generic function <code>draw</code> causes all submitted shapes to be
 rendered.
-<div class="codex-doc-node codex-operator codex-generic-function"><code class="codex-name">draw</code><code class="codex-lambda-list">(renderer)</code><div class="codex-docstring"><p>Draw all graphic objects that have been registered with <code class="codex-param">renderer</code>.</p><p>Perform all outstanding operations in @cl:param:{renderer}: finalize all objects on the
+<div class="codex-doc-node codex-operator codex-generic-function"><code class="codex-name">draw</code><code class="codex-lambda-list">(renderer)</code><div class="codex-docstring"><p>Draw all graphic objects that have been registered with <code class="codex-param">renderer</code>.</p><p>Perform all outstanding operations in <code class="codex-param">renderer</code>: finalize all objects on the
 finalize queue(s), do any upload operations in the upload queue, then traverse the render stages
 and their render queues to render all bundles. The renderer does not swap OpenGL front and back
 buffers; that is done by the application outside of LPSG.</p></div></div>
@@ -568,7 +583,7 @@ single buffer.</div><ul class="codex-slot-list"><li class="codex-slot codex-clas
 <div class="codex-doc-node codex-operator codex-generic-function"><code class="codex-name">close-allocator</code><code class="codex-lambda-list">(allocator)</code><div class="codex-docstring">Stop allocating from ALLOCATOR's buffers.</div></div>
 <div class="codex-doc-node codex-operator codex-macro"><code class="codex-name">with-allocator</code><code class="codex-lambda-list">((allocator &amp;rest allocator-args) &amp;body body)</code><div class="codex-docstring">Bind <code class="codex-param">allocator</code> to an allocator created with <code class="codex-param">allocator-args</code> in
 <code class="codex-param">body</code>. The allocator is opened before and closed after executing <code class="codex-param">body</code></div></div>
-<div class="codex-error codex-no-node">No node with name <code>make-cube-shape</code>.</div>
+<div class="codex-doc-node codex-operator codex-function"><code class="codex-name">make-cube-shape</code><code class="codex-lambda-list">nil</code><div class="codex-docstring"><p>Create a cube shape.</p><p>The cube has VERTEX and NORMAL vertex attributes. The resulting shape has an indexed drawable.</p></div></div>
    
 </p><p>
 </p>
