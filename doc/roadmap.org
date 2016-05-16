@@ -1,0 +1,80 @@
+* LPSG Version Roadmap
+These are the features envisioned for different versions of LPSG,
+subject to change of course. The "Testing" heading ideally indicates
+test applications or cases that will be written for a specific
+version and also gives an idea of the kinds of applications that
+would be possible at that point.
+
+** 0.0.1
+*** Features
+**** shape
+**** effect, environment, bundle
+**** render queues
+**** texture binding (basic)
+**** incremental nodes
+*** Testing
+****   solid examples
+***** cube
+***** textured cube
+****   viewer sets incremental values
+****   arcball in viewer
+  
+** 0.0.2
+*** Features
+**** rewrite incremental nodes
+code that uses incremental node values shouldn't care how nodes are
+hooked up.
+**** expand graphic-state
+Change from multiple inheritance to composition. Add modes, render target.
+**** frame buffer objects
+**** render targets
+**** multiple render queues
+**** GC of GL resources
+**** GPU timestamps
+*** Testing
+**** sphere utility function
+**** load meshes and textures using classimp
+
+   
+** 0.0.3
+September 2016
+*** Features
+**** render queue sorting
+**** download of rendered images
+**** renderer validates context
+**** text library
+Create and display text shapes that are efficient to update
+**** assembly
+This is an aggregate of shapes, effects, and computation nodes - not
+sure if it is necessary.
+*** Testing
+**** test framework with reference images
+
+** 0.0.4
+December 2016
+*** Features
+
+**** usets stored in UBOs
+
+**** foreign storage for mirrored-buffer-resource
+
+**** Lisp storage for textures
+
+**** timing / stats overlay display
+
+**** renderer's draw function runs in seperate thread
+*** Testing
+
+**** depth peeling transparency demo
+
+** 1.0
+Everything I want in LSPSG in the next year or two (December
+2017). These  will features will move into a more specific, earlier release.
+
+*** Features
+**** upload / download of all Lisp and OpenGL types to buffers and textures
+
+
+*** Testing
+
+**** GPU picking
