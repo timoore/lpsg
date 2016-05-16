@@ -1,0 +1,31 @@
+* LPSG Version Roadmap
+These are the features envisioned for different versions of LPSG,
+subject to change of course. The "Testing" heading ideally indicates
+test applications or cases that will be written for a specific
+version, but is also gives an idea of the kinds of applications that
+would be possible at that point.
+
+** 0.0.1
+*** Features
+   assembly, shape, transform
+   shape + environment -> bundle
+   environment skeleton
+   texture binding (basic)
+*** Testing
+   solid examples, sphere
+   viewer tnat can change orientation
+  
+** 0.0.2
+*** Features
+   bundle sorting
+   GC of GL resources
+*** Testing
+   arcball in viewer
+   viewer sets incremental values
+  
+** 0.0.3
+*** Features
+   multiple bundle queues
+   frame buffer objects
+   render targets
+
