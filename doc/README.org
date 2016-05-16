@@ -13,6 +13,10 @@ LPSG is still in a very early stage of development, but it will
 include support for common features in 3D graphical applications,
 such as simple text, rendering to a texture, rendering high-quality
 transparency, GPU-based selection, and more.
+** Documentation
+Documentation for the LPSG API can be found
+[here](http://timoore.github.io/lpsg/lpsg.html). The sources for the
+documentation are in the [docs](docs) directory.
 ** Example
 A commented example is found in [cube.lisp](examples/cube.lisp).
 ** OpenGL
@@ -25,8 +29,10 @@ Some future features of LPSG, as well as user code, will require newer
 versions of OpenGL than 3.3. There will be runtime support for determining
 what features are supported on a platform.
 ** Common Lisp dependencies
-LPSG depends directly on the following Common Lisp libraries,
-available through QuickLisp:
+LPSG depends directly on the following Common Lisp libraries, among
+others. More will certainly be added in the future, so it is simplest
+to use Quicklisp to load the LPSG project and its dependencies in one go.
+
 + [cl-opengl](https://common-lisp.net/project/cl-opengl/) OpenGL interface
 + [sb-cga](http://nikodemus.github.io/sb-cga/) matrix library
 + [mathkit](https://github.com/lispgames/mathkit) graphics math library

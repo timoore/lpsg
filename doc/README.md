@@ -1,11 +1,22 @@
-- [LPSG](#sec-1)
-  - [Introduction](#sec-1-1)
-  - [Example](#sec-1-2)
-  - [OpenGL](#sec-1-3)
-  - [Common Lisp dependencies](#sec-1-4)
-  - [License](#sec-1-5)
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgheadline7">1. LPSG</a>
+<ul>
+<li><a href="#orgheadline1">1.1. Introduction</a></li>
+<li><a href="#orgheadline2">1.2. Documentation</a></li>
+<li><a href="#orgheadline3">1.3. Example</a></li>
+<li><a href="#orgheadline4">1.4. OpenGL</a></li>
+<li><a href="#orgheadline5">1.5. Common Lisp dependencies</a></li>
+<li><a href="#orgheadline6">1.6. License</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
 
-# LPSG<a id="orgheadline6"></a>
+# LPSG<a id="orgheadline7"></a>
 
 LPSG is a library for writing high-performance graphical applications
 in Common Lisp, using OpenGL. 
@@ -24,11 +35,17 @@ include support for common features in 3D graphical applications,
 such as simple text, rendering to a texture, rendering high-quality
 transparency, GPU-based selection, and more.
 
-## Example<a id="orgheadline2"></a>
+## Documentation<a id="orgheadline2"></a>
+
+Documentation for the LPSG API can be found
+[here](<http://timoore.github.io/lpsg/lpsg.html>). The sources for the
+documentation are in the [docs](docs) directory.
+
+## Example<a id="orgheadline3"></a>
 
 A commented example is found in [cube.lisp](examples/cube.lisp).
 
-## OpenGL<a id="orgheadline3"></a>
+## OpenGL<a id="orgheadline4"></a>
 
 LPSG nominally requires OpenGL 3.3, but might be coaxed into running
 with earlier versions of OpenGL and (yet-to-be-identified)
@@ -39,16 +56,17 @@ Some future features of LPSG, as well as user code, will require newer
 versions of OpenGL than 3.3. There will be runtime support for determining
 what features are supported on a platform.
 
-## Common Lisp dependencies<a id="orgheadline4"></a>
+## Common Lisp dependencies<a id="orgheadline5"></a>
 
-LPSG depends directly on the following Common Lisp libraries,
-available through QuickLisp:
+LPSG depends directly on the following Common Lisp libraries, among
+others. More will certainly be added in the future, so it is simplest
+to use Quicklisp to load the LPSG project and its dependencies in one go.
 
 -   [cl-opengl](<https://common-lisp.net/project/cl-opengl/>) OpenGL interface
 -   [sb-cga](<http://nikodemus.github.io/sb-cga/>) matrix library
 -   [mathkit](<https://github.com/lispgames/mathkit>) graphics math library
 -   [alexandria](<https://common-lisp.net/project/alexandria/>) utility library
 
-## License<a id="orgheadline5"></a>
+## License<a id="orgheadline6"></a>
 
 LPSG is released under the Revised BSD license.
