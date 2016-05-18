@@ -2,30 +2,43 @@
 These are the features envisioned for different versions of LPSG,
 subject to change of course. The "Testing" heading ideally indicates
 test applications or cases that will be written for a specific
-version, but is also gives an idea of the kinds of applications that
+version and also gives an idea of the kinds of applications that
 would be possible at that point.
 
 ** 0.0.1
 *** Features
-   assembly, shape, transform
-   shape + environment -> bundle
-   environment skeleton
-   texture binding (basic)
+**** shape
+**** effect, environment, bundle
+**** render queues
+**** texture binding (basic)
+**** incremental nodes
 *** Testing
-   solid examples, sphere
-   viewer tnat can change orientation
+****   solid examples
+***** cube
+***** textured cube
+****   viewer sets incremental values
+****   arcball in viewer
   
 ** 0.0.2
 *** Features
-   bundle sorting
-   GC of GL resources
+**** rewrite incremental nodes
+code that uses incremental node values shouldn't care how nodes are
+hooked up.
+**** frame buffer objects
+**** expand graphic-state
+Change from multiple inheritance to composition. Add modes, render target.
+**** render targets
+**** multiple render queues
+**** GC of GL resources
 *** Testing
-   arcball in viewer
-   viewer sets incremental values
+
   
 ** 0.0.3
 *** Features
-   multiple bundle queues
-   frame buffer objects
-   render targets
-
+**** bundle sorting
+**** download of rendered images
+**** assembly
+This is an aggregate of shapes, effects, and computation nodes - not
+sure if it is necessary.
+*** Testing
+**** test framework with reference images
