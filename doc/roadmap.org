@@ -30,9 +30,12 @@ Change from multiple inheritance to composition. Add modes, render target.
 **** render targets
 **** multiple render queues
 **** GC of GL resources
+**** GPU timestamps
 *** Testing
+**** sphere utility function
+**** load meshes and textures using classimp
 
-  
+   
 ** 0.0.3
 *** Features
 **** bundle sorting
@@ -40,5 +43,24 @@ Change from multiple inheritance to composition. Add modes, render target.
 **** assembly
 This is an aggregate of shapes, effects, and computation nodes - not
 sure if it is necessary.
+**** text library
 *** Testing
 **** test framework with reference images
+
+** 0.0.4
+
+*** Features
+
+**** timing / stats overlay display
+*** Testing
+
+**** depth peeling transparency demo
+** 1.0
+Everything I want in LSPSG in the next year or two. This will move
+into a more specific release.
+
+*** Features
+
+*** Testing
+
+**** GPU picking
