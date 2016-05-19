@@ -38,12 +38,14 @@ Change from multiple inheritance to composition. Add modes, render target.
    
 ** 0.0.3
 *** Features
-**** bundle sorting
+**** render queue sorting
 **** download of rendered images
+**** text library
+Create and display text shapes that are efficient to update
+**** renderer validates context
 **** assembly
 This is an aggregate of shapes, effects, and computation nodes - not
 sure if it is necessary.
-**** text library
 *** Testing
 **** test framework with reference images
 
@@ -51,13 +53,22 @@ sure if it is necessary.
 
 *** Features
 
+**** upload / download of all Lisp and OpenGL types to buffers and textures
+
+**** foreign storage for mirrored-buffer-resource
+
+**** Lisp storage for textures
+
 **** timing / stats overlay display
+
+**** renderer's draw function runs in seperate thread
 *** Testing
 
 **** depth peeling transparency demo
+
 ** 1.0
-Everything I want in LSPSG in the next year or two. This will move
-into a more specific release.
+Everything I want in LSPSG in the next year or two (December
+2017). These  will features will move into a more specific, earlier release.
 
 *** Features
 
