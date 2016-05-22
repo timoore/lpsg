@@ -1,4 +1,4 @@
-* LPSG
+* LPSG version 0.0.1
 LPSG is a library for writing high-performance graphical applications
 in Common Lisp, using OpenGL. 
 ** Introduction
