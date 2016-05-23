@@ -25,57 +25,6 @@
 
 (defvar *renderer*)
 
-(define-protocol-class gl-object ()
-  ((:accessor id :documentation "The OpenGL ID of an object.")
-   (:accessor gl-proxy :documentation "Object for accessing the associated
-OpenGL object"))
-  (:documentation "Class representing any OpenGL object."))
-
-(defclass %gl-object ()
-  ((%id :accessor %id :initform 0)))
-
-(defclass gl-object-mixin ()
-  ((gl-proxy :accessor gl-proxy :initarg :gl-proxy)))
-
-(defmethod initialize-instance :after ((obj gl-object-mixin) &key (id 0 idp))
-  (when idp
-    (setf (id obj) id)))
-
-(defmethod id ((obj gl-object-mixin))
-  (%id (gl-proxy obj)))
-
-(defmethod (setf id) (val (obj gl-object-mixin))
-  (setf (%id (gl-proxy obj)) val))
-
-(defmacro define-gl-object (name super-classes slots &rest options)
-  (let* ((sym-name (symbol-name name))
-         (proxy-name (intern (concatenate 'string "%" sym-name)))
-         (init-mixin-name (intern (concatenate 'string
-                                               "%"
-                                               sym-name
-                                               (symbol-name '#:-proxy-init-mixin)))))
-    `(progn
-       (defclass ,proxy-name (%gl-object) ())
-       (defclass ,init-mixin-name () () (:default-initargs :gl-proxy (make-instance ',proxy-name)))
-       (defclass ,name (,@super-classes gl-object ,init-mixin-name gl-object-mixin)
-         ,slots
-         ,@options))))
-
-(defgeneric gl-finalize (obj &optional errorp)
-  (:documentation "Allocate any OpenGL resources needed for @cl:param(obj) and perform any
-tasks needed to use it (e.g. link a shader program).
-
-Returns @c(t) if finalize actions were performed, @c(nil) otherwise.
-
-This is called when the renderer's OpenGL context is current. The renderer is accessible in
-@c(*renderer*)."))
-
-(defgeneric gl-finalized-p (obj)
-  (:documentation "Returns @c(t) if object has already been finalized."))
-
-(defgeneric gl-destroy (obj)
-  (:documentation "Deallocate an OpenGL object."))
-
 (defmethod gl-finalize :around ((obj t) &optional errorp)
   (if (gl-finalized-p obj)
       nil
@@ -148,10 +97,9 @@ This is called when the renderer's OpenGL context is current. The renderer is ac
                                      :initarg :max-combined-texture-image-units))
   (:default-initargs :max-combined-texture-image-units 8)) ;XXX way to small, for testing
 
-(defclass standard-renderer (renderer)
+(defclass standard-renderer (glstate-tracker renderer)
   ((buffers :accessor buffers :initform nil :documentation "private")
    (bundles :accessor bundles :initform nil :documentation "private")
-   (current-state :accessor current-state :initform nil :documentation "private")
    (predraw-queue :accessor predraw-queue :initform nil :documentation "private")
    (finalize-queue :accessor finalize-queue :initform nil :documentation "private")
    ;; alist of (buffer . buffer-areas)
@@ -315,6 +263,10 @@ Will be created automatically, but must be specified for now.")))
         (push obj (cdr entry))
         (setf (getassoc buffer (bo-queue queue)) (list obj)))))
 
+;;; TODO: Arrange queue by texture object. Push areas onto the end of the queue.
+(defmethod add-to-upload-queue ((queue texture-upload-queue) (obj texture-area))
+  (push obj (tex-queue queue)))
+
 (defgeneric process-upload-queue (renderer queue))
 
 (defmethod process-upload-queue (renderer queue)
@@ -335,6 +287,13 @@ Will be created automatically, but must be specified for now.")))
        (setf (bo-queue queue) nil))
   ;; Is this necessary? Should all the targets be set to 0?
   (gl:bind-buffer :array-buffer 0))
+
+(defmethod process-upload-queue :after (renderer (queue texture-upload-queue))
+  (loop
+     for area in (tex-queue queue)
+     for texture = (texture area)
+     do (upload-texture renderer area texture)
+     finally (setf (tex-queue queue) nil)))
 
 (defun do-upload-queue (renderer)
   (process-upload-queue renderer (upload-queue renderer)))
@@ -427,10 +386,8 @@ Will be created automatically, but must be specified for now.")))
         (setf (vao attribute-set) vao))))
   attribute-set)
 
-(defclass shader-source ()
-  ((shader-type :accessor shader-type :initarg :shader-type )
-   (source :accessor source :initarg :source :initform nil)
-   (usets :accessor usets)))
+(defclass shader-source (gl-shader-source)
+  ((usets :accessor usets)))
    
 (defmethod initialize-instance :after ((obj shader-source) &key usets)
   (setf (usets obj) (mapcar #'(lambda (uset-name)
@@ -442,52 +399,18 @@ Will be created automatically, but must be specified for now.")))
 ;;; strategies might be different. Should we keep a cache of objects for a set
 ;;; of uset strategies?
 
-(define-gl-object shader (shader-source)
-  ((status :accessor status :initarg :status :documentation "status of shader compilation")
-   (compiler-log :accessor compiler-log :initarg :compiler-log :initform nil
-                 :documentation "log of shader compilation errors and warnings"))
+
+(defclass shader (shader-source gl-shader)
+  ()
   (:documentation "The LPSG object that holds the source code for an OpenGL shader, information
   about its usets, ID in OpenGL, and any errors that result from its compilation."))
 
-(defmethod gl-finalized-p ((obj shader))
-  (slot-boundp obj 'status))
 
-(defmethod gl-finalize ((obj shader) &optional (errorp t))
-  (let* ((src (source obj))
-         (id (gl:create-shader (shader-type obj))))
-    (setf (id obj) id)
-    ;; XXX #defines for usets; comes from program
-    (gl:shader-source id src)
-    (gl:compile-shader id)
-    (let ((status (gl:get-shader id :compile-status)))
-      (setf (status obj) status)
-      (unless status
-        (setf (compiler-log obj) (gl:get-shader-info-log id))
-        (when errorp
-          (error 'render-error :gl-object obj :error-log (compiler-log obj)
-                 :format-control "The shader ~S has compile errors.")))))
-  t)
-
-(defmethod gl-destroy ((obj %shader))
-  (gl:delete-shader (%id obj))
-  (setf (%id obj) 0))
-
-(define-gl-object program ()
-  ((shaders :accessor shaders :initarg :shaders :initform nil
-            :documentation "shader objects that compose this program")
-   ;; (name location type size)
-   (uniforms :accessor uniforms :initform nil
-             :documentation "Information on uniforms declared within
-  the program shader source.") 
-   (status :accessor status :initarg :status
-           :documentation "status of shader program link")
-   (link-log :accessor link-log :initarg :link-log :initform nil
-             :documentation "log of errors and warnings from linking shader program")
+(defclass program (gl-program)
+  (
    ;; elements are (desc strategy (most-recent-uset counter))
    (uset-alist :accessor uset-alist :initform nil
-               :documentation "private")
-   (vertex-attribs :accessor vertex-attribs :initform nil :documentation "private"))
-  (:documentation "The representation of an OpenGL shader program."))
+               :documentation "private")))
 
 ;;; Compute all the usets used in a program's shaders, then choose strategies
 ;;; for them.
@@ -521,59 +444,9 @@ Will be created automatically, but must be specified for now.")))
       (funcall (uploader strategy) uset))
     uset))
 
-(defmethod gl-finalized-p ((obj program))
-  (slot-boundp obj 'status))
-
 (defmethod gl-finalize ((obj program) &optional (errorp t))
-  (flet ((err (&rest args)
-           (if errorp
-               (apply #'error args)
-               (return-from gl-finalize nil))))
-    (compute-usets obj)
-    (let ((id (gl:create-program)))
-      (setf (id obj) id)
-      (with-slots (shaders)
-          obj
-        (loop
-           for shader in shaders
-           do (progn
-                (gl-finalize shader errorp)
-                (gl:attach-shader id (id shader)))))
-      (gl:link-program id)
-      (unless (setf (status obj) (gl:get-program id :link-status))
-        (setf (link-log obj) (gl:get-program-info-log id))
-        (err 'render-error
-             :gl-object obj :error-log (link-log obj)
-             :format-control "The program ~S has link errors."))
-      ;; Info on the uniforms
-      (loop
-         with num-actives = (gl:get-program id :active-uniforms)
-         for index from 0 below num-actives
-         collecting (multiple-value-bind (size type name)
-                        (gl:get-active-uniform id index)
-                      (let ((location (gl:get-uniform-location id name)))
-                        (unless (eql -1 location)
-                          (list name location type size))))
-         into uniforms
-         finally (setf (uniforms obj) uniforms))
-      (loop
-         for (nil strategy) in (uset-alist obj)
-         do (initialize-uset-strategy strategy obj))
-      ;; Info on vertex attributes
-      (loop
-         with num-active-attribs = (gl:get-program id :active-attributes)
-         for index from 0 below num-active-attribs
-         collecting (multiple-value-bind (size type name)
-                        (gl:get-active-attrib id index)
-                      (let ((location (gl:get-attrib-location id name)))
-                        (list name location type size)))
-         into attributes
-         finally (setf (vertex-attribs obj) attributes))
-      t)))
-
-(defmethod gl-destroy ((obj %program))
-  (gl:delete-program (%id obj))
-  (setf (%id obj) 0))
+  (compute-usets obj)
+  (call-next-method))
 
 (defgeneric upload-buffers (renderer obj))
 
@@ -599,13 +472,13 @@ buffers; that is done by the application outside of LPSG."))
     (process-finalize-queue renderer)
     (setf (finalize-queue renderer) nil)
     (do-upload-queue renderer)
-    (draw-bundles renderer)))
+    (push-state renderer *default-graphics-state*)
+    (draw-bundles renderer)
+    (pop-state renderer)))
 
 (defgeneric draw-bundle (renderer bundle))
 
 (defmethod draw-bundles ((renderer standard-renderer))
-  ;; XXX Should we set the state to something known here?
-  (setf (current-state renderer) nil)
   (do-render-queue
       (queue (render-stage renderer))
     (do-render-queue

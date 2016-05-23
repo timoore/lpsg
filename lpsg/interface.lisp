@@ -73,3 +73,25 @@ implementation of SUBMIT-WITH-EFFECT."))
 This class contains the objects that are traversed to render a scene. This class does not guarantee
 a traversal order for objects in the queue. Subclasses of this class might sort the objects to
 obtain an optimal order, or in fact guarantee an order."))
+
+(define-protocol-class gl-object ()
+  ((:accessor id :documentation "The OpenGL ID of an object.")
+   (:accessor gl-proxy :documentation "Object for accessing the associated
+OpenGL object"))
+  (:documentation "Class representing any OpenGL object."))
+
+(defgeneric gl-finalize (obj &optional errorp)
+  (:documentation "Allocate any OpenGL resources needed for @cl:param(obj) and perform any
+tasks needed to use it (e.g. link a shader program).
+
+Returns @c(t) if finalize actions were performed, @c(nil) otherwise.
+
+This is called when the renderer's OpenGL context is current. The renderer is accessible in
+@c(*renderer*)."))
+
+(defgeneric gl-finalized-p (obj)
+  (:documentation "Returns @c(t) if object has already been finalized."))
+
+(defgeneric gl-destroy (obj)
+  (:documentation "Deallocate an OpenGL object."))
+

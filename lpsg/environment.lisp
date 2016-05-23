@@ -26,7 +26,7 @@ uniforms")
   (let ((glsl-attrib-name (cadr (member name (attribute-map environment) :key #'car))))
     (unless glsl-attrib-name
       (return-from attribute-array-location nil))
-    (let ((attrib (member glsl-attrib-name (vertex-attribs (program (gl-state environment)))
+    (let ((attrib (member glsl-attrib-name (vertex-attribs (glstate-program (gl-state environment)))
                          :key #'car :test #'string=)))
       (cadr attrib))))
 

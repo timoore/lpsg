@@ -80,13 +80,16 @@ void main()
 
 (defmethod submit-with-effect :before (shape renderer (effect texture-effect))
   (unless (slot-boundp effect 'gl-state)
-    (setf (gl-state effect) (make-instance 'graphics-state
-                                           :renderer renderer
-                                           :program (shader-program effect)))
-    (setf (svref (units (gl-state effect)) 0)
-          (make-instance 'lpsg::gltexture-unit
-                         :tex-object (lpsg::texture (texture-area effect))
-                         :sampler-object (sampler effect))))
+    (setf (gl-state effect)
+          (make-instance
+           'graphics-state
+           :program (shader-program effect)
+           :texunits (make-instance
+                      'lpsg::gl-texunits
+                      :renderer renderer
+                      :units (vector (make-instance 'lpsg::gltexture-unit
+                                                    :tex-object (lpsg::texture (texture-area effect))
+                                                    :sampler-object (sampler effect)))))))
   (unless (tex-loaded effect)
     (lpsg::schedule-upload renderer (texture-area effect))
     (setf (tex-loaded effect) t)))
