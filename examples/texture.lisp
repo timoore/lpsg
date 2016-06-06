@@ -91,7 +91,7 @@ void main()
                                                     :tex-object (lpsg::texture (texture-area effect))
                                                     :sampler-object (sampler effect)))))))
   (unless (tex-loaded effect)
-    (lpsg::schedule-upload renderer (texture-area effect))
+    (schedule-upload renderer (texture-area effect))
     (setf (tex-loaded effect) t)))
 
 (defparameter *default-camera-params* `(:eye ,(sb-cga:vec 1.0 1.0 0.0)

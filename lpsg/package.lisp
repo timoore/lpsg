@@ -80,6 +80,8 @@
    #:define-uset
    ;; graphics state
    #:graphics-state
+   #:glstate-program
+   #:glstate-texunits
    #:units
    #:uniform-sets
    #:environment
@@ -88,10 +90,12 @@
    #:gl-object
    #:texture-area
    #:raw-mirrored-texture-resource
+   #:texture
    #:texture-2d
    #:sampler
    #:shader
    #:program
+   #:gltexture-unit
    #:gl-state
    #:units
    #:gl-finalize

@@ -589,7 +589,7 @@ ultimately controls the appearance of the bundle.
 
 The @c(gl-state) slot contains a @c(graphics-state) object that represents
 the OpenGL state in effect when the environment is used to render a
-bundle. This contains things such as the shader program, and the the
+bundle. This contains things such as the shader program, and the
 bound textures, and is described in the @ref[id=opengl-state](OpenGL
 Objects and State) section.
 
