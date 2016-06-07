@@ -669,6 +669,7 @@ OpenGL objects explicitly; how / when does this happen?])
 @cl:doc(class sampler)
 @cl:doc(class shader)
 @cl:doc(class program)
+@cl:doc(class gltexture-unit)
 )
 
 The @c(graphics-state) object stored in an @c(environment) contains
@@ -678,8 +679,8 @@ that environment.
 
 @cl:with-package[name="lpsg"](
 @cl:doc(class graphics-state)
-@cl:doc(generic units)
-@cl:doc(generic program)
+@cl:doc(generic glstate-texunits)
+@cl:doc(generic glstate-program)
 )
 
 @end(section)

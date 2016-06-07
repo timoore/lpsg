@@ -368,8 +368,11 @@
     (gl:use-program (id m))))
 
 (defclass gltexture-unit ()
-  ((tex-object :accessor tex-object :initarg :tex-object)
-   (sampler-object :accessor sampler-object :initarg :sampler-object)))
+  ((tex-object :accessor tex-object :initarg :tex-object
+               :documentation "The texture bound to a unit.")
+   (sampler-object :accessor sampler-object :initarg :sampler-object
+                   :documentation "The sampler object bound to a unit."))
+  (:documentation "The state of a single OpenGL texture (actually, image) unit."))
 
 (defun compare-texture-unit (unit1 unit2)
   (cond ((and unit1 unit2)
