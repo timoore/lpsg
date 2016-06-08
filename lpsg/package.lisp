@@ -82,8 +82,10 @@
    #:graphics-state
    #:glstate-program                    ;?
    #:glstate-texunits                   ;?
+   #:gl-cull-face
    #:gl-depth-func
    #:gl-depth-range
+   #:make-modes
    #:units
    #:uniform-sets
    #:environment

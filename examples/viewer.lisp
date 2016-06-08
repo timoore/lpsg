@@ -80,10 +80,12 @@
     (setf (slot-value obj 'max-motion-time) (* max-motion-seconds internal-time-units-per-second))
     ;; default graphics state
     (let ((stage-state (make-instance 'graphics-state
+                                      :cull-face (make-instance 'gl-cull-face :face :back)
                                       :depth-func (make-instance 'gl-depth-func :func :less)
                                       :depth-range (make-instance 'gl-depth-range
-                                                                  :near 0.0
-                                                                  :far 1.0))))
+                                                                  :near 0.0 :far 1.0)
+                                      :modes (make-modes '(:cull-face :depth-test)
+                                                         '(:dither :multisample)))))
       (setf (graphics-state (render-stage obj)) stage-state))))
 
 (defgeneric draw-window (window)
@@ -94,13 +96,7 @@
 
 (defmethod draw-window :around ((window viewer-window))
   (setf (slot-value window 'last-draw-time) (get-internal-real-time))
-  ;; All the OpenGL state set by theese calls will eventually be stored in a LPSG:GL-STATE
-  ;; object.
   (%gl:clear-color .8 .8 .8 1.0)
-  (gl:cull-face :back)
-  (gl:depth-func :less)
-  (gl:enable :cull-face :depth-test)
-  (gl:disable :dither)
   (gl:clear :color-buffer :depth-buffer)
   (call-next-method)
   (glop:swap-buffers window))

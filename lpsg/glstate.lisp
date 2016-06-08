@@ -89,7 +89,7 @@
                                *glstate-elements*)))
            (define-glstate ()
              `(defclass graphics-state ,*glstate-elements*
-                ()
+                ((modes :accessor modes :initarg :modes))
                 (:documentation "Class that stores most OpenGL state."))))
   (define-all-elements)
   (define-glstate))
@@ -539,30 +539,116 @@
 (defmethod make-default-glstate-member ((name (eql 'glstate-front-face)))
   (make-instance 'gl-front-face))
 
+;;; Graphics modes are the state controlled by gl:enable and gl:disable. They are represented as
+;;; bits in an integer. The modes fit comfortably in a fixnum in 64 bit Lisps, but things are
+;;; pretty tight on 32 bit Lisps, so we put the less common modes in the top bits.
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *modes*
+    '(:blend
+      :color-logic-op
+      :cull-face
+      :depth-clamp
+      :depth-test
+      :dither
+      :framebuffer-srgb
+      :multisample
+      :polygon-offset-fill
+      :polygon-offset-line
+      :polygon-offset-point
+      :primitive-restart
+      :scissor-test
+      :stencil-test
+      :texture-cube-map-seamless
+      :program-point-size
+      :sample-alpha-to-coverage
+      :sample-alpha-to-one
+      :sample-coverage
+      :clip-distance0
+      :clip-distance1
+      :clip-distance2
+      :clip-distance3
+      :clip-distance4
+      :clip-distance5
+      :clip-distance6
+      :clip-distance7
+      :line-smooth
+      :polygon-smooth
+      ))
+  
+  (defun modelist-to-mask (modes)
+    (let ((val 0))
+      (loop
+         for mode in modes
+         for pos = (position mode *modes*)
+         do (if pos
+                (setf (ldb (byte 1 pos) val) 1)
+                (error "~S is not a known OpenGL mode." mode)))
+      val))
+
+  (defparameter *all-modes* (1- (ash 1 (length *modes*)))))
+
+(defparameter *mode-enums* (mapcar (lambda (name)
+                                     (cffi:foreign-enum-value 'cl-opengl-bindings:enum name))
+                                   *modes*))
+(defclass gl-modes ()
+  ((mode-value :accessor mode-value :initform 0 :initarg :mode-value)
+   (is-set :accessor is-set :initform 0 :initarg :is-set)))
+
+(defun make-modes (enabled disabled)
+  (let* ((enabled-mask (modelist-to-mask enabled))
+         (disabled-mask (modelist-to-mask disabled))
+         (is-set-mask (logior enabled-mask disabled-mask)))
+    (make-instance 'gl-modes :mode-value enabled-mask :is-set is-set-mask)))
+
+(defmethod glstate-compare ((m1 gl-modes) (m2 gl-modes))
+  (let ((mode-comp (compare-num (mode-value m1) (mode-value m2))))
+    (if (zerop mode-comp)
+        (compare-num (is-set m1) (is-set m2))
+        mode-comp)))
+
+(defun bind-mode-mask (modes modes-to-set)
+  (loop
+     for set-shift = modes-to-set then (ash modes-to-set -1)
+     while (not (zerop set-shift))
+     for mode-shift = modes then (ash mode-shift -1)
+     for enum in *mode-enums*
+     when (logbitp 0 set-shift)
+     do
+       (if (logbitp 0 mode-shift)
+           (%gl:enable enum)
+           (%gl:disable enum))
+     end))
+
+(defmethod initialize-instance :after ((obj graphics-state) &key)
+  (unless (slot-boundp obj 'modes)
+    (setf (modes obj) (make-modes nil nil))))
+
 (defgeneric bind-state (renderer state))
 
 (defclass glstate-tracker ()
   ((state-stack :accessor state-stack :initform (make-array 2 :adjustable t :fill-pointer 0))
    (current-state :accessor current-state :initform (make-instance 'graphics-state))
-   (last-applied :accessor last-applied :initform nil)
-   (current-state-valid :accessor current-state-valid :initform nil)))
+   (last-applied :accessor last-applied :initform nil)))
 
 (defgeneric push-state (tracker state))
 
 (defmethod push-state ((tracker glstate-tracker) (state graphics-state))
   (vector-push-extend state (state-stack tracker))
-  (setf (current-state-valid tracker) nil))
+  (setf (last-applied tracker) nil))
 
 (defgeneric pop-state (tracker))
 
 (defmethod pop-state ((tracker glstate-tracker))
   (vector-pop (state-stack tracker))
-  (setf (current-state-valid tracker) nil))
+  (setf (last-applied tracker) nil))
 
 (defgeneric bind-state-with-tracker (tracker state))
 
 (defmethod bind-state ((renderer glstate-tracker) (state graphics-state))
   (bind-state-with-tracker renderer state))
+
+(defgeneric bind-modes (tracker state))
 
 (defmethod bind-state-with-tracker ((tracker glstate-tracker) (state graphics-state))
   (let ((stack (state-stack tracker))
@@ -582,14 +668,44 @@
                (unless (eq new-element (svref current-elements i))
                  (glstate-bind tracker new-element (svref current-elements i))
                  (setf (svref current-elements i) new-element)))))
-      (unless (and (current-state-valid tracker)
-                   (eq state (last-applied tracker)))
+      (unless (eq state (last-applied tracker))
         (loop
            for i from 0 below (length current-elements)
            do
              (bind1 i))
-        (setf (last-applied tracker) state)
-        (setf (current-state-valid tracker) t)))))
+        (bind-modes tracker state)
+        (setf (last-applied tracker) state)))))
+
+(defmethod bind-modes ((tracker glstate-tracker) (new-state graphics-state))
+  ;; First accumulate the mode state represented by the state stack
+  (let ((all-modes 0)
+        (all-is-set 0)
+        (stack (state-stack tracker)))
+    (flet ((update-modes (mode-value is-set)
+             (setq all-modes (logior (logand all-is-set
+                                             (logandc2 all-modes is-set))
+                                     (logand mode-value is-set)))
+             (setq all-is-set (logior all-is-set is-set))))
+      (loop
+         for state across stack
+         for modes = (modes state)
+         for mode-value = (mode-value modes)
+         for is-set = (is-set modes)
+         do (update-modes (mode-value modes) (is-set modes)))
+      ;; modes from new state
+      (let ((modes (modes new-state)))
+        (update-modes (mode-value modes) (is-set modes))))
+    ;; Set modes in OpenGL according to the validity of the current value (was it ever set)  and
+    ;; whether or not the new value is different.
+    (let* ((current-mode-obj (modes (current-state tracker)))
+           (current-mode-value (mode-value current-mode-obj))
+           (current-is-set (is-set current-mode-obj))
+           (difference (logxor all-modes current-mode-value))
+           (to-set (logand all-is-set
+                           (logorc1 current-is-set difference))))
+      (bind-mode-mask all-modes to-set)
+      (setf (mode-value current-mode-obj) (logior (logand all-modes to-set) current-mode-value))
+      (setf (is-set current-mode-obj) (logior to-set current-is-set)))))
 
 (defun make-default-graphics-state ()
   (let* ((state (make-instance 'graphics-state))
@@ -598,6 +714,9 @@
        for i from 0 below (length members)
        for m in *glstate-elements*
        do (setf (svref members i) (make-default-glstate-member m)))
+    (let* ((enabled-modes '(:dither :multisample))
+           (disabled-modes (set-difference *modes* enabled-modes)))
+      (setf (modes state) (make-modes enabled-modes disabled-modes)))
     state))
 
 (defparameter *default-graphics-state* (make-default-graphics-state))
