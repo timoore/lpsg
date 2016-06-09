@@ -30,6 +30,10 @@
       nil
       (call-next-method)))
 
+(defmethod gl-finalize (obj &optional errorp)
+  (declare (ignore errorp))
+  t)
+
 (defmethod gl-finalize :around ((object gl-object) &optional errorp)
   (let ((result (call-next-method)))
     (when result
@@ -40,8 +44,20 @@
   (declare (ignore obj))
   t)
 
+(defclass queue-state-mixin ()
+  ((graphics-state :accessor graphics-state :initarg :graphics-state)))
+
+(defmethod map-render-queue :around ((render-queue queue-state-mixin) func)
+  (declare (ignorable func))
+  (if (slot-boundp render-queue 'graphics-state)
+      (progn
+          (push-state *renderer* (graphics-state render-queue))
+          (call-next-method)
+          (pop-state *renderer*))
+      (call-next-method)))
+
 ;;; This should be some kind of ordered data structure (map, skip list, ...)
-(defclass unordered-render-queue (render-queue)
+(defclass unordered-render-queue (queue-state-mixin render-queue)
   ((bundles :accessor bundles :initarg :bundles :initform nil
             :documentation "private"))
   (:documentation "A queue that contains bundles to be rendered."))
@@ -58,7 +74,7 @@
 (defmethod find-if-queue (predicate (render-queue unordered-render-queue))
   (find-if predicate (bundles render-queue)))
 
-(defclass ordered-render-queue (render-queue)
+(defclass ordered-render-queue (queue-state-mixin render-queue)
   ((queue-object :documentation "private"))
   (:documentation "Class for a queue of objects that are rendered in order.
 
@@ -111,7 +127,9 @@
    (gl-objects :accessor gl-objects :initform nil :documentation "List of all OpenGL objects
 allocated by calls in LPSG." )
    (context-parameters :accessor context-parameters
-                       :documentation "Parameters of the OpenGL context."))
+                       :documentation "Parameters of the OpenGL context.")
+   (default-graphics-state :accessor default-graphics-state :initarg :default-graphics-state
+                           :initform *default-graphics-state*))
   (:documentation "The standard instantiable class of @c(renderer).")
   )
 
@@ -472,7 +490,7 @@ buffers; that is done by the application outside of LPSG."))
     (process-finalize-queue renderer)
     (setf (finalize-queue renderer) nil)
     (do-upload-queue renderer)
-    (push-state renderer *default-graphics-state*)
+    (push-state renderer (default-graphics-state renderer))
     (draw-bundles renderer)
     (pop-state renderer)))
 

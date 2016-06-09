@@ -80,8 +80,10 @@
    #:define-uset
    ;; graphics state
    #:graphics-state
-   #:glstate-program
-   #:glstate-texunits
+   #:glstate-program                    ;?
+   #:glstate-texunits                   ;?
+   #:gl-depth-func
+   #:gl-depth-range
    #:units
    #:uniform-sets
    #:environment

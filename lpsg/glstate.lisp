@@ -45,6 +45,10 @@
     '(#+nil :render-target
       :program
       :texunits
+      :cull-face
+      :depth-func
+      :depth-range
+      :front-face
       #+nil :modes))
   (defparameter *glstate-elements*
     (let ((prefix (symbol-name '#:glstate-)))
@@ -464,6 +468,77 @@
 (defmethod make-default-glstate-member ((name (eql 'glstate-texunits)))
   (make-instance 'gl-texunits))
 
+(defun get-gl-enum (val error-msg)
+  (cond ((keywordp val)
+         (cffi:foreign-enum-value 'cl-opengl-bindings:enum val))
+        ((integerp val)
+         val)
+        (t (error error-msg val))))
+
+(defclass gl-depth-func ()
+  ((func :accessor func)))
+
+(defmethod initialize-instance :after ((obj gl-depth-func) &key (func :less))
+  (setf (func obj) (get-gl-enum func "~S is not a valid value for depth-func.")))
+
+(defmethod glstate-bind (tracker (element gl-depth-func) previous)
+  (%gl:depth-func (func element)))
+
+(defmethod glstate-compare ((e1 gl-depth-func) (e2 gl-depth-func))
+  (compare-num (func e1) (func e2)))
+
+(defmethod make-default-glstate-member ((name (eql 'glstate-depth-func)))
+  (make-instance 'gl-depth-func))
+
+(defclass gl-depth-range ()
+  ((near :accessor near :initarg :near :initform 0.0)
+   (far :accessor far :initarg :far :initform 1.0)))
+
+(defmethod glstate-bind (tracker (element gl-depth-range) previous)
+  (declare (ignore tracker previous))
+  (gl:depth-range (near element) (far element)))
+
+(defmethod glstate-compare ((e1 gl-depth-range) (e2 gl-depth-range))
+  (let ((comp1 (compare-num (near e1) (near e2))))
+    (if (zerop comp1)
+        (compare-num (far e1) (far e2))
+        comp1)))
+
+(defmethod make-default-glstate-member ((name (eql 'glstate-depth-range)))
+  (make-instance 'gl-depth-range))
+
+(defclass gl-cull-face ()
+  ((face :accessor face)))
+
+(defmethod initialize-instance :after ((obj gl-cull-face) &key (face :back))
+  (setf (face obj) (get-gl-enum face "~S is not a valid value for gl-cull-face.")))
+
+(defmethod glstate-bind (tracker (element gl-cull-face) previous)
+  (declare (ignore tracker previous))
+  (%gl:cull-face (face element)))
+
+(defmethod glstate-compare ((e1 gl-cull-face) (e2 gl-cull-face))
+  (compare-num (face e1) (face e2)))
+
+(defmethod make-default-glstate-member ((name (eql 'glstate-cull-face)))
+  (make-instance 'gl-cull-face))
+
+(defclass gl-front-face ()
+  ((mode :accessor mode)))
+
+(defmethod initialize-instance :after ((obj gl-front-face) &key (mode :ccw))
+  (setf (mode obj) (get-gl-enum mode "~S is not a valid value for gl-front-face.")))
+
+(defmethod glstate-bind (tracker (element gl-front-face) previous)
+  (declare (ignore tracker previous))
+  (%gl:front-face (mode element)))
+
+(defmethod glstate-compare ((e1 gl-front-face) (e2 gl-front-face))
+  (compare-num (mode e1) (mode e2)))
+
+(defmethod make-default-glstate-member ((name (eql 'glstate-front-face)))
+  (make-instance 'gl-front-face))
+
 (defgeneric bind-state (renderer state))
 
 (defclass glstate-tracker ()
@@ -504,8 +579,9 @@
                       (setq new-element element-from-stack)
                       (loop-finish)
                     end))
-               (glstate-bind tracker new-element (svref current-elements i))
-               (setf (svref current-elements i) new-element))))
+               (unless (eq new-element (svref current-elements i))
+                 (glstate-bind tracker new-element (svref current-elements i))
+                 (setf (svref current-elements i) new-element)))))
       (unless (and (current-state-valid tracker)
                    (eq state (last-applied tracker)))
         (loop

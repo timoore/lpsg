@@ -37,7 +37,7 @@
     uset))
 
 
-(defclass viewer-window (glop:window)
+(defclass viewer-window (standard-renderer glop:window)
   (
    ;; For testing if a glop resize event is really a resize
    (saved-width :accessor saved-width)
@@ -77,7 +77,14 @@
     (setf (lpsg:input (camera-uset-node obj) 'projection-matrix) choice)
     (setf (lpsg:input (camera-uset-node obj) 'view-matrix)
           (lpsg-tinker:view-matrix-node (view-camera obj)))
-    (setf (slot-value obj 'max-motion-time) (* max-motion-seconds internal-time-units-per-second))))
+    (setf (slot-value obj 'max-motion-time) (* max-motion-seconds internal-time-units-per-second))
+    ;; default graphics state
+    (let ((stage-state (make-instance 'graphics-state
+                                      :depth-func (make-instance 'gl-depth-func :func :less)
+                                      :depth-range (make-instance 'gl-depth-range
+                                                                  :near 0.0
+                                                                  :far 1.0))))
+      (setf (graphics-state (render-stage obj)) stage-state))))
 
 (defgeneric draw-window (window)
   (:documentation "Do one pass of the rendering loop."))

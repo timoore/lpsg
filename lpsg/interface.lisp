@@ -66,8 +66,9 @@ implementation of SUBMIT-WITH-EFFECT."))
 
    (:generic find-if-queue (predicate render-queue)
     (:documentation "Search for an object in @cl:param(render-queue) that satisfies
-@cl:param(predicate)")))
-
+@cl:param(predicate)"))
+   (:accessor graphics-state :documentation "A graphics-state object pushed before the traversal of
+the queue's objects, and popped after."))
   (:documentation "A container class for objects, including @c(render-queue) objects too.
 
 This class contains the objects that are traversed to render a scene. This class does not guarantee
