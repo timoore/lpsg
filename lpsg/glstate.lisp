@@ -45,6 +45,9 @@
     '(#+nil :render-target
       :program
       :texunits
+      :blend-func
+      :blend-equation
+      :blend-color
       :cull-face
       :depth-func
       :depth-range
@@ -353,6 +356,19 @@
          -1)
         (t 1)))
 
+(defmacro compare-pairs (&rest pairs)
+  "Call compare-num on each pair of arguments, but short-circuit and return the value if the result
+  of the comparison is not 0."
+  (if (null pairs)
+      0
+      (destructuring-bind (a b &rest rest-args)
+          pairs
+        (let ((result (gensym)))
+          `(let ((,result (compare-num ,a ,b)))
+             (if (zerop ,result)
+                 (compare-pairs ,@rest-args)
+                 ,result))))))
+
 (defun compare-gl-objects (obj1 obj2)
   (cond ((eq obj1 obj2)
          0)
@@ -499,13 +515,83 @@
   (gl:depth-range (near element) (far element)))
 
 (defmethod glstate-compare ((e1 gl-depth-range) (e2 gl-depth-range))
-  (let ((comp1 (compare-num (near e1) (near e2))))
-    (if (zerop comp1)
-        (compare-num (far e1) (far e2))
-        comp1)))
+  (compare-pairs
+   (near e1) (near e2)
+   (far e1) (far e2)))
 
 (defmethod make-default-glstate-member ((name (eql 'glstate-depth-range)))
   (make-instance 'gl-depth-range))
+
+(defclass gl-blend-func ()
+  ((src-rgb :accessor src-rgb)
+   (dst-rgb :accessor dst-rgb)
+   (src-alpha :accessor src-alpha)
+   (dst-alpha :accessor dst-alpha)))
+
+(defmethod initialize-instance :after ((obj gl-blend-func)
+                                       &key
+                                         (src-rgb :one) (dst-rgb :zero)
+                                         (src-alpha src-rgb) (dst-alpha dst-rgb))
+  (flet ((get-enum (enum)
+           (get-gl-enum enum "~S is not a valid value for gl-blend-func.")))
+    (setf (src-rgb obj) (get-enum src-rgb))
+    (setf (dst-rgb obj) (get-enum dst-rgb))
+    (setf (src-alpha obj) (get-enum src-alpha))
+    (setf (dst-alpha obj) (get-enum dst-alpha))))
+
+(defmethod glstate-bind (tracker (element gl-blend-func) previous)
+  (declare (ignore tracker previous))
+  (%gl:blend-func-separate (src-rgb element)
+                           (dst-rgb element)
+                           (src-alpha element)
+                           (dst-alpha element)))
+
+(defmethod glstate-compare ((e1 gl-blend-func) (e2 gl-blend-func))
+  (compare-pairs
+   (src-rgb e1) (src-rgb e2)
+   (dst-rgb e1) (dst-rgb e2)
+   (src-alpha e1) (src-alpha e2)
+   (dst-alpha e1) (dst-alpha e2)))
+
+(defmethod make-default-glstate-member ((name (eql 'glstate-blend-func)))
+  (make-instance 'gl-blend-func))
+
+(defclass gl-blend-equation ()
+  ((equation :accessor equation)))
+
+(defmethod initialize-instance :after ((obj gl-blend-equation) &key (equation :func-add))
+  (unless (slot-boundp obj 'equation)
+    (setf (equation obj) (get-gl-enum equation "~S is not a valid value for gl-blend-equation."))))
+
+(defmethod glstate-bind (tracker (element gl-blend-equation) previous)
+  (declare (ignore tracker previous))
+  (%gl:blend-equation (equation element)))
+
+(defmethod glstate-compare ((e1 gl-blend-equation) (e2 gl-blend-equation))
+  (compare-num (equation e1) (equation e2)))
+
+(defmethod make-default-glstate-member ((name (eql 'glstate-blend-equation)))
+  (make-instance 'gl-blend-equation))
+
+(defclass gl-blend-color ()
+  ((rgba :accessor rgba :initarg :rgba :initform #(0.0 0.0 0.0 0.0))))
+
+(defmethod glstate-bind (tracker (element gl-blend-color) previous)
+  (declare (ignore tracker previous))
+  (let ((color (rgba element)))
+    (%gl:blend-color (svref color 0) (svref color 1) (svref color 2) (svref color 3))))
+
+(defmethod glstate-compare ((e1 gl-blend-color) (e2 gl-blend-color))
+  (loop
+     for c1 across (rgba e1)
+     for c2 across (rgba e2)
+     for comp = (compare-num c1 c2)
+     unless (zerop comp)
+     return comp
+     finally (return 0)))
+
+(defmethod make-default-glstate-member ((name (eql 'glstate-blend-color)))
+  (make-instance 'gl-blend-color))
 
 (defclass gl-cull-face ()
   ((face :accessor face)))
