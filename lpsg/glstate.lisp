@@ -52,7 +52,7 @@
       :depth-func
       :depth-range
       :front-face
-      #+nil :modes))
+      :framebuffers))
   (defparameter *glstate-elements*
     (let ((prefix (symbol-name '#:glstate-)))
       (mapcar (lambda (element)
@@ -379,6 +379,19 @@
         (t
          (compare-num (id obj1) (id obj2)))))
 
+(defmacro compare-object-pairs (&rest pairs)
+  "Call compare-gl-objects on each pair of arguments, but short-circuit and return the value if the
+result of the comparison is not 0."
+  (if (null pairs)
+      0
+      (destructuring-bind (a b &rest rest-args)
+          pairs
+        (let ((result (gensym)))
+          `(let ((,result (compare-gl-objects ,a ,b)))
+             (if (zerop ,result)
+                 (compare-gl-objects ,@rest-args)
+                 ,result))))))
+
 (defmethod glstate-compare ((m1 gl-program) (m2 gl-program))
   (compare-gl-objects m1 m2))
 
@@ -624,6 +637,96 @@
 
 (defmethod make-default-glstate-member ((name (eql 'glstate-front-face)))
   (make-instance 'gl-front-face))
+
+(defclass gl-framebuffers ()
+  ((read-fbo :accessor read-fbo :initarg :read-fbo :initform nil)
+   (draw-fbo :accessor draw-fbo :initarg :draw-fbo :initform nil)))
+
+(defmethod gl-finalize ((obj gl-framebuffers) &optional errorp)
+  (let ((read-fbo (read-fbo obj))
+        (draw-fbo (draw-fbo obj)))
+    (when read-fbo
+      (gl-finalize read-fbo errorp))
+    (when draw-fbo
+      (gl-finalize draw-fbo errorp))))
+
+(defmethod gl-finalized-p ((obj gl-framebuffers))
+  (let ((read-fbo (read-fbo obj))
+        (draw-fbo (draw-fbo obj)))
+    (and (or (null read-fbo)
+             (gl-finalized-p read-fbo))
+         (or (null draw-fbo)
+             (gl-finalized-p draw-fbo)))))
+
+(defmethod glstate-bind (tracker (element gl-framebuffers) previous)
+  (declare (ignore tracker previous))
+  (let ((read-fbo (read-fbo element))
+        (draw-fbo (draw-fbo element)))
+    (%gl:bind-framebuffer :read-framebuffer (if read-fbo
+                                                (id read-fbo)
+                                                0))
+    (%gl:bind-framebuffer :draw-framebuffer (if draw-fbo
+                                                (id draw-fbo)
+                                                0))))
+
+(defmethod glstate-compare ((e1 gl-framebuffers) (e2 gl-framebuffers))
+  (compare-object-pairs
+   (read-fbo e1) (read-fbo e2)
+   (draw-fbo e1) (draw-fbo e2)))
+
+(defmethod make-default-glstate-member ((name (eql 'glstate-framebuffers)))
+  (make-instance 'gl-framebuffers))
+
+
+(define-gl-object framebuffer-object ()
+  ((color-attachments :accessor color-attachments :initarg :color-attachments :initform nil
+                      :documentation "plist of attachment names and attachment specs. An attachment
+spec is a texture or renderbuffer object, or a list of arguments for
+@c(attach-framebuffer-texture)")
+   (depth-attachment :accessor depth-attachment :initarg :depth-attachment :initform nil)
+   (depth-stencil-attachment :accessor depth-stencil-attachment :initarg
+                             :depth-stencil-attachment :initform nil)
+   (gl-draw-buffers :accessor gl-draw-buffers :initarg :gl-draw-buffers
+                    :initform '(:color-attachment0))))
+
+(defgeneric attach-framebuffer-texture (fb-target attachment-point texture &key level layer))
+
+(defmethod attach-framebuffer-texture (fb-target attachment-point (texture texture-2d)
+                                       &key (level 0) layer)
+  (declare (ignore layer))
+  (gl:framebuffer-texture-2d fb-target attachment-point (target texture) (id texture) level))
+
+(defmethod gl-finalize ((obj framebuffer-object) &optional errorp)
+  (flet ((get-attachment (tex)
+           (if (listp tex)
+               (car tex)
+               tex))
+         (attach (fb-target attachment attachment-spec)
+           (if (listp attachment-spec)
+               (apply #'attach-framebuffer-texture fb-target attachment attachment-spec)
+               (attach-framebuffer-texture fb-target attachment attachment-spec))))
+    (loop
+       for tail on (color-attachments obj) by #'cddr
+       for (nil color-attachment) = tail
+       do (gl-finalize (get-attachment color-attachment) errorp))
+    (when (depth-attachment obj)
+      (gl-finalize (get-attachment (depth-attachment obj)) errorp))
+    (when (depth-stencil-attachment obj)
+      (gl-finalize (get-attachment (depth-stencil-attachment obj)) errorp)))
+  (setf (id obj) (gl:gen-framebuffer))
+  (gl:bind-framebuffer :framebuffer (id obj))
+  (loop
+     for tail on (color-attachments obj) by #'cddr
+     for (attachment-point attachment) = tail
+     do (attach :framebuffer attachment-point attachment))
+  (when (depth-attachment obj)
+    (attach-framebuffer-texture :framebuffer :depth-attachment  (depth-attachment obj)))
+  (when (depth-stencil-attachment obj)
+    (attach-framebuffer-texture
+     :framebuffer :depth-stencil-attachment (depth-stencil-attachment obj)))
+  (gl:draw-buffers (gl-draw-buffers obj))
+  (gl:bind-framebuffer :framebuffer 0))
+
 
 ;;; Graphics modes are the state controlled by gl:enable and gl:disable. They are represented as
 ;;; bits in an integer. The modes fit comfortably in a fixnum in 64 bit Lisps, but things are
