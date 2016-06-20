@@ -17,25 +17,31 @@
 ;;; and incremental nodes, and then route their outputs to a camera-uset-node which produces a uset
 ;;; as its value.
 
-(defclass partial-view-camera (lpsg-tinker:aimed-camera-mixin lpsg-tinker:view-node-mixin)
-  ())
+(defclass partial-view-camera (lpsg-tinker:aimed-camera-mixin)
+  ()
+  (:metaclass compute-class))
 
-(defclass partial-ortho-camera (lpsg-tinker:ortho-camera-mixin lpsg-tinker:projection-node-mixin)
-  ())
+(defclass partial-ortho-camera (lpsg-tinker:ortho-camera-mixin)
+  ()
+  (:metaclass compute-class))
 
-(defclass partial-fov-camera (lpsg-tinker:fov-camera-mixin lpsg-tinker::projection-node-mixin)
-  ())
+(defclass partial-fov-camera (lpsg-tinker:fov-camera-mixin)
+  ()
+  (:metaclass compute-class))
 
 ;;; This incremental node takes 'view-matrix and 'projection-matrix as input and produces a uset.
-(defclass camera-uset-node (lpsg:computation-node lpsg:computation-node-mixin lpsg:source-sink-mixin)
-  ((uset :accessor uset :initform (make-instance 'camera))))
+(defclass camera-uset-node ()
+  ((view-matrix :input-accessor view-matrix)
+   (projection-matrix :input-accessor projection-matrix)
+   (uset :compute-function uset)
+   (%uset :initform (make-instance 'camera)))
+  (:metaclass compute-class))
 
-(defmethod lpsg:compute ((node camera-uset-node))
-  (let ((uset (uset node)))
-    (setf (camera-matrix uset) (lpsg:input-value node 'view-matrix))
-    (setf (projection-matrix uset) (lpsg:input-value node 'projection-matrix))
+(defmethod uset ((node camera-uset-node))
+  (let ((uset (slot-value node '%uset)))
+    (setf (camera-matrix uset) (view-matrix node))
+    (setf (projection-matrix uset) (projection-matrix node))
     uset))
-
 
 (defclass viewer-window (standard-renderer glop:window)
   (
@@ -67,16 +73,15 @@
 
 (defmethod initialize-instance :after ((obj viewer-window) &key (max-motion-seconds .0167))
   (let ((choice (make-instance 'lpsg:if-then-node))
-        (selector (make-instance 'lpsg:input-value-node
-                                 :value (eq (projection-type obj) 'orthographic))))
-    (setf (lpsg:input choice 'lpsg:then) (lpsg-tinker:projection-matrix-node (ortho-camera obj)))
-    (setf (lpsg:input choice 'lpsg:else) (lpsg-tinker:projection-matrix-node (fov-camera obj)))
-    (setf (lpsg:input choice 'if) selector)
+        (selector (make-instance 'lpsg:input-node
+                                 :in (eq (projection-type obj) 'orthographic))))
+    (connect choice 'lpsg:then (ortho-camera obj) 'lpsg-tinker:projection-matrix)
+    (connect choice 'lpsg:else (fov-camera obj) 'lpsg-tinker:projection-matrix)
+    (connect choice 'test selector 'out)
     (setf (camera-choice obj) choice)
     (setf (camera-selector obj) selector)
-    (setf (lpsg:input (camera-uset-node obj) 'projection-matrix) choice)
-    (setf (lpsg:input (camera-uset-node obj) 'view-matrix)
-          (lpsg-tinker:view-matrix-node (view-camera obj)))
+    (connect (camera-uset-node obj) 'projection-matrix choice 'result)
+    (connect (camera-uset-node obj) 'view-matrix (view-camera obj) 'lpsg-tinker:view-matrix)
     (setf (slot-value obj 'max-motion-time) (* max-motion-seconds internal-time-units-per-second))
     ;; default graphics state
     (let ((stage-state (make-instance 'graphics-state
@@ -260,7 +265,7 @@ This calls "))
 (defun print-mouse-click (window x y)
   (let ((mouse-world (kit.math:unproject (sb-cga:vec x y 0.0)
                                          (lpsg-tinker:view-matrix (view-camera window))
-                                         (lpsg:value (camera-choice window))
+                                         (lpsg:result (camera-choice window))
                                          (kit.math:vec4 0.0
                                                         0.0
                                                         (float (glop:window-width window) 1.0)
@@ -280,7 +285,7 @@ This calls "))
                                                         0.0
                                                         (float (glop:window-width window) 1.0)
                                                         (float (glop:window-height window) 1.0))
-                               :perspective-matrix (lpsg:value (camera-choice window))
+                               :perspective-matrix (lpsg:result (camera-choice window))
                                :view-matrix (lpsg-tinker:view-matrix (view-camera window))))
             (button (glop:button event)))
         (cond ((and (eql button 2)

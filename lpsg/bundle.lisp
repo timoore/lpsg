@@ -39,7 +39,7 @@ geometry of the associated @c(shape). "))
 (defmethod draw-bundle ((renderer standard-renderer) bundle)
   (let* ((env (environment bundle))
          (gl-state (gl-state env)))
-    (unless (input-value env 'visiblep)
+    (unless (visiblep env)
       (return-from draw-bundle nil))
     (bind-state renderer gl-state)
     (loop
