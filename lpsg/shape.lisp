@@ -80,7 +80,7 @@ The array storing the data can have any dimensionality; it will be accessed usin
 
 ;;; attributes - alist of (name . vertex-attribute). 
 
-(defclass standard-shape (sink-node sink-node-mixin shape)
+(defclass standard-shape (shape)
   ((attributes :accessor attributes :initarg :attributes :initform nil
                :documentation "Alist of (name . attribute). The names are later mapped to a vertex binding index.")
    (effect :accessor effect :initarg :effect :documentation "private")
@@ -100,10 +100,9 @@ Inputs
 visiblep - true if shape is visible, false if not
 "))
 
-(defmethod initialize-instance :after ((obj standard-shape) &key (visiblep t))
+(defmethod initialize-instance :after ((obj standard-shape) &key)
   (unless (slot-boundp obj 'drawable)
-    (setf (drawable obj) (make-instance 'drawable)))
-  (setf (input obj 'visiblep) visiblep))
+    (setf (drawable obj) (make-instance 'drawable))))
 
 (defmethod attribute ((obj shape) attribute-name)
   (getassoc attribute-name (attributes obj) :test #'equal))

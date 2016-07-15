@@ -7,7 +7,7 @@
   :version "0.0.0"
   :author "Tim Moore <timoore33@gmail.com>"
   :license "Revised BSD"
-  :depends-on (cl-opengl sb-cga mathkit alexandria trivial-garbage serapeum)
+  :depends-on (cl-opengl sb-cga mathkit alexandria trivial-garbage serapeum closer-mop)
   :components
   ((:module "lpsg"
     :components
@@ -24,9 +24,10 @@
      (:file "allocator" :depends-on (base))
      (:file "glstate" :depends-on (base))
      (:file "render" :depends-on (base "uset" "glstate"))
-     (:file "environment" :depends-on (base "render" "incremental-comp" "glstate"))
+     (:file "environment" :depends-on (base "render" "glstate"))
      (:file "bundle" :depends-on (base "render" "environment" "glstate"))
-     (:file "effect" :depends-on (base "render" "environment" "bundle" "glstate"))
+     (:file "effect" :depends-on (base "render" "environment" "glstate"  "bundle"
+                                       "incremental-comp"))
      (:file "shape" :depends-on (base "render" "environment" "allocator" "incremental-comp"))
      (:file "assembly" :depends-on (base "shape"))
      (:file "solids" :depends-on (base "render" "shape"))))

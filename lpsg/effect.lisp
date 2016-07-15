@@ -9,13 +9,21 @@
 
 (defclass effect ()
   ((attribute-map :accessor attribute-map :initform nil :initarg :attribute-map
-                  :documentation "list of (symbol glsl-name) where glsl-name is a string"))
+                  :documentation "list of (symbol glsl-name) where glsl-name is a string")
+   (visiblep :input-accessor visiblep :initarg :visiblep :initform t)
+   ;; This slot exists to enable the invalidation of the node when an input (usually in a subclass)
+   ;; changes.
+   (status :compute-function status :initform t))
+  (:metaclass compute-class)
   (:documentation "Class that represents the rendered appearance of a shape.
 
  EFFECT is responsable for creating bundles and their environments and putting them in the
   appropriate render queues. The effect object contains graphics environments. The SIMPLE-EFFECT
   class only has one environment, but other effects might have different environments for different
   passes."))
+
+(defmethod status ((e effect))
+  t)
 
 (defun init-attr-set-from-shape (attrib-set shape attr-map)
   " Initialize attribute set from shape and drawable attributes. The actual vertex
@@ -37,10 +45,20 @@ just ignore it."
 (defclass simple-effect (effect)
   ((gl-state :accessor gl-state :initarg :gl-state :documentation "@c(graphics-state) object used
   to render shapes that use this effect")
-   (uset-names :accessor uset-names :initarg :uset-names :initform nil
-               :documentation "names (symbols) of usets used by the effect"))
+   (environment :accessor environment :initarg :environment
+                :documentation "@c{environment} object used to implement the effect."))
+  (:metaclass compute-class)
   (:documentation "This class supports effects which are simply the application of OpenGL state,
 with uset parameters, to a shape."))
+
+(defgeneric simple-effect-usets (effect)
+  (:documentation "Create the list of usets used by the effect's environment.")
+  (:method-combination nconc))
+
+(defmethod simple-effect-usets :around ((effect simple-effect))
+  (if (next-method-p)
+      (call-next-method)
+      nil))
 
 (defclass shape-attribute-set (attribute-set)
   ())
@@ -54,16 +72,12 @@ with uset parameters, to a shape."))
                              :attribute-map (attribute-map effect)
                              :gl-state (gl-state effect)
                              :renderer renderer
-                             :inputs (inputs shape)
-                             :uniform-sets (mapcar (lambda (uset-name)
-                                                     (input-value shape uset-name))
-                                                   (uset-names effect))))
+                             :uniform-sets (simple-effect-usets effect)))
          (attr-map (attribute-map env)))
-    ;; Enqueue initial update of usets
-    (notify-invalid-input env nil nil)
     (let* ((attrib-set (make-instance 'shape-attribute-set :shape shape :attribute-map attr-map))
            (bundle (make-instance 'render-bundle
                                   :attribute-set attrib-set :shape shape :environment env)))
+      (setf (environment effect) env)
       (push bundle (bundles shape))
       (push bundle (finalize-queue renderer))
       ;; Use only one render-stage / render-queue for now.
@@ -79,4 +93,14 @@ with uset parameters, to a shape."))
       (loop
          for bundle in (bundles shape)
          do (remove-rendered-object rq bundle)))))
+
+(defmethod update-effect progn ((effect simple-effect))
+  (setf (visiblep (environment effect)) (visiblep effect)))
+
+
+(defmethod invalidate ((node effect))
+  (push (lambda ()
+          (update-effect node)          ; Subclass updates environments, usets, etc.
+          (status node))                ; Reset this dummy computed slot.
+        *deferred-updates*))
 

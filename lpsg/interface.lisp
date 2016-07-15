@@ -96,3 +96,8 @@ This is called when the renderer's OpenGL context is current. The renderer is ac
 (defgeneric gl-destroy (obj)
   (:documentation "Deallocate an OpenGL object."))
 
+(defgeneric update-effect (effect)
+  (:method-combination progn)
+  (:documentation "Perform necessary actions to prepare usets for the next frame, including
+obtaining updated values and loading them into buffers. Effects should define progn methods on this
+generic function."))

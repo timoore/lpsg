@@ -2,15 +2,35 @@
 
 (in-package #:lpsg-examples.texture)
 
+;;; The graphics-state associated with the effect is stored in a "loader" class that is a mixin to
+;;; the renderer.
 (defclass texture-effect (simple-effect)
-  ((texture-area :accessor texture-area :initarg :texture-area)
-   (sampler :accessor sampler :initarg :sampler)
-   (shader-program :accessor shader-program :initform nil :allocation :class)
-   (tex-loaded :accessor tex-loaded :initform nil))
+  ;; uset slots
+  ((camera :input-accessor camera)
+   (model :input-accessor model)
+   (light :input-accessor light)
+   (tex-sampler :input-accessor tex-sampler))
+  (:metaclass compute-class)
   (:default-initargs :attribute-map '((gl:vertex . "in_Position")
                                       (gl:normal . "in_Normal")
-                                      (texcoord . "in_TexCoord"))
-    :uset-names '(lpsg-examples::camera lpsg-examples::model light tex-sampler)))
+                                      (texcoord . "in_TexCoord"))))
+
+(defmethod simple-effect-usets nconc ((effect texture-effect))
+  (list (camera effect)
+        (model effect)
+        (light effect)
+        (tex-sampler effect)))
+
+;;; The uset objects are shared with the environments, and the upstream nodes. Calling the input
+;;; slot accessor forces their update.
+
+(defmethod update-effect progn ((effect texture-effect))
+  (camera effect)
+  (model effect)
+  (light effect)
+  (tex-sampler effect))
+
+;;; Texture effect that uses a single checkerboard texture
 
 ;;; Source for the vertex and fragment shaders. This is pretty standard OpenGL.
 (defparameter *vertex-shader-source* "
@@ -63,8 +83,14 @@ void main()
 
 (lpsg:define-uset tex-sampler (("texSampler" :sampler-2d tex-sampler :accessor tex-sampler)))
 
-(defmethod initialize-instance :after ((obj texture-effect) &key)
-  (unless (shader-program obj)
+(defclass checker-effect-loader ()
+  ((texture-area :accessor texture-area)
+   (gl-state :accessor gl-state)
+   (shader-program :accessor shader-program)
+   (sampler :accessor sampler)))
+
+(defmethod initialize-instance :after ((obj checker-effect-loader) &key)
+  (unless (slot-boundp obj 'shader-program)
     (setf (shader-program obj)
           (make-instance 'lpsg:program
                          :shaders (list (make-instance 'lpsg:shader
@@ -75,32 +101,66 @@ void main()
                                         (make-instance 'lpsg:shader
                                                        :shader-type :fragment-shader
                                                        :source *fragment-shader-source*
-                                                       :usets '(tex-sampler)))))))
+                                                       :usets '(tex-sampler)))))
+    (setf (sampler obj) (make-instance 'sampler :min-filter :linear-mipmap-linear))))
 
+(defun make-checker-texture-area ()
+  (let* ((data-size (* 64 64 3))
+         (mem (cffi:foreign-alloc :uint8 :count data-size :initial-element 255)))
+    ;; Make a cyan checkerboard
+    (loop
+       for j from 0 below 64
+       do (loop
+             for i from 0 below 64
+             for idx = (* (+ (* j 64) i) 3)
+             for row = (floor j 8)
+             for col = (floor i 8)
+             do (if (or (and (evenp row) (evenp col))
+                        (and (not (evenp row)) (not (evenp col))))
+                    (progn
+                      (setf (cffi:mem-aref mem :uint8 idx) 0)
+                      (setf (cffi:mem-aref mem :uint8 (+ idx 1)) 255)
+                      (setf (cffi:mem-aref mem :uint8 (+ idx 2)) 255)))))
+    (let* ((texture (make-instance 'lpsg::texture-2d
+                                   :target :texture-2d
+                                   :width 64
+                                   :height 64
+                                   :internal-format :rgb8
+                                   :pixel-format :rgb
+                                   :data-type :unsigned-byte))
+           (tex-area (make-instance 'lpsg::raw-mirrored-texture-resource
+                                    :texture texture
+                                    :data mem
+                                    :data-count data-size
+                                    :width 64
+                                    :height 64)))
+      tex-area)))
 
-(defmethod submit-with-effect :before (shape renderer (effect texture-effect))
-  (unless (slot-boundp effect 'gl-state)
-    (setf (gl-state effect)
-          (make-instance
-           'graphics-state
-           :program (shader-program effect)
-           :texunits (make-instance
-                      'lpsg::gl-texunits
-                      :renderer renderer
-                      :units (vector (make-instance 'lpsg::gltexture-unit
-                                                    :tex-object (lpsg::texture (texture-area effect))
-                                                    :sampler-object (sampler effect)))))))
-  (unless (tex-loaded effect)
-    (schedule-upload renderer (texture-area effect))
-    (setf (tex-loaded effect) t)))
+(defmethod submit-with-effect :before
+    (shape (renderer checker-effect-loader) (effect texture-effect))
+  (declare (ignore shape))
+  (unless (slot-boundp renderer 'gl-state)
+    (let ((area (make-checker-texture-area)))
+      (setf (texture-area renderer) area)
+      (setf (gl-state renderer)
+            (make-instance
+             'graphics-state
+             :program (shader-program renderer)
+             :texunits (make-instance
+                        'lpsg::gl-texunits
+                        :renderer renderer
+                        :units (vector (make-instance 'lpsg::gltexture-unit
+                                                      :tex-object (lpsg::texture area)
+                                                      :sampler-object (sampler renderer))))))
+      (schedule-upload renderer area)))
+  (setf (gl-state effect) (gl-state renderer)))
 
 (defparameter *default-camera-params* `(:eye ,(sb-cga:vec 1.0 1.0 0.0)
                                         :target ,(sb-cga:vec 0.0 0.0 -5.0)
                                         :up ,(sb-cga:vec 0.0 1.0 0.0)))
 
-(defclass texture-window (viewer-window)
+(defclass texture-window (checker-effect-loader viewer-window)
   ((view-camera :initform (apply #'make-instance 'partial-view-camera *default-camera-params*))
-   (effect :accessor effect)
    (shapes :accessor shapes :initform nil)
    (visible-inputs :accessor visible-inputs :initform nil)
    (texture-source :accessor texture-source :initarg texture-source
@@ -112,9 +172,9 @@ void main()
 (defvar *light-uset* (make-instance 'light))
 (defvar *sampler-uset* (make-instance 'tex-sampler))
 
-(defvar *model-input* (make-instance 'lpsg:input-value-node :value *model-uset*))
-(defvar *light-input* (make-instance 'lpsg:input-value-node :value *light-uset*))
-(defvar *sampler-input* (make-instance 'lpsg:input-value-node :value *sampler-uset*))
+(defvar *model-input* (make-instance 'lpsg:input-node :in *model-uset*))
+(defvar *light-input* (make-instance 'lpsg:input-node :in *light-uset*))
+(defvar *sampler-input* (make-instance 'lpsg:input-node :in *sampler-uset*))
 
 ;;; Compute a high light, slightly to the side and front. This is the standard Lambert shading
 ;;; model, for diffuse shading only.
@@ -167,14 +227,15 @@ void main()
                          :components 3
                          :buffer-type :float))
     cube))
-    
+
 (defun make-textured-shape (model-input allocator window)
-  (let ((shape (make-cube-with-attributes)))
-        (setf (lpsg:effect shape) (effect window))
-    (setf (lpsg:input shape 'lpsg-examples::camera) (lpsg-examples::camera-uset-node window))
-    (setf (lpsg:input shape 'lpsg-examples::model) model-input)
-    (setf (lpsg:input shape 'light) *light-input*)
-    (setf (input shape 'tex-sampler) *sampler-input*)
+  (let ((shape (make-cube-with-attributes))
+        (effect (make-instance 'texture-effect)))
+    (setf (lpsg:effect shape) effect)
+    (connect effect 'camera (lpsg-examples::camera-uset-node window) 'lpsg-examples::uset)
+    (connect effect 'model model-input 'out)
+    (connect effect 'light *light-input* 'out)
+    (connect effect 'tex-sampler *sampler-input* 'out)
     ;; Allocate storage  in OpenGL buffer objects for the shape's geometry.
     (lpsg:compute-shape-allocation allocator shape)
     shape))
@@ -189,9 +250,9 @@ void main()
        for model-input in (list *model-input*)
        for i from 0
        for shape = (make-textured-shape model-input allocator window)
-       for shape-visible = (make-instance 'lpsg:input-value-node :value t)
+       for shape-visible = (make-instance 'lpsg:input-node :in t)
        do (progn
-            (setf (lpsg:input shape 'lpsg:visiblep) shape-visible)
+            (connect (lpsg:effect shape) 'lpsg:visiblep shape-visible 'lpsg:out)
             (setf (aref (shapes window) i) shape)
             (setf (aref (visible-inputs window) i) shape-visible)
             (lpsg:submit shape window)))))
@@ -208,55 +269,18 @@ void main()
 (defmethod draw-window ((window texture-window))
   (draw window))
 
-(defun make-texture-effect (window)
-  ;;; create a texture test pattern
-  (let* ((data-size (* 64 64 3))
-         (mem (cffi:foreign-alloc :uint8 :count data-size :initial-element 255)))
-    ;;; Make a cyan checkerboard
-    (loop
-       for j from 0 below 64
-       do (loop
-             for i from 0 below 64
-             for idx = (* (+ (* j 64) i) 3)
-             for row = (floor j 8)
-             for col = (floor i 8)
-             do (if (or (and (evenp row) (evenp col))
-                        (and (not (evenp row)) (not (evenp col))))
-                    (progn
-                      (setf (cffi:mem-aref mem :uint8 idx) 0)
-                      (setf (cffi:mem-aref mem :uint8 (+ idx 1)) 255)
-                      (setf (cffi:mem-aref mem :uint8 (+ idx 2)) 255)))))
-    (let* ((texture (make-instance 'lpsg::texture-2d
-                                   :target :texture-2d
-                                   :width 64
-                                   :height 64
-                                   :internal-format :rgb8
-                                   :pixel-format :rgb
-                                   :data-type :unsigned-byte))
-           (tex-area (make-instance 'lpsg::raw-mirrored-texture-resource
-                                    :texture texture
-                                    :data mem
-                                    :data-count data-size
-                                    :width 64
-                                    :height 64)))
-      (make-instance 'texture-effect
-                     :texture-area tex-area
-                     :sampler (make-instance 'sampler :min-filter :linear-mipmap-linear)))))
-
-
 (defmethod glop:on-event :after ((window texture-window) (event glop:expose-event))
   (unless (exposed window)
     ;; Create a cube with correct face normals.
-    (let* ((effect (make-texture-effect window)))
-      (setf (lpsg-examples::model-matrix *model-uset*) (sb-cga:translate* 1.0 0.0 -5.0))
-      (setf (light-direction *light-uset*) (compute-light-vector))
-      (setf (tex-sampler *sampler-uset*) 0)
-      (setf (effect window) effect)
-      (submit-shape window)))
+    (setf (lpsg-examples::model-matrix *model-uset*) (sb-cga:translate* 1.0 0.0 -5.0))
+    (setf (light-direction *light-uset*) (compute-light-vector))
+    (setf (tex-sampler *sampler-uset*) 0)
+    (submit-shape window))
   (draw-window window))
 
 (defmethod glop:on-event :after ((window texture-window) (event glop:resize-event))
-  (draw-window window))
+  (when (exposed window)
+    (draw-window window)))
 
 (defmethod glop:on-event ((window texture-window) (event glop:key-event))
   (if (glop:pressed event)
@@ -266,11 +290,11 @@ void main()
                (if (eq (projection-type window) 'orthographic)
                    'perspective
                    'orthographic))
-         (setf (lpsg:value (camera-selector window)) (eq (projection-type window) 'orthographic))
+         (setf (in (camera-selector window)) (eq (projection-type window) 'orthographic))
          (draw-window window))
         (:1
          (let ((input-node (aref (visible-inputs window) 0)))
-           (setf (lpsg:value input-node) (not (lpsg:value input-node))))
+           (setf (lpsg:in input-node) (not (lpsg:out input-node))))
          (draw-window window))
         (:s
          (submit-shape window)
@@ -294,12 +318,10 @@ void main()
 
 (defgeneric cleanup-window (win))
 
-(defmethod cleanup-window ((win texture-window))
-  (let* ((effect (effect win))
-         (mem (data (texture-area effect))))
-    (cffi:foreign-free mem)
-    (setf (shader-program effect) nil)
-    t))
+(defmethod cleanup-window ((win checker-effect-loader))
+  (when (slot-boundp win 'texture-area)
+    (let ((mem (data (texture-area win))))
+      (cffi:foreign-free mem))))
 
 (defun texture-example (&rest args)
   "Draw a textured cube in a window.

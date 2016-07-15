@@ -3,6 +3,30 @@
 
 (in-package #:lpsg-examples)
 
+;;; The graphics-state associated with the effect is stored in a "loader" class that is a mixin to
+;;; the renderer.
+(defclass cube-effect (simple-effect)
+  ;; uset slots
+  ((camera :input-accessor camera)
+   (model :input-accessor model)
+   (light :input-accessor light))
+  (:metaclass compute-class)
+  (:default-initargs :attribute-map '((gl:vertex . "in_Position")
+                                      (gl:normal . "in_Normal"))))
+
+(defmethod simple-effect-usets nconc ((effect cube-effect))
+  (list (camera effect)
+        (model effect)
+        (light effect)))
+
+;;; The uset objects are shared with the environments, and the upstream nodes. Calling the input
+;;; slot accessor forces their update.
+
+(defmethod update-effect progn ((effect cube-effect))
+  (camera effect)
+  (model effect)
+  (light effect))
+
 ;;; Source for the vertex and fragment shaders. This is pretty standard OpenGL.
 (defparameter *vertex-shader-source* "
 #version 330
@@ -52,7 +76,32 @@ void main()
                                         :target ,(sb-cga:vec 0.0 0.0 -5.0)
                                         :up ,(sb-cga:vec 0.0 1.0 0.0)))
 
-(defclass cube-window (viewer-window lpsg:standard-renderer)
+(defclass cube-effect-loader ()
+  ((gl-state :accessor gl-state)
+   (shader-program :accessor shader-program)))
+
+(defmethod initialize-instance :after ((obj cube-effect-loader) &key)
+  (unless (slot-boundp obj 'shader-program)
+    (setf (shader-program obj)
+          (make-instance 'lpsg:program
+                         :shaders (list (make-instance 'lpsg:shader
+                                                       :shader-type :vertex-shader
+                                                       :source *vertex-shader-source*
+                                                       :usets
+                                                       '(lpsg-examples::camera lpsg-examples::model light))
+                                        (make-instance 'lpsg:shader
+                                                       :shader-type :fragment-shader
+                                                       :source *fragment-shader-source*
+                                                       :usets nil))))))
+
+(defmethod submit-with-effect :before
+    (shape (renderer cube-effect-loader) (effect cube-effect))
+  (declare (ignore shape))
+  (unless (slot-boundp renderer 'gl-state)
+    (setf (gl-state renderer) (make-instance 'graphics-state :program (shader-program renderer))))
+  (setf (gl-state effect) (gl-state renderer)))
+
+(defclass cube-window (cube-effect-loader viewer-window lpsg:standard-renderer)
   ((view-camera :initform (apply #'make-instance 'partial-view-camera *default-camera-params*))
    (effect :accessor effect)
    (cubes :accessor cubes :initform nil)
@@ -64,9 +113,9 @@ void main()
 (defvar *light-uset* (make-instance 'light))
 (defvar *model-uset2* (make-instance 'model))
 
-(defvar *model-input* (make-instance 'lpsg:input-value-node :value *model-uset*))
-(defvar *light-input* (make-instance 'lpsg:input-value-node :value *light-uset*))
-(defvar *model-input2* (make-instance 'lpsg:input-value-node :value *model-uset2*))
+(defvar *model-input* (make-instance 'lpsg:input-node :in *model-uset*))
+(defvar *light-input* (make-instance 'lpsg:input-node :in *light-uset*))
+(defvar *model-input2* (make-instance 'lpsg:input-node :in *model-uset2*))
 
 ;;; Compute a high light, slightly to the side and front. This is the standard Lambert shading
 ;;; model, for diffuse shading only.
@@ -82,11 +131,12 @@ void main()
 (defparameter *allocator* (make-instance 'lpsg:simple-allocator))
 
 (defun make-cube (model-input allocator window)
-  (let ((cube (lpsg:make-cube-shape)))
-    (setf (lpsg:effect cube) (effect window))
-    (setf (lpsg:input cube 'camera) (camera-uset-node window))
-    (setf (lpsg:input cube 'model) model-input)
-    (setf (lpsg:input cube 'light) *light-input*)
+  (let ((cube (lpsg:make-cube-shape))
+        (effect (make-instance 'cube-effect)))
+    (setf (lpsg:effect cube) effect)
+    (lpsg:connect effect 'camera (camera-uset-node window) 'uset)
+    (lpsg:connect effect 'model model-input 'out)
+    (lpsg:connect effect 'light *light-input* 'out)
     ;; Allocate storage  in OpenGL buffer objects for the cube's geometry.  Allocate an array
     ;; buffer and element buffer for each cube because we don't support gl:draw-elements-base-index
     ;; yet.
@@ -103,9 +153,9 @@ void main()
        for model-input in (list *model-input* *model-input2*)
        for i from 0
        for cube = (make-cube model-input allocator window)
-       for cube-visible = (make-instance 'lpsg:input-value-node :value t)
+       for cube-visible = (make-instance 'lpsg:input-node :in t)
        do (progn
-            (setf (lpsg:input cube 'lpsg:visiblep) cube-visible)
+            (lpsg:connect (lpsg:effect cube) 'lpsg:visiblep cube-visible 'lpsg:out)
             (setf (aref (cubes window) i) cube)
             (setf (aref (visible-inputs window) i) cube-visible)
             (lpsg:submit cube window)))))
@@ -124,29 +174,10 @@ void main()
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:expose-event))
   (unless (exposed window)
-    ;; Create a cube with correct face normals.
-    (let* ((shader-program
-            (make-instance 'lpsg:program
-                           :shaders (list (make-instance 'lpsg:shader
-                                                         :shader-type :vertex-shader
-                                                         :source *vertex-shader-source*
-                                                         :usets '(camera model light))
-                                          (make-instance 'lpsg:shader
-                                                         :shader-type :fragment-shader
-                                                         :source *fragment-shader-source*
-                                                         :usets ()))))
-           ;; The shader program is the only OpenGL state we care about.
-           (gl-state (make-instance 'lpsg:graphics-state :program shader-program))
-           (effect (make-instance 'lpsg:simple-effect
-                                  :gl-state gl-state
-                                  :attribute-map '((gl:vertex . "in_Position")
-                                                   (gl:normal . "in_Normal"))
-                                  :uset-names '(camera model light))))
-      (setf (model-matrix *model-uset*) (sb-cga:translate* 1.0 0.0 -5.0))
-      (setf (model-matrix *model-uset2*) (sb-cga:translate* -1.0 0.0 -5.0))
-      (setf (light-direction *light-uset*) (compute-light-vector))
-      (setf (effect window) effect)
-      (submit-cubes window)))
+    (setf (model-matrix *model-uset*) (sb-cga:translate* 1.0 0.0 -5.0))
+    (setf (model-matrix *model-uset2*) (sb-cga:translate* -1.0 0.0 -5.0))
+    (setf (light-direction *light-uset*) (compute-light-vector))
+    (submit-cubes window))
   (draw-window window))
 
 (defmethod glop:on-event :after ((window cube-window) (event glop:resize-event))
@@ -160,13 +191,13 @@ void main()
                (if (eq (projection-type window) 'orthographic)
                    'perspective
                    'orthographic))
-         (setf (lpsg:value (camera-selector window)) (eq (projection-type window) 'orthographic))
+         (setf (lpsg:in (camera-selector window)) (eq (projection-type window) 'orthographic))
          (draw-window window))
         ((:1 :2)
          (let ((input-node (aref (visible-inputs window) (if (eq (glop:keysym event) :1)
                                                              0
                                                              1))))
-           (setf (lpsg:value input-node) (not (lpsg:value input-node))))
+           (setf (lpsg:in input-node) (not (lpsg:out input-node))))
          (draw-window window))
         (:s
          (submit-cubes window)

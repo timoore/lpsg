@@ -91,6 +91,8 @@
    #:environment
    #:effect
    #:simple-effect
+   #:simple-effect-usets
+   #:update-effect
    #:gl-object
    #:texture-area
    #:raw-mirrored-texture-resource
@@ -115,22 +117,17 @@
    #:with-allocator
    ;; incremental computation
    #:if-then-node
+   #:test
    #:then
    #:else
-   #:sink-node
-   #:sink-node-mixin
-   #:source-node
-   #:source-node-mixin
-   #:source-sink-mixin
-   #:computation-node
-   #:computation-node-mixin
-   #:delete-sink
-   #:value
-   #:compute
-   #:notify-invalid-input
-   #:input-value-node
-   #:input
-   #:input-value
+   #:result
+   #:compute-class
+   #:notify-invalid
+   #:connect
+   #:invalidate
+   #:input-node
+   #:in
+   #:out
    ;; inputs
    #:visiblep
    ;; utilities

@@ -476,6 +476,9 @@ finalize queue(s), do any upload operations in the upload queue, then traverse t
 and their render queues to render all bundles. The renderer does not swap OpenGL front and back
 buffers; that is done by the application outside of LPSG."))
 
+(defmethod draw :before ((renderer renderer))
+  (do-deferred-updates))
+
 (defgeneric draw-bundles (renderer))
 
 (defgeneric process-gl-objects (renderer))
