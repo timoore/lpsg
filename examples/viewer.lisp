@@ -135,12 +135,11 @@
 (defun compute-projection-matrix (window proj-type near far)
   (let ((width (glop:window-width window))
         (height (glop:window-height window)))
-    (if (eq proj-type 'orthographic)
-        (let* ((right (max (float (/ width height)) 1.0))
-               (top (max (float (/ height width)) 1.0)))
-          (lpsg-tinker:set-ortho-params (ortho-camera window) (- right) right (- top) top near far))
-        (lpsg-tinker:set-perspective-params
-         (fov-camera window) (/ (float pi 1.0) 4.0) (/ width height) near far))))
+    (let* ((right (max (float (/ width height)) 1.0))
+           (top (max (float (/ height width)) 1.0)))
+      (lpsg-tinker:set-ortho-params (ortho-camera window) (- right) right (- top) top near far))
+    (lpsg-tinker:set-perspective-params
+     (fov-camera window) (/ (float pi 1.0) 4.0) (/ width height) near far)))
 
 (defmethod glop:on-event :around ((window viewer-window) (event glop:resize-event))
   (when (not (and (slot-boundp window 'saved-width)
