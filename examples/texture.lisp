@@ -13,7 +13,8 @@
   (:metaclass compute-class)
   (:default-initargs :attribute-map '((gl:vertex . "in_Position")
                                       (gl:normal . "in_Normal")
-                                      (texcoord . "in_TexCoord"))))
+                                      (texcoord . "in_TexCoord")
+                                      (color . "in_Color"))))
 
 (defmethod simple-effect-usets nconc ((effect texture-effect))
   (list (camera effect)
@@ -38,13 +39,13 @@
 
 in vec4 in_Position;
 in vec3 in_Normal;
-// in vec3 in_Color;
+in vec3 in_Color;
 in vec2 in_TexCoord;
 
 smooth out vec3 theColor;
 smooth out vec2 theTexCoord;
 
-vec3 in_Color = vec3(1.0, 1.0, 1.0);
+//vec3 in_Color = vec3(1.0, 1.0, 1.0);
 
 uniform vec4 lightDir;
 uniform mat4 projectionMatrix;
