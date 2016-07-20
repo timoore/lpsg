@@ -8,10 +8,16 @@
 (lpsg:define-uset camera (("projectionMatrix" :float-mat4
                                               projection-matrix :accessor projection-matrix)
                           ("cameraMatrix" :float-mat4
-                                          camera-matrix :accessor camera-matrix)))
+                                          camera-matrix :accessor camera-matrix)
+                          ("cameraMatrixInverse" :float-mat4
+                                                 camera-matrix-inverse
+                                                 :accessor camera-matrix-inverse)))
 
 (lpsg:define-uset model (("modelMatrix" :float-mat4
-                                        model-matrix :accessor model-matrix)))
+                                        model-matrix :accessor model-matrix)
+                         ("modelMatrixInverse" :float-mat4
+                                               model-matrix-inverse
+                                               :accessor model-matrix-inverse)))
 ;;; We support both orthographic and perspective cameras, which are placed with the same
 ;;; eye-target-up parameters. Therefore we build the different parts from the camera mixin classes
 ;;; and incremental nodes, and then route their outputs to a camera-uset-node which produces a uset
@@ -47,6 +53,7 @@
 (defmethod uset ((node camera-uset-node))
   (let ((uset (slot-value node '%uset)))
     (setf (camera-matrix uset) (view-matrix node))
+    (setf (camera-matrix-inverse uset) (sb-cga:inverse-matrix (view-matrix node)))
     (setf (projection-matrix uset) (projection-matrix node))
     uset))
 

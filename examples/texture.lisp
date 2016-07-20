@@ -45,18 +45,19 @@ in vec2 in_TexCoord;
 smooth out vec3 theColor;
 smooth out vec2 theTexCoord;
 
-//vec3 in_Color = vec3(1.0, 1.0, 1.0);
-
 uniform vec4 lightDir;
 uniform mat4 projectionMatrix;
 uniform mat4 cameraMatrix;
+uniform mat4 cameraMatrixInverse;
 uniform mat4 modelMatrix;
+uniform mat4 modelMatrixInverse;
 
 void main()
 {
-  vec4 modelPos = cameraMatrix * modelMatrix * in_Position;
+  vec4 modelPos = cameraMatrix * (modelMatrix * in_Position);
   gl_Position = projectionMatrix * modelPos;
-  // XXX Do the right thing with the normal!
+  // Multiply normal vector by the transposed inverse model view matrix
+  vec3 vNormal = (vec4(in_Normal, 0.0) * modelMatrixInverse * cameraMatrixInverse).xyz;
   float intense = max(dot(in_Normal, -lightDir.xyz), 0.0);
   theColor = intense * in_Color;
   theTexCoord = in_TexCoord;
@@ -273,6 +274,8 @@ void main()
   (unless (exposed window)
     ;; Create a cube with correct face normals.
     (setf (lpsg-examples::model-matrix *model-uset*) (sb-cga:translate* 1.0 0.0 -5.0))
+    (setf (lpsg-examples::model-matrix-inverse *model-uset*)
+          (sb-cga:inverse-matrix (lpsg-examples::model-matrix *model-uset*)))
     (setf (light-direction *light-uset*) (compute-light-vector))
     (setf (tex-sampler *sampler-uset*) 0)
     (submit-shape window))
