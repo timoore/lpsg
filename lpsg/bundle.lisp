@@ -35,12 +35,12 @@ geometry of the associated @c(shape). "))
       (gl-finalize attribute-set errorp)
       t)))
 
-
-(defmethod draw-bundle ((renderer standard-renderer) bundle)
+;; Called when traversing render queues
+(defmethod draw-queue (renderer (bundle render-bundle))
   (let* ((env (environment bundle))
          (gl-state (gl-state env)))
     (unless (visiblep env)
-      (return-from draw-bundle nil))
+      (return-from draw-queue nil))
     (bind-state renderer gl-state)
     (loop
        with program = (glstate-program gl-state)

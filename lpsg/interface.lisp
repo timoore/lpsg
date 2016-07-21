@@ -68,7 +68,10 @@ implementation of SUBMIT-WITH-EFFECT."))
     (:documentation "Search for an object in @cl:param(render-queue) that satisfies
 @cl:param(predicate)"))
    (:accessor graphics-state :documentation "A graphics-state object pushed before the traversal of
-the queue's objects, and popped after."))
+the queue's objects, and popped after.")
+   (:generic draw-queue (renderer renderer-queue)
+    (:documentation "Draw each item in @cl:param(render-queue). If a render queue object is found
+    in @cl:param(render-queue), then @c(draw-queue) is called recurisvely on it.")))
   (:documentation "A container class for objects, including @c(render-queue) objects too.
 
 This class contains the objects that are traversed to render a scene. This class does not guarantee

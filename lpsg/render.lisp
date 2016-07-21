@@ -47,7 +47,7 @@
 (defclass queue-state-mixin ()
   ((graphics-state :accessor graphics-state :initarg :graphics-state)))
 
-(defmethod map-render-queue :around ((render-queue queue-state-mixin) func)
+(defmethod draw-queue :around (renderer (render-queue queue-state-mixin))
   (declare (ignorable func))
   (if (slot-boundp render-queue 'graphics-state)
       (progn
@@ -57,7 +57,7 @@
       (call-next-method)))
 
 ;;; This should be some kind of ordered data structure (map, skip list, ...)
-(defclass unordered-render-queue (queue-state-mixin render-queue)
+(defclass unordered-render-queue (render-queue)
   ((bundles :accessor bundles :initarg :bundles :initform nil
             :documentation "private"))
   (:documentation "A queue that contains bundles to be rendered."))
@@ -74,7 +74,7 @@
 (defmethod find-if-queue (predicate (render-queue unordered-render-queue))
   (find-if predicate (bundles render-queue)))
 
-(defclass ordered-render-queue (queue-state-mixin render-queue)
+(defclass ordered-render-queue (render-queue)
   ((queue-object :documentation "private"))
   (:documentation "Class for a queue of objects that are rendered in order.
 
@@ -103,8 +103,14 @@
 (defmethod find-if-queue (predicate (queue ordered-render-queue))
   (find predicate (serapeum:qlist (slot-value queue 'queue-object))))
 
+(defmethod draw-queue (renderer (render-queue render-queue))
+  (flet ((map-func (item)
+           (draw-queue renderer item)))
+    (declare (dynamic-extent map-func))
+    (map-render-queue render-queue #'map-func)))
+
 ;;; holds multiple render queues. These will be rendered in order.
-(defclass render-stage (ordered-render-queue)
+(defclass render-stage (queue-state-mixin ordered-render-queue)
   ()
   (:documentation "A render queue with designated read and draw buffers @i([default for now])"))
 
@@ -497,15 +503,8 @@ buffers; that is done by the application outside of LPSG."))
     (draw-bundles renderer)
     (pop-state renderer)))
 
-(defgeneric draw-bundle (renderer bundle))
-
 (defmethod draw-bundles ((renderer standard-renderer))
-  (do-render-queue
-      (queue (render-stage renderer))
-    (do-render-queue
-        (bundle queue)
-      (draw-bundle renderer bundle))))
-
+  (draw-queue renderer (render-stage renderer)))
 
 (defmethod process-gl-objects ((renderer standard-renderer))
   (unless (gl-objects renderer)
