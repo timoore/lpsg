@@ -832,6 +832,11 @@ spec is a texture or renderbuffer object, or a list of arguments for
   (vector-pop (state-stack tracker))
   (setf (last-applied tracker) nil))
 
+(defun bind-and-push-state (tracker state)
+  "Convenience function to bind a graphics-state and push it on the state stack."
+  (bind-state tracker state)
+  (push-state tracker state))
+
 (defgeneric bind-state-with-tracker (tracker state))
 
 (defmethod bind-state ((renderer glstate-tracker) (state graphics-state))

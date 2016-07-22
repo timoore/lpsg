@@ -45,15 +45,20 @@
   t)
 
 (defclass queue-state-mixin ()
-  ((graphics-state :accessor graphics-state :initarg :graphics-state)))
+  ((graphics-state :accessor graphics-state :initarg :graphics-state)
+   (bind-state-p :accessor bind-state-p :initarg :bind-state-p :initform nil))
+  (:documentation "A queue that contains a graphics state to be pushed and popped in an around method on
+DRAW-QUEUE. @c(bind-state) indicates if the graphics state should also be bound."))
 
 (defmethod draw-queue :around (renderer (render-queue queue-state-mixin))
   (declare (ignorable func))
   (if (slot-boundp render-queue 'graphics-state)
       (progn
-          (push-state *renderer* (graphics-state render-queue))
-          (call-next-method)
-          (pop-state *renderer*))
+        (if (bind-state-p render-queue)
+            (bind-and-push-state renderer (graphics-state render-queue))
+            (push-state renderer (graphics-state render-queue)))
+        (call-next-method)
+        (pop-state renderer))
       (call-next-method)))
 
 ;;; This should be some kind of ordered data structure (map, skip list, ...)
