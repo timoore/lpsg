@@ -818,7 +818,7 @@ spec is a texture or renderbuffer object, or a list of arguments for
 
 (defun bind-mode-mask (modes modes-to-set)
   (loop
-     for set-shift = modes-to-set then (ash modes-to-set -1)
+     for set-shift = modes-to-set then (ash set-shift -1)
      while (not (zerop set-shift))
      for mode-shift = modes then (ash mode-shift -1)
      for enum in *mode-enums*
@@ -918,7 +918,9 @@ spec is a texture or renderbuffer object, or a list of arguments for
            (to-set (logand all-is-set
                            (logorc1 current-is-set difference))))
       (bind-mode-mask all-modes to-set)
-      (setf (mode-value current-mode-obj) (logior (logand all-modes to-set) current-mode-value))
+      (setf (mode-value current-mode-obj)
+            (logior (logand all-modes to-set)
+                    (logand current-is-set current-mode-value (lognot to-set))))
       (setf (is-set current-mode-obj) (logior to-set current-is-set)))))
 
 (defun make-default-graphics-state ()
