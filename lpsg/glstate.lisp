@@ -42,8 +42,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter *glstate-element-keywords*
-    '(#+nil :render-target
-      :program
+    '(:program
       :texunits
       :blend-func
       :blend-equation
@@ -52,7 +51,8 @@
       :depth-func
       :depth-range
       :front-face
-      :framebuffers))
+      :framebuffers
+      :viewport))
   (defparameter *glstate-elements*
     (let ((prefix (symbol-name '#:glstate-)))
       (mapcar (lambda (element)
@@ -747,6 +747,31 @@ spec is a texture or renderbuffer object, or a list of arguments for
     (gl:draw-buffers (gl-draw-buffers obj))
     (gl:bind-framebuffer :framebuffer 0)))
 
+(defclass gl-viewport ()
+  ((x :accessor x :initarg :x :initform 0)
+   (y :accessor y :initarg :y :initform 0)
+   (width :accessor width :initarg :width :initform 0)
+   (height :accessor height :initarg :height :initform 0)))
+
+(defmethod gl-finalized-p ((obj gl-viewport))
+  t)
+
+(defmethod gl-finalize ((obj gl-viewport) &optional errorp)
+  t)
+
+(defmethod glstate-compare ((e1 gl-viewport) (e2 gl-viewport))
+  (compare-pairs
+   (x e1) (x e2)
+   (y e1) (y e2)
+   (width e1) (width e2)
+   (height e1) (height e2)))
+
+(defmethod glstate-bind (tracker (element gl-viewport) previous-element)
+  (declare (ignore tracker previous-element))
+  (gl:viewport (x element) (y element) (width element) (height element)))
+
+(defmethod make-default-glstate-member ((name (eql 'glstate-viewport)))
+  (make-instance 'gl-viewport))
 
 ;;; Graphics modes are the state controlled by gl:enable and gl:disable. They are represented as
 ;;; bits in an integer. The modes fit comfortably in a fixnum in 64 bit Lisps, but things are
