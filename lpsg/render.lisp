@@ -116,8 +116,40 @@ DRAW-QUEUE. @c(bind-state) indicates if the graphics state should also be bound.
 
 ;;; holds multiple render queues. These will be rendered in order.
 (defclass render-stage (queue-state-mixin ordered-render-queue)
-  ()
+  ())
+
+
+(defclass render-target-stage (render-stage)
+  ((clear-colors :accessor clear-colors :initform '(#(0.0 0.0 0.0 0.0)) :initarg :clear-colors
+                 :documentation "list of color vectors")
+   (depth-clear :accessor depth-clear :initform 1.0 :initarg :depth-clear)
+   (framebuffer-object :accessor framebuffer-object :initarg :framebuffer-object
+                       :initform (make-instance 'gl-framebuffers)))
+  (:default-initargs :bind-state-p t)
   (:documentation "A render queue with designated read and draw buffers @i([default for now])"))
+
+(defmethod initialize-instance :after ((obj render-target-stage) &key)
+  (unless (slot-boundp obj 'graphics-state)
+    (setf (graphics-state obj)
+          (make-instance 'graphics-state :framebuffers (framebuffer-object obj)))))
+
+(defmethod draw-queue :before (renderer (render-queue render-target-stage))
+  (cffi:with-foreign-object (gl-col '%gl:float 4)
+    (flet ((copy-color (color)
+             (loop
+                for i from 0 below 4
+                do (setf (cffi:mem-aref gl-col '%gl:float i) (aref color i)))))
+      (if (is-default-p (framebuffer-object render-queue))
+          (progn
+            (copy-color (car (clear-colors render-queue)))
+            (%gl:clear-buffer-fv :color 0 gl-col))
+          (loop
+             for color in (clear-colors render-queue)
+             for i from 0
+             do
+               (copy-color color)
+               (%gl:clear-buffer-fv :color i gl-col)))
+      (%gl:clear-buffer-fi :depth-stencil 0 (depth-clear render-queue) 0))))
 
 (defclass glcontext-parameters ()
   ((max-combined-texture-image-units :accessor max-combined-texture-image-units
@@ -131,8 +163,9 @@ DRAW-QUEUE. @c(bind-state) indicates if the graphics state should also be bound.
    (finalize-queue :accessor finalize-queue :initform nil :documentation "private")
    ;; alist of (buffer . buffer-areas)
    (upload-queue :accessor upload-queue :initform nil :documentation "private")
-   (render-stage :accessor render-stage
-                  :documentation "The top-level (default) render stage.")
+   (render-stage :accessor render-stage :initarg :render-stage
+                 :initform (make-instance 'render-target-stage)
+                 :documentation "The top-level (default) render stage.")
    ;; XXX Should be weak
    (vao-cache :accessor vao-cache :initform (make-hash-table :test 'equal) :documentation "private")
    (gl-objects :accessor gl-objects :initform nil :documentation "List of all OpenGL objects
@@ -140,16 +173,18 @@ allocated by calls in LPSG." )
    (context-parameters :accessor context-parameters
                        :documentation "Parameters of the OpenGL context.")
    (default-graphics-state :accessor default-graphics-state :initarg :default-graphics-state
-                           :initform *default-graphics-state*))
-  (:documentation "The standard instantiable class of @c(renderer).")
-  )
+                           :initform *default-graphics-state*)
+   (default-render-queue :accessor default-render-queue :initarg :default-render-queue))
+  (:documentation "The standard instantiable class of @c(renderer)."))
+
 
 ;;; XXX Temporary until we figure out how how / when to intialize the renderer from a graphics
 ;;; context.
 
 (defmethod initialize-instance :after ((obj standard-renderer) &key)
   (setf (context-parameters obj) (make-instance 'glcontext-parameters))
-  (setf (render-stage obj) (make-instance 'render-stage)))
+  (unless (slot-boundp obj 'default-render-queue)
+    (setf (default-render-queue obj) (render-stage obj))))
 
 (defun process-finalize-queue (renderer)
   (loop

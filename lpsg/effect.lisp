@@ -81,7 +81,7 @@ with uset parameters, to a shape."))
       (push bundle (bundles shape))
       (push bundle (finalize-queue renderer))
       ;; Use only one render-stage / render-queue for now.
-      (let ((rq (find-if-queue #'render-queue-p (render-stage renderer))))
+      (let ((rq (default-render-queue renderer)))
         (unless rq
           (setq rq (make-instance 'unordered-render-queue))
           (add-rendered-object (render-stage renderer) rq))
