@@ -632,9 +632,34 @@ result of the comparison is not 0."
 (defmethod make-default-glstate-member ((name (eql 'glstate-front-face)))
   (make-instance 'gl-front-face))
 
+(define-gl-object renderbuffer ()
+  ((internal-format :accessor internal-format :initarg :internal-format)
+   (width :accessor width :initarg :width :documentation "width of renderbuffer")
+   (height :accessor height :initarg :height :documentation "height of renderbuffer")
+   (samples :accessor samples :initarg :samples :initform 0)))
+
+(defmethod gl-finalized-p ((obj renderbuffer))
+  (gl-valid-p obj))
+
+(defmethod gl-finalize ((obj renderbuffer) &optional errorp)
+  (declare (ignorable errorp))
+  (setf (id obj) (gl:gen-renderbuffer))
+  (gl:bind-renderbuffer :renderbuffer (id obj))
+  (if (zerop (samples obj))
+      (gl:renderbuffer-storage :renderbuffer (internal-format obj) (width obj) (height obj))
+      (%gl:renderbuffer-storage-multisample :renderbuffer (samples obj)
+                                            (internal-format obj) (width obj) (height obj))))
+
+
 (defclass gl-framebuffers ()
   ((read-fbo :accessor read-fbo :initarg :read-fbo :initform nil)
    (draw-fbo :accessor draw-fbo :initarg :draw-fbo :initform nil)))
+
+(defgeneric is-default-p (gl-obj))
+
+(defmethod is-default-p ((gl-obj gl-framebuffers))
+  (and (null (read-fbo gl-obj))
+       (null (draw-fbo gl-obj))))
 
 (defmethod gl-finalize ((obj gl-framebuffers) &optional errorp)
   (let ((read-fbo (read-fbo obj))
@@ -671,7 +696,6 @@ result of the comparison is not 0."
 (defmethod make-default-glstate-member ((name (eql 'glstate-framebuffers)))
   (make-instance 'gl-framebuffers))
 
-
 (define-gl-object framebuffer-object ()
   ((color-attachments :accessor color-attachments :initarg :color-attachments :initform nil
                       :documentation "plist of attachment names and attachment specs. An attachment
@@ -683,12 +707,14 @@ spec is a texture or renderbuffer object, or a list of arguments for
    (gl-draw-buffers :accessor gl-draw-buffers :initarg :gl-draw-buffers
                     :initform '(:color-attachment0))))
 
-(defgeneric attach-framebuffer-texture (fb-target attachment-point texture &key level layer))
+(defgeneric attach-framebuffer-texture (fb-target attachment-point texture &key))
 
 (defmethod attach-framebuffer-texture (fb-target attachment-point (texture texture-2d)
-                                       &key (level 0) layer)
-  (declare (ignore layer))
+                                       &key (level 0))
   (gl:framebuffer-texture-2d fb-target attachment-point (target texture) (id texture) level))
+
+(defmethod attach-framebuffer-texture (fb-target attachment-point (buffer renderbuffer) &key)
+  (gl:framebuffer-renderbuffer fb-target attachment-point :renderbuffer (id buffer)))
 
 (defmethod gl-finalize ((obj framebuffer-object) &optional errorp)
   (flet ((get-attachment (tex)
@@ -706,20 +732,20 @@ spec is a texture or renderbuffer object, or a list of arguments for
     (when (depth-attachment obj)
       (gl-finalize (get-attachment (depth-attachment obj)) errorp))
     (when (depth-stencil-attachment obj)
-      (gl-finalize (get-attachment (depth-stencil-attachment obj)) errorp)))
-  (setf (id obj) (gl:gen-framebuffer))
-  (gl:bind-framebuffer :framebuffer (id obj))
-  (loop
-     for tail on (color-attachments obj) by #'cddr
-     for (attachment-point attachment) = tail
-     do (attach :framebuffer attachment-point attachment))
-  (when (depth-attachment obj)
-    (attach-framebuffer-texture :framebuffer :depth-attachment  (depth-attachment obj)))
-  (when (depth-stencil-attachment obj)
-    (attach-framebuffer-texture
-     :framebuffer :depth-stencil-attachment (depth-stencil-attachment obj)))
-  (gl:draw-buffers (gl-draw-buffers obj))
-  (gl:bind-framebuffer :framebuffer 0))
+      (gl-finalize (get-attachment (depth-stencil-attachment obj)) errorp))
+    (setf (id obj) (gl:gen-framebuffer))
+    (gl:bind-framebuffer :framebuffer (id obj))
+    (loop
+       for tail on (color-attachments obj) by #'cddr
+       for (attachment-point attachment) = tail
+       do (attach :framebuffer attachment-point attachment))
+    (when (depth-attachment obj)
+      (attach-framebuffer-texture :framebuffer :depth-attachment  (depth-attachment obj)))
+    (when (depth-stencil-attachment obj)
+      (attach-framebuffer-texture
+       :framebuffer :depth-stencil-attachment (depth-stencil-attachment obj)))
+    (gl:draw-buffers (gl-draw-buffers obj))
+    (gl:bind-framebuffer :framebuffer 0)))
 
 
 ;;; Graphics modes are the state controlled by gl:enable and gl:disable. They are represented as
