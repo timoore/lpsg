@@ -35,15 +35,24 @@
    #:draw-window
    #:on-mouse-motion-event
    #:exposed
+   ;; viewer stuff
    #:view-camera
+   #:camera-selector
+   #:camera-uset-node
    #:open-viewer
    #:projection-type
-   #:camera-selector
    #:perspective
    #:orthographic
    #:partial-view-camera
    #:current-dragger
-   #:process-events))
+   #:process-events
+   ;; usets
+   #:camera
+   #:uset
+   #:model
+   #:model-matrix
+   #:model-matrix-inverse
+   ))
 
 (defpackage #:lpsg-examples.texture
   (:use #:cl #:lpsg #:lpsg-examples)

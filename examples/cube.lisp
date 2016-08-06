@@ -88,7 +88,7 @@ void main()
                                                        :shader-type :vertex-shader
                                                        :source *vertex-shader-source*
                                                        :usets
-                                                       '(lpsg-examples::camera lpsg-examples::model light))
+                                                       '(camera model light))
                                         (make-instance 'lpsg:shader
                                                        :shader-type :fragment-shader
                                                        :source *fragment-shader-source*

@@ -99,7 +99,7 @@ void main()
                                                        :shader-type :vertex-shader
                                                        :source *vertex-shader-source*
                                                        :usets
-                                                       '(lpsg-examples::camera lpsg-examples::model light))
+                                                       '(camera model light))
                                         (make-instance 'lpsg:shader
                                                        :shader-type :fragment-shader
                                                        :source *fragment-shader-source*
@@ -169,7 +169,7 @@ void main()
   (:default-initargs :exposed nil))
 
 ;;; Instances of usets
-(defvar *model-uset* (make-instance 'lpsg-examples::model))
+(defvar *model-uset* (make-instance 'model))
 (defvar *light-uset* (make-instance 'light))
 (defvar *sampler-uset* (make-instance 'tex-sampler))
 
@@ -233,7 +233,7 @@ void main()
   (let ((shape (make-cube-with-attributes))
         (effect (make-instance 'texture-effect)))
     (setf (lpsg:effect shape) effect)
-    (connect effect 'camera (lpsg-examples::camera-uset-node window) 'lpsg-examples::uset)
+    (connect effect 'camera (camera-uset-node window) 'uset)
     (connect effect 'model model-input 'out)
     (connect effect 'light *light-input* 'out)
     (connect effect 'tex-sampler *sampler-input* 'out)
@@ -273,9 +273,9 @@ void main()
 (defmethod glop:on-event :after ((window texture-window) (event glop:expose-event))
   (unless (exposed window)
     ;; Create a cube with correct face normals.
-    (setf (lpsg-examples::model-matrix *model-uset*) (sb-cga:translate* 1.0 0.0 -5.0))
-    (setf (lpsg-examples::model-matrix-inverse *model-uset*)
-          (sb-cga:inverse-matrix (lpsg-examples::model-matrix *model-uset*)))
+    (setf (model-matrix *model-uset*) (sb-cga:translate* 1.0 0.0 -5.0))
+    (setf (model-matrix-inverse *model-uset*)
+          (sb-cga:inverse-matrix (model-matrix *model-uset*)))
     (setf (light-direction *light-uset*) (compute-light-vector))
     (setf (tex-sampler *sampler-uset*) 0)
     (submit-shape window))
