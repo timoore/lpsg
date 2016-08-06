@@ -148,7 +148,6 @@ void main()
              :program (shader-program renderer)
              :texunits (make-instance
                         'lpsg::gl-texunits
-                        :renderer renderer
                         :units (vector (make-instance 'lpsg::gltexture-unit
                                                       :tex-object (lpsg::texture area)
                                                       :sampler-object (sampler renderer))))))

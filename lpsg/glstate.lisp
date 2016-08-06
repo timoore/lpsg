@@ -420,24 +420,16 @@ result of the comparison is not 0."
         (t 0)))
 
 (defclass gl-texunits ()
-  ((units :accessor units
+  ((units :accessor units :initarg :units :initform #()
           :documentation "An array of bindings for OpenGL's texture units. The members of the array
   can be NIL, representing no binding")))
 
-(defmethod initialize-instance :after ((obj gl-texunits) &key units renderer)
-  (let ((max-tex-units (if renderer
-                           (max-combined-texture-image-units (context-parameters renderer))
-                           16)))
-    (if (and units (= (length units) max-tex-units))
-        (setf (units obj) units)
-        (let ((new-units (make-array max-tex-units :initial-element nil)))
-          (when units
-            (setf (subseq new-units 0) units))
-          (setf (units obj) new-units)))))
-
 (defmethod glstate-compare ((m1 gl-texunits) m2)
   (let* ((units1 (units m1))
-         (units2 (units m2)))
+         (units2 (units m2))
+         (result (compare-num (length units1) (length units2))))
+    (unless (zerop result)
+      (return-from glstate-compare result))
     (loop
        for unit1 across units1
        for unit2 across units2
@@ -450,33 +442,35 @@ result of the comparison is not 0."
                                          for i from 0 below 32
                                          collect (intern (format nil "TEXTURE~d" i) :keyword))))
 
-#|
-(defun active-texture (num &optional (unit :texture0))
-  (let ((texture0 (cffi:foreign-enum-value '%gl:enum unit)))
-    (%gl:active-texture (+ texture0 num))))
-|#
-
 (defmethod glstate-bind (tracker (m gl-texunits) previous-units)
   (declare (ignore tracker))
   (flet ((unbind-texture (unit)
            (when unit
-             (gl:bind-texture (target (tex-object unit)) 0))))
+             (gl:bind-texture (target (tex-object unit)) 0)))
+         (safe-unit (units i)
+           (if (< i (length units))
+               (svref units i)
+               nil)))
     (loop
        with units = (units m)
        with prev-units = (and previous-units (units previous-units))
-       with len = (length units)
+       with len = (max (min (length units) (length prev-units))
+                       (max-combined-texture-image-units (context-parameters tracker)))
        for i from 0 below len
-       do (progn
-            (gl:active-texture (svref *tex-unit-enums* i))
-            (cond ((svref units i)
-                   (let* ((unit (svref units i))
-                          (tex-obj (tex-object unit))
-                          (sampler-obj (sampler-object unit)))
-                     (gl:bind-texture (target tex-obj) (id tex-obj))
-                     (gl:bind-sampler i (id sampler-obj))))
-                  ((and prev-units (svref prev-units i))
-                   (unbind-texture (svref prev-units i)))
-                  (t (gl:bind-texture :texture-2d 0)))))))
+       for unit = (safe-unit units i)
+       for prev-unit = (safe-unit prev-units i)
+       if (or unit prev-unit)
+       do 
+         (gl:active-texture (svref *tex-unit-enums* i))
+         (cond (unit
+                (let* ((tex-obj (tex-object unit))
+                       (sampler-obj (sampler-object unit)))
+                  (gl:bind-texture (target tex-obj) (id tex-obj))
+                  (gl:bind-sampler i (id sampler-obj))))
+               (prev-unit
+                (unbind-texture prev-unit))
+               (t (gl:bind-texture :texture-2d 0)))
+       end)))
 
 (defmethod gl-finalized-p ((m gl-texunits))
   (loop
