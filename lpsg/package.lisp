@@ -57,9 +57,14 @@
    #:find-if-queue
    #:do-render-queue
    #:finalize-queue
+   #:render-target-stage
+   #:clear-colors
+   #:depth-clear
+   #:framebuffer-object
    #:retract
    #:retract-with-effect
    #:standard-renderer
+   #:default-render-queue
    ;; buffers and attributes
    #:gl-buffer
    #:buffer
@@ -80,11 +85,15 @@
    #:define-uset
    ;; graphics state
    #:graphics-state
+   ;; XXX glstate-foo should probably not be external
    #:glstate-program                    ;?
    #:glstate-texunits                   ;?
    #:gl-cull-face
    #:gl-depth-func
    #:gl-depth-range
+   #:gl-texunits
+   #:gltexture-unit
+   #:gl-viewport
    #:make-modes
    #:units
    #:uniform-sets

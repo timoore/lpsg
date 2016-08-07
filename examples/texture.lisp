@@ -123,14 +123,14 @@ void main()
                       (setf (cffi:mem-aref mem :uint8 idx) 0)
                       (setf (cffi:mem-aref mem :uint8 (+ idx 1)) 255)
                       (setf (cffi:mem-aref mem :uint8 (+ idx 2)) 255)))))
-    (let* ((texture (make-instance 'lpsg::texture-2d
+    (let* ((texture (make-instance 'texture-2d
                                    :target :texture-2d
                                    :width 64
                                    :height 64
                                    :internal-format :rgb8
                                    :pixel-format :rgb
                                    :data-type :unsigned-byte))
-           (tex-area (make-instance 'lpsg::raw-mirrored-texture-resource
+           (tex-area (make-instance 'raw-mirrored-texture-resource
                                     :texture texture
                                     :data mem
                                     :data-count data-size
@@ -149,9 +149,9 @@ void main()
              'graphics-state
              :program (shader-program renderer)
              :texunits (make-instance
-                        'lpsg::gl-texunits
-                        :units (vector (make-instance 'lpsg::gltexture-unit
-                                                      :tex-object (lpsg::texture area)
+                        'gl-texunits
+                        :units (vector (make-instance 'gltexture-unit
+                                                      :tex-object (texture area)
                                                       :sampler-object (sampler renderer))))))
       (schedule-upload renderer area)))
   (setf (gl-state effect) (gl-state renderer)))

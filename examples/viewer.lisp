@@ -71,7 +71,7 @@
 (defun update-viewport-stage (stage)
   (let* ((new-viewport (viewport stage))
          (graphics-state (make-instance 'graphics-state
-                                        :viewport (make-instance 'lpsg::gl-viewport
+                                        :viewport (make-instance 'gl-viewport
                                                                  :x (x new-viewport)
                                                                  :y (y new-viewport)
                                                                  :width (width new-viewport)
@@ -141,14 +141,14 @@
                             :graphics-state (make-instance
                                              'graphics-state
                                              :viewport (make-instance
-                                                        'lpsg::gl-viewport
+                                                        'gl-viewport
                                                         :x 0 :y 0 :width 1 :height 1)))))
       (connect viewport-stage 'viewport vp 'out)
       (setf (viewport-node obj) vp)
       (add-rendered-object (render-stage obj) render-stage)
       (add-rendered-object render-stage viewport-stage)
-      (setf (lpsg::default-render-queue obj) viewport-stage)
-      (setf (lpsg::clear-colors (render-stage obj)) '(#(.8 .8 .8 1.0))))))
+      (setf (default-render-queue obj) viewport-stage)
+      (setf (clear-colors (render-stage obj)) '(#(.8 .8 .8 1.0))))))
 
 (defgeneric draw-window (window)
   (:documentation "Do one pass of the rendering loop."))
