@@ -40,4 +40,8 @@
    #:view-matrix-inverse-node
    #:projection-node-mixin
    #:projection-matrix-node
-   #:projection-matrix-inverse-node))
+   #:projection-matrix-inverse-node
+   #:translate-dragger
+   #:rotate-dragger
+   #:current-world-transform
+   ))
