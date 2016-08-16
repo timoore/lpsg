@@ -1,7 +1,7 @@
 ;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
 
-(in-package #:lpsg-tinker)
+(in-package #:lpsg-scene)
 
 (defconstant +pif+ (float pi 1.0))
 

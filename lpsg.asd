@@ -32,7 +32,7 @@
      (:file "assembly" :depends-on (base "shape"))
      (:file "solids" :depends-on (base "render" "shape"))))
    (:module
-    "tinker"
+    "scene"
     :depends-on ("lpsg")
     :components
     ((:file "package")

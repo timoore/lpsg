@@ -23,15 +23,15 @@
 ;;; and incremental nodes, and then route their outputs to a camera-uset-node which produces a uset
 ;;; as its value.
 
-(defclass partial-view-camera (lpsg-tinker:aimed-camera-mixin)
+(defclass partial-view-camera (lpsg-scene:aimed-camera-mixin)
   ()
   (:metaclass compute-class))
 
-(defclass partial-ortho-camera (lpsg-tinker:ortho-camera-mixin)
+(defclass partial-ortho-camera (lpsg-scene:ortho-camera-mixin)
   ()
   (:metaclass compute-class))
 
-(defclass partial-fov-camera (lpsg-tinker:fov-camera-mixin)
+(defclass partial-fov-camera (lpsg-scene:fov-camera-mixin)
   ()
   (:metaclass compute-class))
 
@@ -119,13 +119,13 @@
         (selector (make-instance 'lpsg:input-node
                                  :in (eq (projection-type obj) 'orthographic)))
         (vp (make-instance 'lpsg:input-node :in (make-instance 'viewport))))
-    (connect choice 'lpsg:then (ortho-camera obj) 'lpsg-tinker:projection-matrix)
-    (connect choice 'lpsg:else (fov-camera obj) 'lpsg-tinker:projection-matrix)
+    (connect choice 'lpsg:then (ortho-camera obj) 'lpsg-scene:projection-matrix)
+    (connect choice 'lpsg:else (fov-camera obj) 'lpsg-scene:projection-matrix)
     (connect choice 'test selector 'out)
     (setf (camera-choice obj) choice)
     (setf (camera-selector obj) selector)
     (connect (camera-uset-node obj) 'projection-matrix choice 'result)
-    (connect (camera-uset-node obj) 'view-matrix (view-camera obj) 'lpsg-tinker:view-matrix)
+    (connect (camera-uset-node obj) 'view-matrix (view-camera obj) 'lpsg-scene:view-matrix)
     (setf (slot-value obj 'max-motion-time) (* max-motion-seconds internal-time-units-per-second))
     ;; default graphics state
     (let* ((stage-state (make-instance 'graphics-state
@@ -192,8 +192,8 @@
         (height (glop:window-height window)))
     (let* ((right (max (float (/ width height)) 1.0))
            (top (max (float (/ height width)) 1.0)))
-      (lpsg-tinker:set-ortho-params (ortho-camera window) (- right) right (- top) top near far))
-    (lpsg-tinker:set-perspective-params
+      (lpsg-scene:set-ortho-params (ortho-camera window) (- right) right (- top) top near far))
+    (lpsg-scene:set-perspective-params
      (fov-camera window) (/ (float pi 1.0) 4.0) (/ width height) near far)))
 
 (defmethod glop:on-event :around ((window viewer-window) (event glop:resize-event))
@@ -301,7 +301,7 @@ This calls "))
   ((start-eye :initarg :start-eye)
    (start-look-at :initarg :start-look-at)))
 
-(defclass trans-dragger (viewer-dragger lpsg-tinker:translate-dragger)
+(defclass trans-dragger (viewer-dragger lpsg-scene:translate-dragger)
   ())
 
 (defclass perspective-trans-dragger (trans-dragger)
@@ -313,12 +313,12 @@ This calls "))
     (setf scale-factor (/ (sb-cga:vec-length (sb-cga:vec- start-look-at start-eye)) near))
     (format *terminal-io* "scale factor: ~S~%" scale-factor)))
 
-(defclass rotate-dragger (viewer-dragger lpsg-tinker:rotate-dragger)
+(defclass rotate-dragger (viewer-dragger lpsg-scene:rotate-dragger)
   ((start-up :initarg :start-up)))
 
 (defun print-mouse-click (window x y)
   (let ((mouse-world (kit.math:unproject (sb-cga:vec x y 0.0)
-                                         (lpsg-tinker:view-matrix (view-camera window))
+                                         (lpsg-scene:view-matrix (view-camera window))
                                          (lpsg:result (camera-choice window))
                                          (kit.math:vec4 0.0
                                                         0.0
@@ -333,28 +333,28 @@ This calls "))
     (multiple-value-bind (x y)
         (mouse-to-viewport window (last-x window) (last-y window))
       (let ((common-args (list :start-mouse-point (kit.math:vec2 x y)
-                               :start-eye (lpsg-tinker:eye (view-camera window))
-                               :start-look-at (lpsg-tinker:target (view-camera window))
+                               :start-eye (lpsg-scene:eye (view-camera window))
+                               :start-look-at (lpsg-scene:target (view-camera window))
                                :viewport (kit.math:vec4 0.0
                                                         0.0
                                                         (float (glop:window-width window) 1.0)
                                                         (float (glop:window-height window) 1.0))
                                :perspective-matrix (lpsg:result (camera-choice window))
-                               :view-matrix (lpsg-tinker:view-matrix (view-camera window))))
+                               :view-matrix (lpsg-scene:view-matrix (view-camera window))))
             (button (glop:button event)))
         (cond ((and (eql button 2)
                     (eq (projection-type window) 'orthographic))
                (setq current-dragger (apply #'make-instance 'trans-dragger common-args)))
               ((eql button 2)
                (setq current-dragger (apply #'make-instance 'perspective-trans-dragger
-                                            :near (lpsg-tinker:near (fov-camera window))
+                                            :near (lpsg-scene:near (fov-camera window))
                                             common-args)))
               ((eql button 1)
                (setq current-dragger
                      (apply #'make-instance 'rotate-dragger
-                            :arcball-center (lpsg-tinker:target (view-camera window))
+                            :arcball-center (lpsg-scene:target (view-camera window))
                             :radius .8
-                            :start-up (lpsg-tinker:up (view-camera window))
+                            :start-up (lpsg-scene:up (view-camera window))
                             common-args)))
               (t nil)))
       (print-mouse-click window x y))))
@@ -368,7 +368,7 @@ This calls "))
 (defmethod get-world-transform ((window viewer-window) (dragger trans-dragger) event-x event-y)
   (multiple-value-bind (x y)
       (mouse-to-viewport window event-x event-y)
-    (lpsg-tinker:current-world-transform dragger (kit.math:vec2 x y))))
+    (lpsg-scene:current-world-transform dragger (kit.math:vec2 x y))))
 
 (defmethod get-world-transform :around ((window viewer-window) (dragger perspective-trans-dragger)
                                         event-x event-y)
@@ -383,17 +383,17 @@ This calls "))
            (new-eye (sb-cga:transform-point start-eye transform))
            (new-look-at (sb-cga:transform-point start-look-at transform))
            (camera (view-camera window)))
-      (lpsg-tinker:aim-camera camera new-eye new-look-at (lpsg-tinker:up camera)))))
+      (lpsg-scene:aim-camera camera new-eye new-look-at (lpsg-scene:up camera)))))
 
 (defmethod transform-camera ((window viewer-window) (dragger rotate-dragger) event-x event-y)
   (with-slots (start-eye start-look-at start-up)
       dragger
     (multiple-value-bind (x y)
         (mouse-to-viewport window event-x event-y)
-      (let* ((transform (lpsg-tinker:current-world-transform dragger (kit.math:vec2 x y)))
+      (let* ((transform (lpsg-scene:current-world-transform dragger (kit.math:vec2 x y)))
              (new-eye (sb-cga:transform-point start-eye transform))
              (new-up (sb-cga:transform-direction start-up transform)))
-        (lpsg-tinker:aim-camera (view-camera window) new-eye start-look-at new-up)))))
+        (lpsg-scene:aim-camera (view-camera window) new-eye start-look-at new-up)))))
 
 (defmethod on-mouse-motion-event :after ((window viewer-window) (event glop:mouse-motion-event)
                                          last-event-p)

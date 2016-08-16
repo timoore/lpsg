@@ -1,7 +1,7 @@
 ;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
 
-(in-package #:lpsg-tinker)
+(in-package #:lpsg-scene)
 
 ;;; Classes for calculating displacement and rotation of a camera during a user mouse-drag event.
 ;;;
