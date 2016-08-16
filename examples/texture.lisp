@@ -193,7 +193,7 @@ void main()
 ;;; Assign colors and texture coordinates to the vertices of the cube.
 
 (defun make-cube-with-attributes ()
-  (let ((cube (make-cube-shape))
+  (let ((cube (lpsg-scene:make-cube-shape))
         (texcoord-array (make-array '(24 2) :element-type 'single-float))
         (color-array (make-array '(24 3) :element-type 'single-float)))
     ;; Map each face to a square texture

@@ -131,7 +131,7 @@ void main()
 (defparameter *allocator* (make-instance 'lpsg:simple-allocator))
 
 (defun make-cube (model-input allocator window)
-  (let ((cube (lpsg:make-cube-shape))
+  (let ((cube (lpsg-scene:make-cube-shape))
         (effect (make-instance 'cube-effect)))
     (setf (lpsg:effect cube) effect)
     (lpsg:connect effect 'camera (camera-uset-node window) 'uset)

@@ -29,12 +29,12 @@
      (:file "effect" :depends-on (base "render" "environment" "glstate"  "bundle"
                                        "incremental-comp"))
      (:file "shape" :depends-on (base "render" "environment" "allocator" "incremental-comp"))
-     (:file "assembly" :depends-on (base "shape"))
-     (:file "solids" :depends-on (base "render" "shape"))))
+     (:file "assembly" :depends-on (base "shape"))))
    (:module
     "scene"
     :depends-on ("lpsg")
     :components
     ((:file "package")
      (:file "camera" :depends-on ("package"))
-     (:file "draggers" :depends-on ("package"))))))
+     (:file "draggers" :depends-on ("package"))
+     (:file "solids" :depends-on ("package"))))))

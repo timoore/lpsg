@@ -1,6 +1,6 @@
 ;;;; Utility functions to create assemblies of shapes
 
-(in-package #:lpsg)
+(in-package #:lpsg-scene)
 
 (defparameter *cube-verts*
   (make-array '(8 3)

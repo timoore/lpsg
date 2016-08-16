@@ -139,6 +139,4 @@
    #:out
    ;; inputs
    #:visiblep
-   ;; utilities
-   #:make-cube-shape
    ))

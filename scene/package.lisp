@@ -44,4 +44,7 @@
    #:translate-dragger
    #:rotate-dragger
    #:current-world-transform
+   ;; utilities
+   #:make-cube-shape
+
    ))
