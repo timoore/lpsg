@@ -2,6 +2,135 @@
 
 (in-package #:lpsg-scene)
 
+(defun rref* (array &rest indices)
+  (declare (dynamic-extent indices))
+  "Return a row (last rank) of @cl:param(array) as 3 values. @c(rref*) is a place for @c(setf)."
+  (case (array-rank array)
+    (1
+     (values (aref array 0)
+             (aref array 1)
+             (aref array 2)))
+    (2
+     (let ((i (car indices)))
+       (values (aref array i 0)
+               (aref array i 1)
+               (aref array i 2))))
+    (3
+     (destructuring-bind (i j)
+         indices
+       (values (aref array i j 0)
+               (aref array i j 1)
+               (aref array i j 2))))
+    (otherwise
+     (values (apply #'aref array (append indices '(0)))
+             (apply #'aref array (append indices '(1)))
+             (apply #'aref array (append indices '(2)))))))
+
+(defun rref2* (array &rest indices)
+  (declare (dynamic-extent indices))
+  "Return a row (last rank) of @cl:param(array) as 2 values. @c(rref*) is a place for @c(setf)."
+  (case (array-rank array)
+    (1
+     (values (aref array 0)
+             (aref array 1)))
+    (2
+     (let ((i (car indices)))
+       (values (aref array i 0)
+               (aref array i 1))))
+    (3
+     (destructuring-bind (i j)
+         indices
+       (values (aref array i j 0)
+               (aref array i j 1))))
+    (otherwise
+     (values (apply #'aref array (append indices '(0)))
+             (apply #'aref array (append indices '(1)))))))
+
+(defun rref4* (array &rest indices)
+  (declare (dynamic-extent indices))
+  "Return a row (last rank) of @cl:param(array) as 4 values. @c(rref*) is a place for @c(setf)."
+  (case (array-rank array)
+    (1
+     (values (aref array 0)
+             (aref array 1)
+             (aref array 2)
+             (aref array 3)))
+    (2
+     (let ((i (car indices)))
+       (values (aref array i 0)
+               (aref array i 1)
+               (aref array i 2)
+               (aref array i 3))))
+    (3
+     (destructuring-bind (i j)
+         indices
+       (values (aref array i j 0)
+               (aref array i j 1)
+               (aref array i j 2)
+               (aref array i j 3))))
+    (otherwise
+     (values (apply #'aref array (append indices '(0)))
+             (apply #'aref array (append indices '(1)))
+             (apply #'aref array (append indices '(2)))
+             (apply #'aref array (append indices '(3)))))))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun make-rref*-macro (num-elements array indices)
+    (let* ((index-temps (mapcar (lambda (sym)
+                                  (declare (ignore sym))
+                                  (gensym))
+                                indices))
+           (index-binding (mapcar #'list index-temps indices)))
+      (alexandria:once-only (array)
+        (loop
+           for i from 0 below num-elements
+           collect `(aref ,array ,@index-temps ,i) into values
+           finally
+             (return `(let ,index-binding
+                        (values ,@values))))))))
+
+(define-compiler-macro rref* (array &rest indices)
+  (make-rref*-macro 3 array indices))
+
+(define-compiler-macro rref2* (array &rest indices)
+  (make-rref*-macro 2 array indices))
+
+(define-compiler-macro rref4* (array &rest indices)
+  (make-rref*-macro 4 array indices))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun make-rref*-expander (accessor num-elements array indices)
+    (let* ((array-var (gensym "ARRAY"))
+           (index-vars (mapcar (lambda (index)
+                                 (declare (ignore index))
+                                 (gensym "INDEX"))
+                               indices))
+           (store-vars (loop
+                          for i from 0 below num-elements
+                          collect (gensym "STORE")))
+           (setf-pairs (loop
+                          for store-var in store-vars
+                          for elem from 0
+                          append `((aref ,array-var ,@index-vars ,elem) ,store-var))))
+      (values `(,array-var ,@index-vars)
+              `(,array ,@indices)
+              store-vars
+              `(progn
+                 (setf ,@setf-pairs)
+                 (values ,@store-vars))
+              `(,accessor ,array-var ,@index-vars))))
+  )
+
+(define-setf-expander rref* (array &rest indices)
+  (make-rref*-expander 'rref* 3 array indices))
+
+(define-setf-expander rref2* (array &rest indices)
+  (make-rref*-expander 'rref2* 2 array indices))
+
+(define-setf-expander rref4* (array &rest indices)
+  (make-rref*-expander 'rref4* 2 array indices))
+
+
 (defparameter *cube-verts*
   (make-array '(8 3)
               :initial-contents '((0.5 -0.5 -0.5)
@@ -25,16 +154,6 @@
                 (1 2 6 5)               ;back
                 (0 1 5 4)               ;right
                 (3 7 6 2))))            ;left
-
-(defun copy-vec3-row (dest dest-row src src-row)
-  (loop
-     for i from 0 below 3
-     do (setf (aref dest dest-row i) (aref src src-row i))))
-
-(defun copy-vec3-to-row (dest dest-row src)
-  (loop
-     for i from 0 below 3
-     do (setf (aref dest dest-row i) (aref src i))))
 
 (defun make-cube-shape ()
   "Create a cube shape.
@@ -64,10 +183,10 @@ The cube has VERTEX and NORMAL vertex attributes. The resulting shape has an ind
               ;; Copy the geometry...
               (loop
                  for k from 0 below 4
-                 do (progn
-                      (copy-vec3-row vertex-array (+ (* i 4) k)
-                                     *cube-verts* (aref *cube-faces* i k))
-                      (copy-vec3-to-row normal-array (+ (* i 4) k) normal)))
+                 for vidx = (+ (* i 4) k)
+                 do 
+                   (setf (rref* vertex-array vidx) (rref* *cube-verts* (aref *cube-faces* i k)))
+                   (setf (rref* normal-array vidx) (rref* normal)))
               ;; ... and now the indices for the triangles. For each face, we want a
               ;; pattern of [0 1 2 2 3 0]. It would be easier just to specify that!
               (loop
