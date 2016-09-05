@@ -13,7 +13,7 @@
   (:metaclass compute-class)
   (:default-initargs :attribute-map '((gl:vertex . "in_Position")
                                       (gl:normal . "in_Normal")
-                                      (texcoord . "in_TexCoord")
+                                      (gl:tex-coord . "in_TexCoord")
                                       (color . "in_Color"))))
 
 (defmethod simple-effect-usets nconc ((effect texture-effect))
@@ -165,8 +165,9 @@ void main()
    (shapes :accessor shapes :initform nil)
    (visible-inputs :accessor visible-inputs :initform nil)
    (texture-source :accessor texture-source :initarg texture-source
-                   :documentation "??? A pathname, perhaps?"))
-  (:default-initargs :exposed nil))
+                   :documentation "??? A pathname, perhaps?")
+   (shape-type :accessor shape-type :initarg :shape-type))
+  (:default-initargs :exposed nil :shape-type 'cube))
 
 ;;; Instances of usets
 (defvar *model-uset* (make-instance 'model))
@@ -194,7 +195,7 @@ void main()
 
 (defun make-cube-with-attributes ()
   (let ((cube (lpsg-scene:make-cube-shape))
-        (texcoord-array (make-array '(24 2) :element-type 'single-float))
+        (tex-coord-array (make-array '(24 2) :element-type 'single-float))
         (color-array (make-array '(24 3) :element-type 'single-float)))
     ;; Map each face to a square texture
     (loop
@@ -206,8 +207,8 @@ void main()
              for v = (if (>= in-face 2) 1.0 0.0)
              for tex-index = (+ face-base in-face)
              do (progn
-                  (setf (aref texcoord-array tex-index 0) u)
-                  (setf (aref texcoord-array tex-index 1) v))))
+                  (setf (aref tex-coord-array tex-index 0) u)
+                  (setf (aref tex-coord-array tex-index 1) v))))
     ;; map each vertex to a color using the coordinates of the vertex
     (let ((coord-array (data (attribute cube 'gl:vertex))))
       (loop
@@ -215,9 +216,9 @@ void main()
          do (loop
                for j from 0 below 3
                do (setf (aref color-array i j) (+ (aref coord-array i j) 0.5)))))
-    (setf (attribute cube 'texcoord)
+    (setf (attribute cube 'tex-coord)
           (make-instance 'vertex-attribute
-                         :data texcoord-array
+                         :data tex-coord-array
                          :data-count 24
                          :components 2
                          :buffer-type :float))
@@ -229,8 +230,24 @@ void main()
                          :buffer-type :float))
     cube))
 
+(defun make-sphere-with-attributes ()
+  (let* ((sphere-shape (lpsg-scene:make-sphere-shape))
+         (vertex-count (lpsg::data-count (attribute sphere-shape 'gl:vertex)))
+         (color-array (make-array (list vertex-count 3)
+                                  :element-type 'single-float
+                                  :initial-element 1.0)))
+    (setf (attribute sphere-shape 'color)
+          (make-instance 'vertex-attribute
+                         :data color-array
+                         :data-count vertex-count
+                         :components 3
+                         :buffer-type :float))
+    sphere-shape))
+
 (defun make-textured-shape (model-input allocator window)
-  (let ((shape (make-cube-with-attributes))
+  (let ((shape (if (eq (shape-type window) 'cube)
+                   (make-cube-with-attributes)
+                   (make-sphere-with-attributes)))
         (effect (make-instance 'texture-effect)))
     (setf (lpsg:effect shape) effect)
     (connect effect 'camera (camera-uset-node window) 'uset)
@@ -327,7 +344,7 @@ void main()
       (cffi:foreign-free mem))))
 
 (defun texture-example (&rest args)
-  "Draw a textured cube in a window.
+  "Draw a textured object in a window.
 
 The `p' key switches between orthographic and perspective views."
   (let* ((win (apply #'make-instance 'texture-window args)))

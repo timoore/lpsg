@@ -214,3 +214,85 @@ The cube has VERTEX and NORMAL vertex attributes. The resulting shape has an ind
       (setf (attribute cube-shape 'normal) normal-attr)
       cube-shape)))
 
+(defun lat/lon-to-xyz (phi theta)
+  (let ((cos-phi (cos phi)))
+    (values (* cos-phi (cos theta)) (sin phi) (- (* cos-phi (sin theta))))))
+
+(defparameter +float-pi+ (float pi 1.0))
+
+(defun make-sphere-shape (&key (segments 32) (rings 16))
+  "Segments and rings are patches on the sphere."
+  ;; There is only one vertex at each pole, but it needs to be repeated for each ring in order to
+  ;; do texture mapping correctly. The common vertices of the first and last ring need to be
+  ;; repeated for the same reason.
+  (let* ((ring-verts (1+ rings))
+         (seg-verts (1+ segments))
+         (total-vertices (* ring-verts seg-verts))
+         (vertex-array (make-array (list total-vertices 3) :element-type 'single-float))
+         (normal-array (make-array (array-dimensions vertex-array) :element-type 'single-float))
+         (tex-array (make-array (list total-vertices 2) :element-type 'single-float))
+         (lat-array (make-array (list ring-verts seg-verts 3) :displaced-to vertex-array
+                                :displaced-index-offset 0 :element-type 'single-float))
+         (lat-tex-array (make-array (list ring-verts seg-verts 2) :displaced-to tex-array
+                                    :displaced-index-offset 0 :element-type 'single-float))
+         (last-coord (1- total-vertices)))
+    (loop
+       for ring from 0 to rings
+       for lat-coord = (float (/ ring rings) 1.0)
+       for phi = (* (- lat-coord .5) +float-pi+)
+       do (loop
+             for segment from 0 to segments
+             for lon-coord = (float (/ segment segments) 1.0)
+             for theta = (* lon-coord 2.0 +float-pi+)
+             do
+               (setf (rref* lat-array ring segment) (lat/lon-to-xyz phi theta))
+               (setf (rref2* lat-tex-array ring segment) (values lon-coord lat-coord))))
+    ;; copy vertex array to normal array
+    (loop
+       for i from 0 below total-vertices
+       do (setf (rref* normal-array i) (rref* vertex-array i)))
+
+    ;; Now the element array
+    (let* ((elements (* 6 segments rings))
+           (element-array (make-array elements)))
+      ;; The lat/lon quads
+      (loop
+         for quad-ring from 0 below rings
+         for ring-bottom-start from 0 by seg-verts
+         for ring-top-start = (+ ring-bottom-start seg-verts)
+         with poly-idx = 0
+         do (loop
+               for quad-segment from 0 below segments
+               for quad-ll = (+ ring-bottom-start quad-segment)
+               for quad-ul = (+ ring-top-start quad-segment)
+               for quad-lr = (+ ring-bottom-start (1+ quad-segment))
+               for quad-ur = (+ ring-top-start (1+ quad-segment))
+               do
+                 (setf (aref element-array poly-idx)  quad-ll
+                       (aref element-array (+ poly-idx 1)) quad-lr
+                       (aref element-array (+ poly-idx 2)) quad-ul
+                       (aref element-array (+ poly-idx 3)) quad-lr
+                       (aref element-array (+ poly-idx 4)) quad-ur
+                       (aref element-array (+ poly-idx 5)) quad-ul)
+                 (incf poly-idx 6)))
+      (let* ((vertex-attr (make-instance 'vertex-attribute
+                                         :data vertex-array :data-count total-vertices
+                                         :components 3 :buffer-type :float))
+             (normal-attr (make-instance 'vertex-attribute
+                                         :data normal-array :data-count total-vertices
+                                         :components 3 :buffer-type :float))
+             (tex-attr (make-instance 'vertex-attribute
+                                         :data tex-array :data-count total-vertices
+                                         :components 2 :buffer-type :float))
+             (element-attr (make-instance 'mirrored-buffer-resource
+                                          :data element-array :data-count elements
+                                          :components 1 :buffer-type :short))
+             (sphere-shape (make-instance 'standard-shape
+                                          :drawable (make-instance 'indexed-drawable
+                                                                   :mode :triangles
+                                                                   :vertex-count elements
+                                                                   :element-array element-attr))))
+        (setf (attribute sphere-shape 'vertex) vertex-attr)
+        (setf (attribute sphere-shape 'normal) normal-attr)
+        (setf (attribute sphere-shape 'tex-coord) tex-attr)
+        sphere-shape))))

@@ -46,5 +46,5 @@
    #:current-world-transform
    ;; utilities
    #:make-cube-shape
-
+   #:make-sphere-shape
    ))
