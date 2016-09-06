@@ -94,6 +94,10 @@
    #:gl-texunits
    #:gltexture-unit
    #:gl-viewport
+   #:viewport-x
+   #:viewport-y
+   #:viewport-width
+   #:viewport-height
    #:make-modes
    #:units
    #:uniform-sets

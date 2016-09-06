@@ -71,7 +71,6 @@ with uset parameters, to a shape."))
   (let* ((env (make-instance 'environment
                              :attribute-map (attribute-map effect)
                              :gl-state (gl-state effect)
-                             :renderer renderer
                              :uniform-sets (simple-effect-usets effect)))
          (attr-map (attribute-map env)))
     (let* ((attrib-set (make-instance 'shape-attribute-set :shape shape :attribute-map attr-map))

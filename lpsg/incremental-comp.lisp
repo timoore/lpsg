@@ -337,6 +337,12 @@
       (setf (receivers source) (delete receiver (receivers source)))
       (notify-invalid receiver))))
 
+(defgeneric connectedp (receiver local-slot))
+
+(defmethod connectedp ((receiver compute-object) local-slot)
+  (let ((cell (slot-value receiver local-slot)))
+    (not (null (cdr cell)))))
+
 (defmethod invalidate ((obj compute-object))
   (let ((computed-slots (computed-slots (class-of obj))))
     (loop

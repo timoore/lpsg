@@ -469,49 +469,6 @@ Will be created automatically, but must be specified for now.")))
   (:documentation "The LPSG object that holds the source code for an OpenGL shader, information
   about its usets, ID in OpenGL, and any errors that result from its compilation."))
 
-
-(defclass program (gl-program)
-  (
-   ;; elements are (desc strategy (most-recent-uset counter))
-   (uset-alist :accessor uset-alist :initform nil
-               :documentation "private")))
-
-;;; Compute all the usets used in a program's shaders, then choose strategies
-;;; for them.
-(defun compute-usets (program)
-  (let ((uset-alist nil))
-    (loop
-       for shader in (shaders program)
-       for usets = (usets shader)
-       do (loop
-             for uset in usets
-             for uset-pair = (assoc uset uset-alist)
-             do (if uset-pair
-                    (push shader (cdr uset-pair))
-                    (push (cons uset shader) uset-alist))))
-    ;; Only one kind of uset for now.
-    (setf (uset-alist program)
-          (mapcar #'(lambda (entry)
-                      (list (car entry)
-                            (make-uset-strategy (car entry)
-                                                program
-                                                'explicit-uniforms)
-                            (list nil 0)))
-                  uset-alist))))
-
-;;; Set the uniform values in a program, assuming  that it is currently bound.
-(defun upload-uset-to-program (uset program)
-  (let* ((descriptor (descriptor uset))
-         (uset-data (getassoc descriptor (uset-alist program)))
-         (strategy (car uset-data)))
-    (when strategy
-      (funcall (uploader strategy) uset))
-    uset))
-
-(defmethod gl-finalize ((obj program) &optional (errorp t))
-  (compute-usets obj)
-  (call-next-method))
-
 (defgeneric upload-buffers (renderer obj))
 
 (defgeneric draw (renderer)

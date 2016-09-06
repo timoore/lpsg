@@ -92,7 +92,8 @@
                                *glstate-elements*)))
            (define-glstate ()
              `(defclass graphics-state ,*glstate-elements*
-                ((modes :accessor modes :initarg :modes))
+                ((modes :accessor modes :initarg :modes)
+                 (global-usets :accessor global-usets :initarg :global-usets :initform nil))
                 (:documentation "Class that stores most OpenGL state."))))
   (define-all-elements)
   (define-glstate))
@@ -200,6 +201,48 @@
 
 (defmethod make-default-glstate-member ((name (eql 'glstate-program)))
   (make-instance 'gl-program :status t))
+
+(defclass program (gl-program)
+  (
+   ;; elements are (desc strategy (most-recent-uset counter))
+   (uset-alist :accessor uset-alist :initform nil
+               :documentation "private")))
+
+;;; Compute all the usets used in a program's shaders, then choose strategies
+;;; for them.
+(defun compute-usets (program)
+  (let ((uset-alist nil))
+    (loop
+       for shader in (shaders program)
+       for usets = (usets shader)
+       do (loop
+             for uset in usets
+             for uset-pair = (assoc uset uset-alist)
+             do (if uset-pair
+                    (push shader (cdr uset-pair))
+                    (push (cons uset shader) uset-alist))))
+    ;; Only one kind of uset for now.
+    (setf (uset-alist program)
+          (mapcar #'(lambda (entry)
+                      (list (car entry)
+                            (make-uset-strategy (car entry)
+                                                program
+                                                'explicit-uniforms)
+                            (list nil 0)))
+                  uset-alist))))
+
+;;; Set the uniform values in a program, assuming  that it is currently bound.
+(defun upload-uset-to-program (uset program)
+  (let* ((descriptor (descriptor uset))
+         (uset-data (getassoc descriptor (uset-alist program)))
+         (strategy (car uset-data)))
+    (when strategy
+      (funcall (uploader strategy) uset))
+    uset))
+
+(defmethod gl-finalize ((obj program) &optional (errorp t))
+  (compute-usets obj)
+  (call-next-method))
 
 (defclass texture-area ()
   ((level :accessor level :initarg :level :documentation "Mipmap level of this data in the texture.")
@@ -748,10 +791,10 @@ spec is a texture or renderbuffer object, or a list of arguments for
     (gl:bind-framebuffer :framebuffer 0)))
 
 (defclass gl-viewport ()
-  ((x :accessor x :initarg :x :initform 0)
-   (y :accessor y :initarg :y :initform 0)
-   (width :accessor width :initarg :width :initform 0)
-   (height :accessor height :initarg :height :initform 0)))
+  ((viewport-x :accessor viewport-x :initarg :viewport-x :initform 0)
+   (viewport-y :accessor viewport-y :initarg :viewport-y :initform 0)
+   (viewport-width :accessor viewport-width :initarg :viewport-width :initform 0)
+   (viewport-height :accessor viewport-height :initarg :viewport-height :initform 0)))
 
 (defmethod gl-finalized-p ((obj gl-viewport))
   t)
@@ -761,14 +804,14 @@ spec is a texture or renderbuffer object, or a list of arguments for
 
 (defmethod glstate-compare ((e1 gl-viewport) (e2 gl-viewport))
   (compare-pairs
-   (x e1) (x e2)
-   (y e1) (y e2)
-   (width e1) (width e2)
-   (height e1) (height e2)))
+   (viewport-x e1) (viewport-x e2)
+   (viewport-y e1) (viewport-y e2)
+   (viewport-width e1) (viewport-width e2)
+   (viewport-height e1) (viewport-height e2)))
 
 (defmethod glstate-bind (tracker (element gl-viewport) previous-element)
   (declare (ignore tracker previous-element))
-  (gl:viewport (x element) (y element) (width element) (height element)))
+  (gl:viewport (viewport-x element) (viewport-y element) (viewport-width element) (viewport-height element)))
 
 (defmethod make-default-glstate-member ((name (eql 'glstate-viewport)))
   (make-instance 'gl-viewport))
@@ -908,11 +951,21 @@ spec is a texture or renderbuffer object, or a list of arguments for
                  (glstate-bind tracker new-element (svref current-elements i))
                  (setf (svref current-elements i) new-element)))))
       (unless (eq state (last-applied tracker))
-        (loop
-           for i from 0 below (length current-elements)
-           do
-             (bind1 i))
-        (bind-modes tracker state)
+        (let ((old-program (glstate-program (current-state tracker))))
+          (loop
+             for i from 0 below (length current-elements)
+             do
+               (bind1 i))
+          (bind-modes tracker state)
+          ;; Global uset values. Will change with UBOs. Gross hack or clever hack?
+          (let ((current-program (glstate-program (current-state tracker))))
+            (unless (eq old-program current-program)
+              (loop
+                 for state-on-stack across stack
+                 for usets = (global-usets state-on-stack)
+                 do (loop
+                       for uset in usets
+                       do (upload-uset-to-program uset current-program))))))
         (setf (last-applied tracker) state)))))
 
 (defmethod bind-modes ((tracker glstate-tracker) (new-state graphics-state))

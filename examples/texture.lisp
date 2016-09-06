@@ -17,16 +17,19 @@
                                       (color . "in_Color"))))
 
 (defmethod simple-effect-usets nconc ((effect texture-effect))
-  (list (camera effect)
-        (model effect)
-        (light effect)
-        (tex-sampler effect)))
+  (nconc (if (lpsg::connectedp effect 'camera)
+             (list (camera effect))
+             nil)
+         (list (model effect)
+               (light effect)
+               (tex-sampler effect))))
 
 ;;; The uset objects are shared with the environments, and the upstream nodes. Calling the input
 ;;; slot accessor forces their update.
 
 (defmethod update-effect progn ((effect texture-effect))
-  (camera effect)
+  (when (lpsg::connectedp effect 'camera)
+    (camera effect))
   (model effect)
   (light effect)
   (tex-sampler effect))
@@ -250,7 +253,7 @@ void main()
                    (make-sphere-with-attributes)))
         (effect (make-instance 'texture-effect)))
     (setf (lpsg:effect shape) effect)
-    (connect effect 'camera (camera-uset-node window) 'uset)
+    #++(connect effect 'camera (camera-uset-node window) 'uset)
     (connect effect 'model model-input 'out)
     (connect effect 'light *light-input* 'out)
     (connect effect 'tex-sampler *sampler-input* 'out)

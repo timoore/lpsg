@@ -36,11 +36,12 @@
   (:metaclass compute-class))
 
 ;;; Track the viewport and set it as part of the graphics state
-(defclass viewport ()
-  ((x :accessor x :initarg :x :initform 0)
-   (y :accessor y :initarg :y :initform 0)
-   (width :accessor width :initarg :width :initform 0)
-   (height :accessor height :initarg :height :initform 0)))
+
+(defun equal-viewport-p (vp0 vp1)
+  (and (eql (viewport-x vp0) (viewport-x vp1))
+       (eql (viewport-y vp0) (viewport-y vp1))
+       (eql (viewport-width vp0) (viewport-width vp1))
+       (eql (viewport-height vp0) (viewport-height vp1))))
 
 ;;; This incremental node takes 'view-matrix and 'projection-matrix as input and produces a uset.
 (defclass camera-uset-node ()
@@ -62,6 +63,7 @@
 
 (defclass viewport-stage (render-stage)
   ((viewport :input-accessor viewport)
+   (camera-uset :input-accessor camera-uset :initarg :camera-uset)
    (status :compute-function status :initform t))
   (:metaclass compute-class))
 
@@ -70,13 +72,19 @@
 
 (defun update-viewport-stage (stage)
   (let* ((new-viewport (viewport stage))
-         (graphics-state (make-instance 'graphics-state
-                                        :viewport (make-instance 'gl-viewport
-                                                                 :x (x new-viewport)
-                                                                 :y (y new-viewport)
-                                                                 :width (width new-viewport)
-                                                                 :height (height new-viewport)))))
-    (setf (graphics-state stage) graphics-state)))
+         (camera-uset (camera-uset stage))
+         (state (and (slot-boundp stage 'graphics-state) (graphics-state stage))))
+    (unless (and state
+                 (lpsg::global-usets state)
+                 (equal-viewport-p new-viewport (lpsg::glstate-viewport state)))
+      (let ((graphics-state (make-instance 'graphics-state
+                                           :viewport (make-instance 'gl-viewport
+                                                                    :viewport-x (viewport-x new-viewport)
+                                                                    :viewport-y (viewport-y new-viewport)
+                                                                    :viewport-width (viewport-width new-viewport)
+                                                                    :viewport-height (viewport-height new-viewport))
+                                           :global-usets (list camera-uset))))
+        (setf (graphics-state stage) graphics-state)))))
 
 (defmethod invalidate ((node viewport-stage))
   (push (lambda ()
@@ -118,7 +126,7 @@
   (let ((choice (make-instance 'lpsg:if-then-node))
         (selector (make-instance 'lpsg:input-node
                                  :in (eq (projection-type obj) 'orthographic)))
-        (vp (make-instance 'lpsg:input-node :in (make-instance 'viewport))))
+        (vp (make-instance 'lpsg:input-node :in (make-instance 'gl-viewport))))
     (connect choice 'lpsg:then (ortho-camera obj) 'lpsg-scene:projection-matrix)
     (connect choice 'lpsg:else (fov-camera obj) 'lpsg-scene:projection-matrix)
     (connect choice 'test selector 'out)
@@ -136,15 +144,10 @@
                                        :modes (make-modes '(:cull-face :depth-test)
                                                           '(:dither :multisample))))
            (render-stage (make-instance 'render-stage :graphics-state stage-state))
-           (viewport-stage (make-instance
-                            'viewport-stage
-                            :graphics-state (make-instance
-                                             'graphics-state
-                                             :viewport (make-instance
-                                                        'gl-viewport
-                                                        :x 0 :y 0 :width 1 :height 1)))))
+           (viewport-stage (make-instance 'viewport-stage)))
       (connect viewport-stage 'viewport vp 'out)
       (setf (viewport-node obj) vp)
+      (connect viewport-stage 'camera-uset (camera-uset-node obj) 'uset)
       (add-rendered-object (render-stage obj) render-stage)
       (add-rendered-object render-stage viewport-stage)
       (setf (default-render-queue obj) viewport-stage)
@@ -185,7 +188,7 @@
 (defmethod update-for-window-change ((w viewer-window) event)
   (let ((width (glop:width event))
         (height (glop:height event)))
-    (setf (in (viewport-node w)) (make-instance 'viewport :width width :height height))))
+    (setf (in (viewport-node w)) (make-instance 'gl-viewport :viewport-width width :viewport-height height))))
 
 (defun compute-projection-matrix (window proj-type near far)
   (let ((width (glop:window-width window))
