@@ -216,7 +216,7 @@ void main()
          do (loop
                for j from 0 below 3
                do (setf (aref color-array i j) (+ (aref coord-array i j) 0.5)))))
-    (setf (attribute cube 'tex-coord)
+    (setf (attribute cube 'gl:tex-coord)
           (make-instance 'vertex-attribute
                          :data tex-coord-array
                          :data-count 24
