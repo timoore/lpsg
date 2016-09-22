@@ -501,6 +501,7 @@ buffers; that is done by the application outside of LPSG."))
     (pop-state renderer)))
 
 (defmethod draw-bundles ((renderer standard-renderer))
+  (increment-frame-count renderer)
   (draw-queue renderer (render-stage renderer)))
 
 (defmethod process-gl-objects ((renderer standard-renderer))

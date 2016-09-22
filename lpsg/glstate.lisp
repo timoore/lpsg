@@ -202,48 +202,6 @@
 (defmethod make-default-glstate-member ((name (eql 'glstate-program)))
   (make-instance 'gl-program :status t))
 
-(defclass program (gl-program)
-  (
-   ;; elements are (desc strategy (most-recent-uset counter))
-   (uset-alist :accessor uset-alist :initform nil
-               :documentation "private")))
-
-;;; Compute all the usets used in a program's shaders, then choose strategies
-;;; for them.
-(defun compute-usets (program)
-  (let ((uset-alist nil))
-    (loop
-       for shader in (shaders program)
-       for usets = (usets shader)
-       do (loop
-             for uset in usets
-             for uset-pair = (assoc uset uset-alist)
-             do (if uset-pair
-                    (push shader (cdr uset-pair))
-                    (push (cons uset shader) uset-alist))))
-    ;; Only one kind of uset for now.
-    (setf (uset-alist program)
-          (mapcar #'(lambda (entry)
-                      (list (car entry)
-                            (make-uset-strategy (car entry)
-                                                program
-                                                'explicit-uniforms)
-                            (list nil 0)))
-                  uset-alist))))
-
-;;; Set the uniform values in a program, assuming  that it is currently bound.
-(defun upload-uset-to-program (uset program)
-  (let* ((descriptor (descriptor uset))
-         (uset-data (getassoc descriptor (uset-alist program)))
-         (strategy (car uset-data)))
-    (when strategy
-      (funcall (uploader strategy) uset))
-    uset))
-
-(defmethod gl-finalize ((obj program) &optional (errorp t))
-  (compute-usets obj)
-  (call-next-method))
-
 (defclass texture-area ()
   ((level :accessor level :initarg :level :documentation "Mipmap level of this data in the texture.")
    (texture :accessor texture :initarg :texture :documentation "OpenGL texture object")
@@ -906,7 +864,13 @@ spec is a texture or renderbuffer object, or a list of arguments for
 (defclass glstate-tracker ()
   ((state-stack :accessor state-stack :initform (make-array 2 :adjustable t :fill-pointer 0))
    (current-state :accessor current-state :initform (make-instance 'graphics-state))
-   (last-applied :accessor last-applied :initform nil)))
+   (last-applied :accessor last-applied :initform nil)
+   (frame-count :accessor frame-count :initform 0)))
+
+(defgeneric increment-frame-count (tracker))
+
+(defmethod increment-frame-count ((tracker glstate-tracker))
+  (incf (frame-count tracker)))
 
 (defgeneric push-state (tracker state))
 
@@ -929,6 +893,48 @@ spec is a texture or renderbuffer object, or a list of arguments for
 
 (defmethod bind-state ((renderer glstate-tracker) (state graphics-state))
   (bind-state-with-tracker renderer state))
+
+(defclass program (gl-program)
+  (
+   ;; elements are (desc strategy (most-recent-uset counter))
+   (uset-alist :accessor uset-alist :initform nil
+               :documentation "private")))
+
+;;; Compute all the usets used in a program's shaders, then choose strategies
+;;; for them.
+(defun compute-usets (program)
+  (let ((uset-alist nil))
+    (loop
+       for shader in (shaders program)
+       for usets = (usets shader)
+       do (loop
+             for uset in usets
+             for uset-pair = (assoc uset uset-alist)
+             do (if uset-pair
+                    (push shader (cdr uset-pair))
+                    (push (cons uset shader) uset-alist))))
+    ;; Only one kind of uset for now.
+    (setf (uset-alist program)
+          (mapcar #'(lambda (entry)
+                      (list (car entry)
+                            (make-uset-strategy (car entry)
+                                                program
+                                                'explicit-uniforms)
+                            (list nil 0)))
+                  uset-alist))))
+
+;;; Set the uniform values in a program, assuming  that it is currently bound.
+(defun upload-uset-to-program (uset program tracker)
+  (let* ((descriptor (descriptor uset))
+         (uset-data (getassoc descriptor (uset-alist program)))
+         (strategy (car uset-data)))
+    (when strategy
+      (funcall (uploader strategy) uset))
+    uset))
+
+(defmethod gl-finalize ((obj program) &optional (errorp t))
+  (compute-usets obj)
+  (call-next-method))
 
 (defgeneric bind-modes (tracker state))
 
