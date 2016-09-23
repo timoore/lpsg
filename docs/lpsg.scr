@@ -31,12 +31,12 @@ of parameters called @i(usets). On the other hand, LPSG does @i([will])
 support efficient methods for uploading large updates of user data.
 
 Another important optimization is reducing CPU cache misses during
-rendering. This is often caused by traversing large tree-like
+rendering. Such cache misses often caused by traversing large tree-like
 structures or scene graphs in the user's application. LPSG uses a
 different approach: the application @i(submits) graphics objects to
 LPSG, which is from then on responsible for traversing the objects and
 displaying them. LPSG can use data structures that are more efficient
-than the application's, @i([and much of the traversal may even be
+than those of the application, @i([and much of the traversal may even be
 moved to the GPU.]) Newer versions of OpenGL contain interfaces that
 can reduce the number of cache misses inside the driver itself,
 @i([LPSG will take of advantage of them.])
@@ -89,16 +89,16 @@ are documented along with the protocol classes.
 
 LPSG contains a @c(renderer) class that controls all rendering to the
 screen. The user creates @c(shapes) containing per-vertex attributes,
-such as position or color data. The shape also contains an effect
+such as position or color data. The shape also contains an @c(effect)
 object which controls its appearence on the screen.
 
 Once a shape has been prepared, it is submitted to the renderer using
-the generic function @c(submit). This invokes the
+the generic function @c(submit). The call to @(submit) invokes the
 @c(submit-with-effect) generic function which, dispatching on its
 renderer, shape, and effect arguments, creates the objects that are
 used in the actual OpenGL rendering and places them on various
-queues. These are used when the user calls the renderer's @c(draw)
-method; at that time OpenGL objects are created on the GPU, any necessary
+queues. These objects are used when the user calls the renderer's @c(draw)
+method; at that time, OpenGL objects are created on the GPU, any necessary
 initialization is performed, and shapes are rendered. On future calls
 to @c(draw), these objects will be rendered again. The user
 effectively gives up ownership of a shape object until the @c(retract)
@@ -165,7 +165,7 @@ LPSG comes with some simple example programs in the @c(examples) subdirectory:
 @begin(section)
 @title(The Renderer)
 
-The @c(renderer) class that controls all rendering to the
+The @c(renderer) class controls all rendering to the
 screen. Generic functions that dispatch on @c(renderer) ultimately
 perform all OpenGL calls. @c(open-renderer) performs any OpenGL
 initialization needed; @c(close-renderer) cleans up when the

@@ -8,15 +8,15 @@
   ((:generic open-renderer (renderer)
     (:documentation "Intialize @cl:param(renderer) for rendering.
 
-The OpenGL context that will be used to do all rendering must be current when this is called.  This
-method verifies that the context can support the rendering done by lpsg; that is, the version of
-OpenGL supports the features needed by lpsg or has extensions that support them. It also records
-parameters and capabilities of the OpenGL implementation, such as the number of texture
-units."))
+The OpenGL context that will be used to do all rendering must be current when generic function
+called.  This generic function verifies that the context can support the rendering done by lpsg;
+that is, the version of OpenGL supports the features needed by lpsg or has extensions that support
+them. It also records parameters and capabilities of the OpenGL implementation, such as the number
+of texture units."))
    (:generic close-renderer (renderer &key deallocate-objects)
     (:documentation "Close @cl:param(renderer) for rendering.
 
-If @cl:param(deallocate-objects) is @c(t), then all OpenGL objects that are still allocated by
+If @cl:param(deallocate-objects) is true, then all OpenGL objects that are still allocated by
 LPSG will be explicitly deallocated. The default, @c(nil), doesn't deallocate these objects; it
 assumes that the context will soon be destroyed." )) 
    (:generic submit (object renderer)
