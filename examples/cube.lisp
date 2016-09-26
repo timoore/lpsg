@@ -95,7 +95,7 @@ void main()
                                                        :usets nil))))))
 
 (defmethod submit-with-effect :before
-    (shape (renderer cube-effect-loader) (effect cube-effect))
+    (shape (renderer cube-effect-loader) (effect cube-effect) &key)
   (declare (ignore shape))
   (unless (slot-boundp renderer 'gl-state)
     (setf (gl-state renderer) (make-instance 'graphics-state :program (shader-program renderer))))

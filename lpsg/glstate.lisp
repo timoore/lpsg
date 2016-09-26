@@ -897,8 +897,8 @@ spec is a texture or renderbuffer object, or a list of arguments for
 (defclass program (gl-program)
   (
    ;; elements are (desc strategy (most-recent-uset counter))
-   (uset-alist :accessor uset-alist :initform nil
-               :documentation "private")))
+   (uset-alist :accessor uset-alist :initform nil :documentation "private")
+   (last-frame-count :accessor last-frame-count :initform 0)))
 
 ;;; Compute all the usets used in a program's shaders, then choose strategies
 ;;; for them.
@@ -925,12 +925,20 @@ spec is a texture or renderbuffer object, or a list of arguments for
 
 ;;; Set the uniform values in a program, assuming  that it is currently bound.
 (defun upload-uset-to-program (uset program tracker)
+  (unless (eql (frame-count tracker) (last-frame-count program))
+    (loop
+       for (nil nil usage) in (uset-alist program)
+       do (setf (car usage) nil))
+    (setf (last-frame-count program) (frame-count tracker)))
   (let* ((descriptor (descriptor uset))
          (uset-data (getassoc descriptor (uset-alist program)))
-         (strategy (car uset-data)))
-    (when strategy
-      (funcall (uploader strategy) uset))
-    uset))
+         (strategy (car uset-data))
+         (usage (cadr uset-data)))
+    (unless (eq (car usage) uset)
+      (when strategy
+        (funcall (uploader strategy) uset))
+      (setf (car usage) uset)))
+  uset)
 
 (defmethod gl-finalize ((obj program) &optional (errorp t))
   (compute-usets obj)
@@ -971,7 +979,7 @@ spec is a texture or renderbuffer object, or a list of arguments for
                  for usets = (global-usets state-on-stack)
                  do (loop
                        for uset in usets
-                       do (upload-uset-to-program uset current-program))))))
+                       do (upload-uset-to-program uset current-program tracker))))))
         (setf (last-applied tracker) state)))))
 
 (defmethod bind-modes ((tracker glstate-tracker) (new-state graphics-state))

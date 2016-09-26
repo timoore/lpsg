@@ -19,9 +19,9 @@ units."))
 If @cl:param(deallocate-objects) is @c(t), then all OpenGL objects that are still allocated by
 LPSG will be explicitly deallocated. The default, @c(nil), doesn't deallocate these objects; it
 assumes that the context will soon be destroyed." )) 
-   (:generic submit (object renderer)
+   (:generic submit (object renderer &key &allow-other-keys)
     (:documentation "Submit OBJECT to RENDERER."))
-   (:generic submit-with-effect (shape renderer effect)
+   (:generic submit-with-effect (shape renderer effect &key)
     (:documentation "Submit SHAPE to RENDERER.
 
 This function creates all the bundles necessary to render SHAPE with the appearance defined by

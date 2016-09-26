@@ -14,8 +14,9 @@
      if (typep obj 'shape)
      do (funcall func obj)))
 
-(defmethod submit ((assembly assembly) renderer)
+(defmethod submit ((assembly assembly) renderer &rest effect-args)
+  (declare (dynamic-extent effect-args))
   (do-shapes assembly
     (lambda (shape)
-      (submit-with-effect shape renderer (effect shape)))))
+      (apply #'submit-with-effect shape renderer (effect shape) effect-args))))
 

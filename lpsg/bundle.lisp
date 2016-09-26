@@ -45,7 +45,7 @@ geometry of the associated @c(shape). "))
     (loop
        with program = (glstate-program gl-state)
        for uset in (uniform-sets env)
-       do (upload-uset-to-program uset program))
+       do (upload-uset-to-program uset program renderer))
     (let ((attr-set (attribute-set bundle))
           (drawable (drawable (shape bundle))))
       (gl:bind-vertex-array (id (vao attr-set)))

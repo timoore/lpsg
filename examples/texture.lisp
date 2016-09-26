@@ -142,7 +142,7 @@ void main()
       tex-area)))
 
 (defmethod submit-with-effect :before
-    (shape (renderer checker-effect-loader) (effect texture-effect))
+    (shape (renderer checker-effect-loader) (effect texture-effect) &key)
   (declare (ignore shape))
   (unless (slot-boundp renderer 'gl-state)
     (let ((area (make-checker-texture-area)))
@@ -276,7 +276,7 @@ void main()
             (connect (lpsg:effect shape) 'lpsg:visiblep shape-visible 'lpsg:out)
             (setf (aref (shapes window) i) shape)
             (setf (aref (visible-inputs window) i) shape-visible)
-            (lpsg:submit shape window)))))
+            (lpsg:submit shape window :extra-usets `(,(uset (camera-uset-node window))))))))
 
 (defun retract-shapes (window)
   (unless (shapes window)

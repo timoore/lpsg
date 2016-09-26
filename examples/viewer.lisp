@@ -63,7 +63,6 @@
 
 (defclass viewport-stage (render-stage)
   ((viewport :input-accessor viewport)
-   (camera-uset :input-accessor camera-uset :initarg :camera-uset)
    (status :compute-function status :initform t))
   (:metaclass compute-class))
 
@@ -72,26 +71,35 @@
 
 (defun update-viewport-stage (stage)
   (let* ((new-viewport (viewport stage))
-         (camera-uset (camera-uset stage))
          (state (and (slot-boundp stage 'graphics-state) (graphics-state stage))))
     (unless (and state
                  (lpsg::global-usets state)
                  (equal-viewport-p new-viewport (lpsg::glstate-viewport state)))
-      (let ((graphics-state (make-instance 'graphics-state
-                                           :viewport (make-instance 'gl-viewport
-                                                                    :viewport-x (viewport-x new-viewport)
-                                                                    :viewport-y (viewport-y new-viewport)
-                                                                    :viewport-width (viewport-width new-viewport)
-                                                                    :viewport-height (viewport-height new-viewport))
-                                           :global-usets (list camera-uset))))
+      (let ((graphics-state
+             (make-instance 'graphics-state
+                            :viewport (make-instance 'gl-viewport
+                                                     :viewport-x (viewport-x new-viewport)
+                                                     :viewport-y (viewport-y new-viewport)
+                                                     :viewport-width (viewport-width new-viewport)
+                                                     :viewport-height (viewport-height new-viewport)))))
         (setf (graphics-state stage) graphics-state)))))
 
-(defmethod invalidate ((node viewport-stage))
+(defmethod invalidate :after ((node viewport-stage))
   (push (lambda ()
           (update-viewport-stage node)
           (status node))
         lpsg::*deferred-updates*))
 
+;;; camera-uset-node that updates its uset without a consumer
+
+(defclass updating-camera-uset-node (camera-uset-node)
+  ()
+  (:metaclass compute-class))
+
+(defmethod invalidate :after ((node updating-camera-uset-node))
+  (push (lambda ()
+          (uset node))
+        lpsg::*deferred-updates*))
 
 (defclass viewer-window (standard-renderer glop:window)
   (
@@ -113,7 +121,7 @@
    (camera-choice :accessor camera-choice)
    ;; An input-value node for holding T or NIL to select the type of camera.
    (camera-selector :accessor camera-selector)
-   (camera-uset-node :accessor camera-uset-node :initform (make-instance 'camera-uset-node))
+   (camera-uset-node :accessor camera-uset-node :initform (make-instance 'updating-camera-uset-node))
    (exposed :accessor exposed :initarg :exposed)
    (current-dragger :initform nil)
    (last-draw-time :initform 0)
@@ -147,7 +155,6 @@
            (viewport-stage (make-instance 'viewport-stage)))
       (connect viewport-stage 'viewport vp 'out)
       (setf (viewport-node obj) vp)
-      (connect viewport-stage 'camera-uset (camera-uset-node obj) 'uset)
       (add-rendered-object (render-stage obj) render-stage)
       (add-rendered-object render-stage viewport-stage)
       (setf (default-render-queue obj) viewport-stage)

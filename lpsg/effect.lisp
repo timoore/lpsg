@@ -67,11 +67,11 @@ with uset parameters, to a shape."))
   (when (and shape attribute-map)
     (init-attr-set-from-shape obj shape attribute-map)))
 
-(defmethod submit-with-effect (shape renderer (effect simple-effect))
+(defmethod submit-with-effect (shape renderer (effect simple-effect) &key (extra-usets nil))
   (let* ((env (make-instance 'environment
                              :attribute-map (attribute-map effect)
                              :gl-state (gl-state effect)
-                             :uniform-sets (simple-effect-usets effect)))
+                             :uniform-sets (append (simple-effect-usets effect) extra-usets)))
          (attr-map (attribute-map env)))
     (let* ((attrib-set (make-instance 'shape-attribute-set :shape shape :attribute-map attr-map))
            (bundle (make-instance 'render-bundle

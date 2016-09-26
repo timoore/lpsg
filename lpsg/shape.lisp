@@ -245,16 +245,16 @@ Returns list-of-offsets, total padded size for all elements (which is the stride
     (when (typep (drawable shape) 'indexed-drawable)
       (allocate-attr (element-array (drawable shape)) :element-array-buffer))))
 
-(defmethod submit ((shape shape) renderer)
+(defmethod submit ((shape shape) renderer &rest effect-args)
   "Submit SHAPE to RENDERER.
 
 Calls (submit-with-effect SHAPE RENDERER (effect SHAPE))"
-  (submit-with-effect shape renderer (effect shape)))
+  (apply #'submit-with-effect shape renderer (effect shape) effect-args))
 
 (defmethod retract ((shape shape) renderer)
   (retract-with-effect shape renderer (effect shape)))
 
-(defmethod submit-with-effect :after ((shape shape) renderer effect)
+(defmethod submit-with-effect :after ((shape shape) renderer effect &key)
   (declare (ignore effect))
   (loop
      for (name . vertex-attrib) in (attributes shape)
