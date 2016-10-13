@@ -28,30 +28,36 @@
   (:metaclass compute-class))
 
 (defmethod world-matrix ((node transform))
-  (sb-cga:matrix* parent-matrix local-matrix))
+  (sb-cga:matrix* (parent-matrix node) (local-matrix node)))
 
 (defmethod world-matrix-inverse ((node transform))
   (sb-cga:inverse-matrix (world-matrix node)))
 
-(defclass node ()
-  ((transform :accessor transform :initform (make-instance 'transform))))
-
-(defclass leaf (node)
+(defclass node (transform)
   ())
 
-(defclass group (node)
+(defmacro define-node-class (name superclasses slots &rest options)
+  `(defclass ,name (,@superclasses node)
+     ,slots
+     ,@options
+     (:metaclass compute-class)))
+
+(define-node-class leaf ()
+  ())
+
+(define-node-class group ()
   ((children :accessor children :initarg :children :initform nil)))
 
 (defgeneric add-child (parent child))
 
 (defmethod add-child ((parent group) (child node))
-  (connect (transform child) 'parent-matrix (transform group) 'world-matrix)
+  (connect child 'parent-matrix group 'world-matrix)
   (push child (children parent)))
 
 (defgeneric remove-child (parent child))
 
 (defmethod remove-child ((parent group) (child node))
-  (disconnect (transform child) 'parent-matrix (transform group))
+  (disconnect child 'parent-matrix group)
   (setf (children parent) (delete child (children parent))))
 
 (defgeneric map-children (fn node))
@@ -62,10 +68,16 @@
 (defmethod map-children (fn (node group))
   (mapc fn (children group)))
 
-(defclass shape-node (leaf)
+(define-node-class shape-node (leaf)
   ((shape :accessor shape :initform nil)
    (submitted :accessor submitted :initform nil :documentation "?")))
+
+(define-node-class camera-node (view-mixin camera)
+  ((projection-matrix :input-accessor projection-matrix :initarg :projection-matrix)))
+
+(defmethod)
 
 (defgeneric submit-graph (root renderer) &key camera-stage)
 
 (defgeneric retract-graph (root renderer) &key camera-stage)
+

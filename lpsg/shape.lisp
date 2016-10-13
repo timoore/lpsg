@@ -85,20 +85,10 @@ The array storing the data can have any dimensionality; it will be accessed usin
                :documentation "Alist of (name . attribute). The names are later mapped to a vertex binding index.")
    (effect :accessor effect :initarg :effect :documentation "private")
    ;; XXX uset computation nodes?
-   (usets :accessor usets :initarg :usets :initform nil :documentation "private")
    (drawable :accessor drawable :initarg :drawable :documentation "private")
    (bundles :accessor bundles :initform nil
             :documentation "The bundles that are created by EFFECT for this shape."))
-  (:documentation "Class for geometry coupled with an effect.
-
-When a shape is submitted to the renderer, all its input nodes are copied into the
-environment objects that might be created. This means that a shape's inputs cannot be setf'ed after
-submission.
-
-Inputs
-
-visiblep - true if shape is visible, false if not
-"))
+  (:documentation "Class for geometry coupled with an effect."))
 
 (defmethod initialize-instance :after ((obj standard-shape) &key)
   (unless (slot-boundp obj 'drawable)
