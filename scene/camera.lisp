@@ -22,6 +22,9 @@
    (view-matrix-inverse :compute-function view-matrix-inverse))
   (:metaclass compute-class))
 
+(defmethod view-matrix-inverse ((camera view-mixin))
+  (inverse-matrix (view-matrix camera)))
+
 (defclass aimed-camera-mixin (view-mixin)
   ((eye :input-accessor eye :initarg :eye)
    (target :input-accessor target :initarg :target)
@@ -38,9 +41,6 @@
 
 (defmethod view-matrix ((camera aimed-camera-mixin))
   (look-at (eye camera) (target camera) (up camera)))
-
-(defmethod view-matrix-inverse ((camera aimed-camera-mixin))
-  (inverse-matrix (view-matrix camera)))
 
 (defclass projection-mixin ()
   ((projection-matrix :compute-function projection-matrix)

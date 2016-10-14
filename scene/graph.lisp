@@ -18,6 +18,21 @@
 
 (in-package #:lpsg-scene)
 
+
+(lpsg:define-uset camera (("projectionMatrix" :float-mat4
+                                              projection-matrix :accessor projection-matrix)
+                          ("cameraMatrix" :float-mat4
+                                          camera-matrix :accessor camera-matrix)
+                          ("cameraMatrixInverse" :float-mat4
+                                                 camera-matrix-inverse
+                                                 :accessor camera-matrix-inverse)))
+
+(lpsg:define-uset model-uset (("modelMatrix" :float-mat4
+                                             model-matrix :accessor model-matrix)
+                              ("modelMatrixInverse" :float-mat4
+                                                    model-matrix-inverse
+                                                    :accessor model-matrix-inverse)))
+
 (defclass transform ()
   ((local-matrix :input-accessor local-matrix :initarg :local-matrix
                  :initform (sb-cga:identity-matrix))
@@ -70,12 +85,25 @@
 
 (define-node-class shape-node (leaf)
   ((shape :accessor shape :initform nil)
-   (submitted :accessor submitted :initform nil :documentation "?")))
+   (submitted :accessor submitted :initform nil :documentation "?")
+   (model-uset :compute-function model-uset)
+   (%model-uset :accessor %model-uset :initform (make-instance 'model-uset))))
+
+(defmethod model-uset ((node shape-node))
+  (let ((uset (%model-uset node)))
+    (setf (model-matrix uset) (world-matrix node)
+          (model-matrix-inverse uset) (world-matrix-inverse node))
+    uset))
 
 (define-node-class camera-node (view-mixin camera)
-  ((projection-matrix :input-accessor projection-matrix :initarg :projection-matrix)))
+  ((projection-matrix :input-accessor projection-matrix :initarg :projection-matrix)
+   (projection-matrix-inverse :compute-function projection-matrix-inverse)))
 
-(defmethod)
+(defmethod view-matrix ((node camera-node))
+  (world-matrix-inverse node))
+
+(defmethod projection-matrix-inverse ((camera camera-node))
+  (inverse-matrix (projection-matrix camera)))
 
 (defgeneric submit-graph (root renderer) &key camera-stage)
 
