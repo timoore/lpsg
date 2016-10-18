@@ -105,6 +105,14 @@
 (defmethod projection-matrix-inverse ((camera camera-node))
   (inverse-matrix (projection-matrix camera)))
 
+(define-node-class light ()
+  ())
+
+(defclass scene ()
+  ((cameras)
+   (lights)
+   (groups :documentation "?")))
+
 (defgeneric submit-graph (root renderer) &key camera-stage)
 
 (defgeneric retract-graph (root renderer) &key camera-stage)
