@@ -49,7 +49,8 @@
   (sb-cga:inverse-matrix (world-matrix node)))
 
 (defclass node (transform)
-  ())
+  ()
+  (:metaclass compute-class))
 
 (defmacro define-node-class (name superclasses slots &rest options)
   `(defclass ,name (,@superclasses node)
@@ -108,10 +109,10 @@
 (define-node-class light ()
   ())
 
-(defclass scene ()
+(defclass universe ()
   ((cameras)
    (lights)
-   (groups :documentation "?")))
+   (scenes :documentation "?")))
 
 (defgeneric submit-graph (root renderer) &key camera-stage)
 
