@@ -55,6 +55,8 @@
    #:remove-rendered-object
    #:map-render-queue
    #:find-if-queue
+   #:schedule-update
+   #:update-object-for-draw
    #:do-render-queue
    #:finalize-queue
    #:render-target-stage

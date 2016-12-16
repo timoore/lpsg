@@ -84,11 +84,9 @@
                                                      :viewport-height (viewport-height new-viewport)))))
         (setf (graphics-state stage) graphics-state)))))
 
-(defmethod invalidate :after ((node viewport-stage))
-  (push (lambda ()
-          (update-viewport-stage node)
-          (status node))
-        lpsg::*deferred-updates*))
+(defmethod update-object-for-draw (renderer (node viewport-stage))
+  (update-viewport-stage node)
+  (status node))
 
 ;;; camera-uset-node that updates its uset without a consumer
 
@@ -96,10 +94,8 @@
   ()
   (:metaclass compute-class))
 
-(defmethod invalidate :after ((node updating-camera-uset-node))
-  (push (lambda ()
-          (uset node))
-        lpsg::*deferred-updates*))
+(defmethod update-object-for-draw (renderer (node updating-camera-uset-node))
+  (uset node))
 
 (defclass viewer-window (standard-renderer glop:window)
   (
@@ -142,6 +138,7 @@
     (setf (camera-selector obj) selector)
     (connect (camera-uset-node obj) 'projection-matrix choice 'result)
     (connect (camera-uset-node obj) 'view-matrix (view-camera obj) 'lpsg-scene:view-matrix)
+    (schedule-update obj (camera-uset-node obj))
     (setf (slot-value obj 'max-motion-time) (* max-motion-seconds internal-time-units-per-second))
     ;; default graphics state
     (let* ((stage-state (make-instance 'graphics-state
@@ -154,6 +151,7 @@
            (render-stage (make-instance 'render-stage :graphics-state stage-state))
            (viewport-stage (make-instance 'viewport-stage)))
       (connect viewport-stage 'viewport vp 'out)
+      (schedule-update obj viewport-stage)
       (setf (viewport-node obj) vp)
       (add-rendered-object (render-stage obj) render-stage)
       (add-rendered-object render-stage viewport-stage)

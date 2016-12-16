@@ -175,13 +175,28 @@ DRAW-QUEUE. @c(bind-state) indicates if the graphics state should also be bound.
                                      :initarg :max-combined-texture-image-units))
   (:default-initargs :max-combined-texture-image-units 8)) ;XXX way to small, for testing
 
+(defclass draw-update-queue ()
+  ((update-queue :accessor update-queue :initform (make-instance 'ordered-queue))))
+
+(defclass buffer-object-upload-queue ()
+  ((bo-queue :accessor bo-queue :initform nil)))
+
+(defclass texture-upload-queue ()
+  ((tex-queue :accessor tex-queue :initform nil)))
+
+(defclass upload-queue (draw-update-queue buffer-object-upload-queue texture-upload-queue)
+  ())
+
+(defgeneric update-object-for-draw (renderer object)
+  (:documentation "Generic function calledd when draw update queue is processed."))
+
 (defclass standard-renderer (glstate-tracker renderer)
   ((buffers :accessor buffers :initform nil :documentation "private")
    (bundles :accessor bundles :initform nil :documentation "private")
    (predraw-queue :accessor predraw-queue :initform nil :documentation "private")
    (finalize-queue :accessor finalize-queue :initform nil :documentation "private")
    ;; alist of (buffer . buffer-areas)
-   (upload-queue :accessor upload-queue :initform nil :documentation "private")
+   (upload-queue :accessor upload-queue :initform (make-instance 'upload-queue) :documentation "private")
    (render-stage :accessor render-stage :initarg :render-stage
                  :initform (make-instance 'render-target-stage)
                  :documentation "The top-level (default) render stage.")
@@ -321,20 +336,7 @@ Will be created automatically, but must be specified for now.")))
 (defgeneric schedule-upload (renderer object)
   (:documentation "Register an object to be uploaded to OpenGL."))
 
-(defclass buffer-object-upload-queue ()
-  ((bo-queue :accessor bo-queue :initform nil)))
-
-(defclass texture-upload-queue ()
-  ((tex-queue :accessor tex-queue :initform nil)))
-
-(defclass upload-queue (buffer-object-upload-queue texture-upload-queue)
-  ())
-
 (defgeneric add-to-upload-queue (queue object))
-
-(defmethod schedule-upload :before ((renderer standard-renderer) object)
-  (unless (upload-queue renderer)
-    (setf (upload-queue renderer) (make-instance 'upload-queue))))
 
 (defmethod schedule-upload ((renderer standard-renderer) object)
   (add-to-upload-queue (upload-queue renderer) object))
@@ -346,6 +348,12 @@ Will be created automatically, but must be specified for now.")))
         (push obj (cdr entry))
         (setf (getassoc buffer (bo-queue queue)) (list obj)))))
 
+(defgeneric schedule-update (renderer object)
+  (:documentation "Register an object to be updated at every draw call."))
+
+(defmethod schedule-update ((renderer standard-renderer) object)
+  (add-to-queue (update-queue (upload-queue renderer)) object))
+
 ;;; TODO: Arrange queue by texture object. Push areas onto the end of the queue.
 (defmethod add-to-upload-queue ((queue texture-upload-queue) (obj texture-area))
   (push obj (tex-queue queue)))
@@ -355,7 +363,12 @@ Will be created automatically, but must be specified for now.")))
 (defmethod process-upload-queue (renderer queue)
   )
 
-(defmethod process-upload-queue :after (renderer (queue buffer-object-upload-queue))
+(defmethod process-upload-queue :before (renderer (queue draw-update-queue))
+  (map-queue (update-queue (upload-queue renderer))
+             (lambda (object)
+               (update-object-for-draw renderer object))))
+
+(defmethod process-upload-queue :before (renderer (queue buffer-object-upload-queue))
   (loop
      for (buffer . uploads) in (bo-queue queue)
      for target = (target buffer)
@@ -371,7 +384,7 @@ Will be created automatically, but must be specified for now.")))
   ;; Is this necessary? Should all the targets be set to 0?
   (gl:bind-buffer :array-buffer 0))
 
-(defmethod process-upload-queue :after (renderer (queue texture-upload-queue))
+(defmethod process-upload-queue :before (renderer (queue texture-upload-queue))
   (loop
      for area in (tex-queue queue)
      for texture = (texture area)
