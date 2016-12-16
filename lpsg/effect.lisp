@@ -17,7 +17,7 @@
   (:metaclass compute-class)
   (:documentation "Class that represents the rendered appearance of a shape.
 
- EFFECT is responsable for creating bundles and their environments and putting them in the
+ EFFECT is responsible for creating bundles and their environments and putting them in the
   appropriate render queues. The effect object contains graphics environments. The SIMPLE-EFFECT
   class only has one environment, but other effects might have different environments for different
   passes."))
