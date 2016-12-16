@@ -79,34 +79,53 @@ DRAW-QUEUE. @c(bind-state) indicates if the graphics state should also be bound.
 (defmethod find-if-queue (predicate (render-queue unordered-render-queue))
   (find-if predicate (bundles render-queue)))
 
-(defclass ordered-render-queue (render-queue)
-  ((queue-object :documentation "private"))
-  (:documentation "Class for a queue of objects that are rendered in order.
+(defclass ordered-queue ()
+  ((queue-object :initform (serapeum:queue)))
+  (:documentation "CLOS wrapper around serapeum:queue."))
 
-@c(add-rendered-object) will add an object to the end of the queue."))
+(defgeneric add-to-queue (queue object))
 
-(defmethod initialize-instance :after ((obj ordered-render-queue) &key)
-  (setf (slot-value obj 'queue-object) (serapeum:queue)))
+(defgeneric remove-from-queue (queue object))
 
-(defmethod add-rendered-object ((render-queue ordered-render-queue) object)
+(defgeneric map-queue (queue function))
+
+(defgeneric find-if-queue (predicate queue))
+
+(defmethod add-to-queue ((queue ordered-queue) object)
   (with-slots (queue-object)
-      render-queue
+      queue
     (serapeum:enq object queue-object)
     nil))
 
-(defmethod remove-rendered-object ((render-queue ordered-render-queue) object)
+(defmethod remove-from-queue ((queue ordered-queue) object)
   (with-slots (queue-object)
-      render-queue
+      queue
     (let ((contents (serapeum:clear-queue queue-object)))
       (setq contents (delete object contents))
       (serapeum:qconc queue-object contents))
     nil))
 
-(defmethod map-render-queue ((render-queue ordered-render-queue) function)
-  (mapc function (serapeum:qlist (slot-value render-queue 'queue-object))))
+(defmethod map-queue ((queue ordered-queue) function)
+  (mapc function (serapeum:qlist (slot-value queue 'queue-object))))
 
-(defmethod find-if-queue (predicate (queue ordered-render-queue))
+(defmethod find-if-queue (predicate (queue ordered-queue))
   (find predicate (serapeum:qlist (slot-value queue 'queue-object))))
+
+(defclass ordered-render-queue (ordered-queue render-queue)
+  ()
+  (:documentation "Class for a queue of objects that are rendered in order.
+
+@c(add-rendered-object) will add an object to the end of the queue."))
+
+(defmethod add-rendered-object ((render-queue ordered-render-queue) object)
+  (add-to-queue render-queue object))
+
+(defmethod remove-rendered-object ((render-queue ordered-render-queue) object)
+  (remove-from-queue render-queue object))
+
+(defmethod map-render-queue ((render-queue ordered-render-queue) function)
+  (map-queue render-queue function))
+
 
 (defmethod draw-queue (renderer (render-queue render-queue))
   (flet ((map-func (item)
