@@ -56,6 +56,7 @@
    #:map-render-queue
    #:find-if-queue
    #:schedule-update
+   #:remove-update
    #:update-object-for-draw
    #:do-render-queue
    #:finalize-queue
@@ -76,6 +77,7 @@
    #:buffer-attribute
    #:mirrored-buffer-resource
    #:schedule-upload
+   #:remove-upload
    #:vertex-attribute
    ;; shapes
    #:shape

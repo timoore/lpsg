@@ -101,8 +101,7 @@ DRAW-QUEUE. @c(bind-state) indicates if the graphics state should also be bound.
   (with-slots (queue-object)
       queue
     (let ((contents (serapeum:clear-queue queue-object)))
-      (setq contents (delete object contents))
-      (serapeum:qconc queue-object contents))
+      (serapeum:qconc queue-object (delete object contents)))
     nil))
 
 (defmethod map-queue ((queue ordered-queue) function)
@@ -336,10 +335,18 @@ Will be created automatically, but must be specified for now.")))
 (defgeneric schedule-upload (renderer object)
   (:documentation "Register an object to be uploaded to OpenGL."))
 
+(defgeneric remove-upload (renderer object)
+  (:documentation "Cancel the upload of a previously scheduled object."))
+
 (defgeneric add-to-upload-queue (queue object))
+
+(defgeneric remove-from-upload-queue (queue object))
 
 (defmethod schedule-upload ((renderer standard-renderer) object)
   (add-to-upload-queue (upload-queue renderer) object))
+
+(defmethod remove-upload ((renderer standard-renderer) object)
+  (remove-from-upload-queue (upload-queue renderer) object))
 
 (defmethod add-to-upload-queue ((queue buffer-object-upload-queue) (obj buffer-area))
   (let* ((buffer (buffer obj))
@@ -348,11 +355,26 @@ Will be created automatically, but must be specified for now.")))
         (push obj (cdr entry))
         (setf (getassoc buffer (bo-queue queue)) (list obj)))))
 
+(defmethod remove-from-upload-queue ((queue buffer-object-upload-queue) (obj buffer-area))
+  (let* ((buffer (buffer obj))
+         (entry (assoc buffer (bo-queue queue))))
+    (when entry
+      (let ((tail (setf (cdr entry) (delete obj (cdr entry)))))
+        (unless tail
+          (setf (bo-queue queue) (delete entry (bo-queue queue) :test #'eq)))))
+    nil))
+
 (defgeneric schedule-update (renderer object)
   (:documentation "Register an object to be updated at every draw call."))
 
+(defgeneric remove-update (renderer object)
+  (:documentation "Remove object that has been registered for update."))
+
 (defmethod schedule-update ((renderer standard-renderer) object)
   (add-to-queue (update-queue (upload-queue renderer)) object))
+
+(defmethod remove-update ((renderer standard-renderer) object)
+  (remove-from-queue (update-queue (upload-queue renderer)) object))
 
 ;;; TODO: Arrange queue by texture object. Push areas onto the end of the queue.
 (defmethod add-to-upload-queue ((queue texture-upload-queue) (obj texture-area))
