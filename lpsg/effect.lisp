@@ -42,6 +42,11 @@ just ignore it."
     (setf (element-binding attrib-set) (element-array (drawable shape))))
   attrib-set)
 
+(defmethod update-object-for-draw (renderer (object effect))
+  (update-effect object)
+  ;; Force incremental computation; still necessary?
+  (status object))
+
 (defclass simple-effect (effect)
   ((gl-state :accessor gl-state :initarg :gl-state :documentation "@c(graphics-state) object used
   to render shapes that use this effect")
@@ -96,10 +101,4 @@ with uset parameters, to a shape."))
 (defmethod update-effect progn ((effect simple-effect))
   (setf (visiblep (environment effect)) (visiblep effect)))
 
-
-(defmethod invalidate ((node effect))
-  (push (lambda ()
-          (update-effect node)          ; Subclass updates environments, usets, etc.
-          (status node))                ; Reset this dummy computed slot.
-        *deferred-updates*))
 
