@@ -21,12 +21,6 @@
 
 ;;; MOP implementation
 
-(defvar *deferred-updates* nil "List of functions that will perform some action on nodes.")
-
-(defun do-deferred-updates ()
-  (mapc #'funcall *deferred-updates*)
-  (setq *deferred-updates* nil))
-
 ;;; This uses both the design patterns found on http://www.cliki.net/MOP%20design%20patterns !
 (defclass compute-class (closer-mop:standard-class)
   ((computed-slots :accessor computed-slots :initform nil)))
