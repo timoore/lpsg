@@ -26,15 +26,29 @@
   ((computed-slots :accessor computed-slots :initform nil)))
 
 (defclass compute-object ()
-  ((receivers :accessor receivers :initform nil) 
-   (connections :accessor connections :initform nil)))
+  ())
 
-(defun %input-source (cell)
-  (car cell))
+;;; The connection between nodes. This is stored in an input slot, and also with each computed
+;;; slot. 
 
-(defun %input-access-function (cell)
-  (cdr cell))
+(defclass connection ()
+  ((source :accessor source :initform nil :initarg :source)
+   (source-slot :accessor source-slot :initform nil :initarg :source-slot)
+   (access-function :accessor access-function :initarg :access-function)
+   (receiver :accessor receiver :initform nil :initarg :receiver)
+   (receiver-slot :accessor receiver-slot :initform nil :initarg :receiver-slot)))
 
+;;; The value stored in each computed slot...
+
+(defclass computed-value ()
+  ((cached-value :accessor cached-value)
+   (receivers :accessor receivers :initform nil)))
+
+;;; ... and in each input slot
+
+(defclass input-value ()
+  ((local-value-p :accessor local-value-p :initform t)
+   (value-source :accessor value-source :initarg :value-source)))
 ;;; From Pascal Constanza
 
 (defmethod initialize-instance :around ((class compute-class) &rest initargs
@@ -132,9 +146,11 @@
          (gf (closer-mop:ensure-generic-function compute-fn)))
     (closer-mop:ensure-method gf
                               `(lambda (obj)
-                                 (if (slot-boundp obj ',slot-name)
-                                     (slot-value obj ',slot-name)
-                                     (setf (slot-value obj ',slot-name) (call-next-method))))
+                                 (let ((computed-value-object (slot-value obj ',slot-name)))
+                                   (if (slot-boundp computed-value-object 'cached-value)
+                                       (slot-value computed-value-object 'cached-value)
+                                       (setf (slot-value computed-value-object 'cached-value)
+                                             (call-next-method)))))
                               :qualifiers '(:around)
                               :specializers (list class)
                               :method-class (find-class 'compute-function-method))))
@@ -149,8 +165,12 @@
        with method-class = (find-class 'input-reader-method)
        do (closer-mop:ensure-method gf
                                     `(lambda (obj)
-                                       (let ((cell (slot-value obj ',slot-name)))
-                                         (funcall (cdr cell) (car cell))))
+                                       (let* ((input-value (slot-value obj ',slot-name))
+                                              (value-source (value-source input-value)))
+                                         (if (local-value-p input-value)
+                                             value-source
+                                             (funcall (access-function value-source)
+                                                      (source value-source)))))
                                     :specializers (list class)
                                     :method-class method-class))
     (loop
@@ -161,9 +181,9 @@
                                     `(lambda (newval obj)
                                        (let ((cell (slot-value obj ',slot-name)))
                                          ;; XXX disconnect old val
-                                         (setf (car cell) newval)
-                                         (setf (cdr cell) #'identity)
-                                         (notify-invalid obj)
+                                         (setf (local-value-p cell) t)
+                                         (setf (value-source cell) newval)
+                                         (notify-invalid obj ',slot-name)
                                          newval))
                                     :specializers (list (find-class 't) class)
                                     :method-class method-class))))
@@ -214,19 +234,18 @@
           (setf (compute-function def) (compute-function (car compute-tail))))))
     def))
 
-(defgeneric invalidate (node))
+(defgeneric invalidate (node source-slot))
 
-(defun notify-invalid (obj)
+(defun notify-invalid (obj slot-name)
   (let ((must-invalidate (loop
                             for slot in (computed-slots (class-of obj))
-                            thereis (slot-boundp obj slot))))
+                            for computed-value = (slot-value obj slot)
+                            thereis (slot-boundp computed-value 'cached-value))))
     (if must-invalidate
         (progn
-          (invalidate obj)
+          (invalidate obj slot-name)
           t)
         nil)))
-  
-
 
 (defmethod closer-mop:finalize-inheritance :after ((class compute-class))
   (setf (computed-slots class) (mapcan (lambda (slot)
@@ -260,7 +279,7 @@
              (when tail
                (setf (slot-value obj (closer-mop:slot-definition-name slot))
                      (if (input-slot-p slot)
-                         (cons val #'identity)
+                         (make-instance 'input-value :value-source val)
                          val)))))
       (loop
          for slot in slot-list
@@ -270,47 +289,54 @@
                        (member slot-name slot-names :test #'eq))
                    (not (slot-boundp obj slot-name)))
          do (cond ((input-slot-p slot)
-                   (if  slot-initfunc
-                        (setf (slot-value obj slot-name)
-                              (cons (funcall slot-initfunc) #'identity))
-                        (setf (slot-value obj slot-name) (cons nil nil))))
+                   (let ((input-value (make-instance 'input-value)))
+                     (when slot-initfunc
+                       (setf (value-source input-value) (funcall slot-initfunc)))
+                     (setf (slot-value obj slot-name) input-value)))
                   ((input-plist-p slot)
                    (setf (slot-value obj slot-name) nil))))
+      (loop
+         for slot-name in (computed-slots metaclass)
+         do (setf (slot-value obj slot-name) (make-instance 'computed-value)))
       (call-next-method obj slot-names))))
 
 
-(defgeneric %connect (receiver local-slot transmitter accessor-fn &key))
+(defgeneric %connect (receiver local-slot transmitter transmitter-slot accessor-function))
 
-(defmethod %connect ((receiver compute-object) local-slot (transmitter compute-object) accessor-fn
-                     &key)
-  (setf (car (slot-value receiver local-slot)) transmitter)
-  (setf (cdr (slot-value receiver local-slot)) accessor-fn)
-  (push receiver (receivers transmitter))
-  (notify-invalid receiver)
+(defmethod %connect ((receiver compute-object) local-slot (transmitter compute-object)
+                     transmitter-slot accessor-function)
+  (let* ((connection (make-instance 'connection
+                                    :source transmitter :source-slot transmitter-slot
+                                    :access-function accessor-function
+                                    :receiver receiver :receiver-slot local-slot))
+         (input-value (slot-value receiver local-slot))
+         (computed-value (slot-value transmitter transmitter-slot)))
+    (setf (value-source input-value) connection)
+    (setf (local-value-p input-value) nil)
+    (push connection (receivers computed-value)))
+  (notify-invalid receiver local-slot)
   receiver)
 
-(defgeneric connect (receiver local-slot transmitter accessor-fn &key))
+(defgeneric connect (receiver local-slot transmitter transmitter-slot &key accessor-function))
 
 (defmethod  connect ((receiver compute-object) local-slot
                      (transmitter compute-object) transmitter-slot
-                     &key)
-  (%connect receiver local-slot transmitter (lambda (obj) (funcall transmitter-slot obj))))
+                     &key (accessor-function transmitter-slot))
+  (%connect receiver local-slot transmitter transmitter-slot accessor-function))
 
-(defmethod  connect ((receiver compute-object) local-slot
-                     (transmitter compute-object) (transmitter-slot symbol)
-                     &key)
-  (%connect receiver local-slot transmitter (lambda (obj)
-                                              (funcall (symbol-function transmitter-slot) obj))))
 
 (defgeneric disconnect (receiver local-slot transmitter &key))
 
 (defmethod disconnect ((receiver compute-object) local-slot (transmitter compute-object) &key)
-  (let* ((cell (slot-value receiver local-slot))
-         (source (%input-source cell)))
-    (setf (receivers source) (delete receiver (receivers source)))
-    (setf (car cell) nil)
-    (setf (cdr cell) nil)))
-
+  (let* ((input-value (slot-value receiver local-slot))
+         (connection (value-source input-value))
+         (source (source connection))
+         (computed-value (slot-value source (source-slot connection))))
+    (setf (receivers computed-value) (delete connection (receivers computed-value)))
+    (setf (local-value-p input-value) t)
+    (slot-makunbound input-value 'value-source)))
+#++
+(progn
 (defgeneric connect-plist (reciever local-slot key transmitter accessor-fn &key))
 
 (defmethod connect-plist ((reciever compute-object) local-slot key
@@ -330,19 +356,28 @@
     (when (remf (receivers source) key)
       (setf (receivers source) (delete receiver (receivers source)))
       (notify-invalid receiver))))
-
+)
 (defgeneric connectedp (receiver local-slot))
 
 (defmethod connectedp ((receiver compute-object) local-slot)
   (let ((cell (slot-value receiver local-slot)))
-    (not (null (cdr cell)))))
+    (typecase cell
+      (computed-value
+       (not (null (receivers cell))))
+      (input-value
+       (not (local-value-p cell)))
+      (t nil))))
 
-(defmethod invalidate ((obj compute-object))
+(defmethod invalidate ((obj compute-object) slot-name)
   (let ((computed-slots (computed-slots (class-of obj))))
     (loop
        for slot in computed-slots
-       do (slot-makunbound obj slot))
-    (mapc #'notify-invalid (receivers obj))))
+       for computed-value = (slot-value obj slot)
+       do (progn
+            (slot-makunbound computed-value 'cached-value)
+            (loop
+               for connection in (receivers computed-value)
+               do (notify-invalid (receiver connection) (receiver-slot connection)))))))
 
 ;;; Apparently we need to make sure the method classes are finalized before we start creating
 ;;; method objects.
